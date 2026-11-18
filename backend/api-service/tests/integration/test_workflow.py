@@ -2,7 +2,7 @@
 
 import pytest
 
-from tests.integration.conftest import AC, BADGE, CHAIR, DOCK, LIGHTS, TAP, USERS, WIFI
+from tests.integration.conftest import AC, BADGE, CHAIR, DOCK, LIGHTS, TAP, USERS, WIFI, unread
 
 
 def status(client, headers, incident_id, new, **extra):
@@ -89,6 +89,53 @@ def test_reassign_records_history(client, as_):
 
 def test_busy_engineer_can_still_be_assigned(client, as_):
     assert assign(client, as_("alice"), WIFI, "priya").status_code == 200
+
+
+def set_capacity(client, headers, engineer, spare):
+    """Set the engineer's limit to their active tickets + spare; returns the active count."""
+    eid = USERS[engineer][0]
+    active = client.get(f"/engineers/{eid}", headers=headers).json()["active_tickets"]
+    assert active >= 1  # seed: Tom works DOCK
+    r = client.patch(f"/engineers/{eid}", headers=headers, json={"max_active_tickets": active + spare})
+    assert r.status_code == 200
+    return active
+
+
+def test_assign_rejects_engineer_at_full_capacity(client, as_):
+    admin, tom = as_("alice"), as_("tom")
+    active = set_capacity(client, admin, "tom", 0)
+    before = unread(client, tom)
+    r = assign(client, admin, WIFI, "tom")
+    assert r.status_code == 409
+    assert r.json()["message"] == (
+        f"Tom Tech is at full capacity ({active}/{active} active tickets). "
+        "Choose another engineer, or raise their limit on the Engineers page."
+    )
+    d = client.get(f"/incidents/{WIFI}", headers=admin).json()
+    assert d["status"] == "open" and d["assigned_engineer"] is None
+    assert unread(client, tom) == before  # nothing was saved, so nobody was notified
+
+
+def test_assign_fills_last_slot_then_blocks(client, as_, new_incident):
+    admin = as_("alice")
+    set_capacity(client, admin, "tom", 1)
+    assert assign(client, admin, WIFI, "tom").status_code == 200
+    assert client.get(f"/engineers/{USERS['tom'][0]}", headers=admin).json()["remaining_capacity"] == 0
+    assert assign(client, admin, new_incident()["id"], "tom").status_code == 409
+
+
+def test_reassigning_same_engineer_at_capacity_is_allowed(client, as_):
+    admin = as_("alice")
+    set_capacity(client, admin, "tom", 0)
+    assert assign(client, admin, DOCK, "tom").status_code == 200
+
+
+def test_finished_ticket_frees_capacity(client, as_):
+    admin = as_("alice")
+    set_capacity(client, admin, "tom", 0)
+    assert assign(client, admin, WIFI, "tom").status_code == 409
+    assert status(client, admin, DOCK, "cancelled").status_code == 200
+    assert assign(client, admin, WIFI, "tom").status_code == 200
 
 
 @pytest.mark.parametrize("engineer_id, message", [

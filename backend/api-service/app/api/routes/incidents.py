@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
@@ -191,7 +191,9 @@ def assign_engineer(incident_id: int, body: AssignIn, db: DbSession, user: Admin
     inc = svc.get_incident_or_404(db, incident_id, user)
     if inc.status in (S.CLOSED, S.CANCELLED):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Closed or cancelled incidents can't be assigned.")
-    profile = db.get(EngineerProfile, body.engineer_id)
+    # Lock the engineer's profile row until commit, so two admins assigning at
+    # the same moment can't both take the engineer's last free slot.
+    profile = db.get(EngineerProfile, body.engineer_id, with_for_update=True)
     engineer = db.get(User, body.engineer_id)
     if profile is None or engineer is None or not engineer.is_active:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That engineer doesn't exist or is inactive.")
@@ -200,6 +202,9 @@ def assign_engineer(incident_id: int, body: AssignIn, db: DbSession, user: Admin
             status.HTTP_400_BAD_REQUEST,
             f"{engineer.full_name} is {profile.availability.value.replace('_', ' ')} and can't take new tickets.",
         )
+
+    if inc.assigned_engineer_id != engineer.id:
+        _check_capacity(db, engineer)
 
     previous_id = inc.assigned_engineer_id
     inc.assigned_engineer_id = profile.user_id
@@ -211,6 +216,20 @@ def assign_engineer(incident_id: int, body: AssignIn, db: DbSession, user: Admin
         notify.assigned(db, inc, user, engineer, previous_id)
     _commit(db)
     return _reload(db, incident_id, user)
+
+
+def _check_capacity(db, engineer: User) -> None:
+    """Refuse a new ticket for an engineer already at max_active_tickets."""
+    load = db.execute(
+        text("SELECT active_tickets, max_active_tickets FROM engineer_workload WHERE engineer_id = :id"),
+        {"id": engineer.id},
+    ).one()
+    if load.active_tickets >= load.max_active_tickets:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{engineer.full_name} is at full capacity ({load.active_tickets}/{load.max_active_tickets} active tickets). "
+            "Choose another engineer, or raise their limit on the Engineers page.",
+        )
 
 
 @router.post("/{incident_id}/escalate", response_model=IncidentDetail)
