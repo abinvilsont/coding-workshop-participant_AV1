@@ -1,21 +1,46 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  Alert, Box, Button, Chip, LinearProgress, Link, Paper, Stack, Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { Section, StatCard, StatusBadge } from '../components/Badges';
 import IncidentTable from '../components/IncidentTable';
 import useAction from '../hooks/useAction';
+import { useIsCompact, useIsPhone } from '../hooks/useResponsive';
 import { setMyAvailability } from '../services/adminService';
 import { getDashboard } from '../services/incidentService';
 import { AVAILABILITY_LABELS, STATUS_LABELS, categoryLabel, sumCounts } from '../utils/format';
+
+const AVAILABILITY_COLORS = { available: 'success', busy: 'warning', on_leave: 'default', offline: 'default' };
+
+/** Row of stat cards: 2 per row on phones, all in one row on wider screens. */
+function StatGrid({ children, columns }) {
+  const isPhone = useIsPhone();
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gap: 2,
+        mb: 3,
+        gridTemplateColumns: isPhone ? 'repeat(2, minmax(0, 1fr))' : `repeat(${columns}, minmax(0, 1fr))`,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
 
 function EmployeeView({ data }) {
   const c = data.status_counts;
   return (
     <>
-      <div className="stat-grid">
+      <StatGrid columns={4}>
         <StatCard label="Waiting for engineer" value={sumCounts(c, ['open', 'assigned'])} tone="info" />
-        <StatCard label="Being worked on" value={sumCounts(c, ['in_progress', 'on_hold'])} tone="warn" />
-        <StatCard label="Resolved" value={sumCounts(c, ['resolved', 'closed'])} tone="ok" />
+        <StatCard label="Being worked on" value={sumCounts(c, ['in_progress', 'on_hold'])} tone="warning" />
+        <StatCard label="Resolved" value={sumCounts(c, ['resolved', 'closed'])} tone="success" />
         <StatCard label="Total reported" value={sumCounts(c, Object.keys(STATUS_LABELS))} />
-      </div>
+      </StatGrid>
       <Section title="My incidents">
         <IncidentTable
           incidents={data.incidents}
@@ -37,30 +62,34 @@ const AVAILABILITY_HINTS = {
 function AvailabilitySwitch({ value, onChanged }) {
   const { run, busy, error } = useAction();
   return (
-    <section className="panel availability-panel" aria-labelledby="avail-label">
-      <div className="availability-row">
-        <div>
-          <h2 id="avail-label">My availability</h2>
-          <p className="muted small">{AVAILABILITY_HINTS[value]}</p>
-        </div>
-        <div className="segmented" role="radiogroup" aria-labelledby="avail-label">
-          {Object.entries(AVAILABILITY_LABELS).map(([v, label]) => (
-            <button
-              key={v}
-              type="button"
-              role="radio"
-              aria-checked={v === value}
-              className={`seg seg-${v} ${v === value ? 'on' : ''}`}
-              disabled={busy}
-              onClick={() => v !== value && run(() => setMyAvailability(v)).then((ok) => ok && onChanged())}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-    </section>
+    <Paper component="section" variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }} aria-labelledby="avail-label">
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { md: 'center' } }}>
+        <Box>
+          <Typography variant="h2" component="h2" id="avail-label">My availability</Typography>
+          <Typography variant="body2" color="text.secondary">{AVAILABILITY_HINTS[value]}</Typography>
+        </Box>
+        <Stack direction="row" role="radiogroup" aria-labelledby="avail-label" sx={{ flexWrap: 'wrap', gap: 1 }}>
+          {Object.entries(AVAILABILITY_LABELS).map(([v, label]) => {
+            const on = v === value;
+            return (
+              <Button
+                key={v}
+                role="radio"
+                aria-checked={on}
+                size="small"
+                variant={on ? 'contained' : 'outlined'}
+                color={on && AVAILABILITY_COLORS[v] !== 'default' ? AVAILABILITY_COLORS[v] : 'inherit'}
+                disabled={busy}
+                onClick={() => !on && run(() => setMyAvailability(v)).then((ok) => ok && onChanged())}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </Stack>
+      </Stack>
+      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+    </Paper>
   );
 }
 
@@ -70,21 +99,21 @@ function EngineerView({ data, reload }) {
   return (
     <>
       {p && <AvailabilitySwitch value={p.availability} onChanged={reload} />}
-      <div className="stat-grid">
+      <StatGrid columns={4}>
         <StatCard label="New assignments" value={c.assigned ?? 0} tone="info" />
-        <StatCard label="In progress" value={c.in_progress ?? 0} tone="warn" />
+        <StatCard label="In progress" value={c.in_progress ?? 0} tone="warning" />
         <StatCard label="On hold" value={c.on_hold ?? 0} />
         <StatCard
           label="Capacity"
           value={p ? `${p.active_tickets}/${p.max_active_tickets}` : '–'}
-          tone={p && p.remaining_capacity <= 0 ? 'danger' : 'ok'}
+          tone={p && p.remaining_capacity <= 0 ? 'danger' : 'success'}
           hint={
             p
               ? `${AVAILABILITY_LABELS[p.availability]} · ${p.specializations.map(categoryLabel).join(', ')}`
               : 'No engineer profile'
           }
         />
-      </div>
+      </StatGrid>
       <Section title="My tickets">
         <IncidentTable
           incidents={data.incidents}
@@ -96,23 +125,61 @@ function EngineerView({ data, reload }) {
   );
 }
 
+function Workload({ engineers }) {
+  if (!engineers.length) {
+    return <Typography color="text.secondary">No engineer profiles yet.</Typography>;
+  }
+  return (
+    <Stack component="ul" spacing={2} sx={{ listStyle: 'none', p: 0, m: 0 }}>
+      {engineers.map((e) => {
+        const pct = Math.min(100, Math.round((e.active_tickets / e.max_active_tickets) * 100));
+        return (
+          <li key={e.id}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography sx={{ fontWeight: 600 }}>{e.name}</Typography>
+              <Chip
+                size="small"
+                label={AVAILABILITY_LABELS[e.availability]}
+                color={AVAILABILITY_COLORS[e.availability]}
+                variant={e.availability === 'available' ? 'filled' : 'outlined'}
+              />
+            </Stack>
+            <Typography variant="body2" color="text.secondary">{e.specializations.map(categoryLabel).join(', ')}</Typography>
+            <LinearProgress
+              variant="determinate"
+              value={pct}
+              color={pct >= 100 ? 'error' : 'primary'}
+              aria-label={`${e.active_tickets} of ${e.max_active_tickets} tickets`}
+              sx={{ height: 8, borderRadius: 4, my: 0.75 }}
+            />
+            <Typography variant="body2" color="text.secondary">
+              {e.active_tickets} of {e.max_active_tickets} active tickets
+            </Typography>
+          </li>
+        );
+      })}
+    </Stack>
+  );
+}
+
 function AdminView({ data }) {
+  const compact = useIsCompact();
   const c = data.status_counts;
   const a = data.attention;
   const f = data.facilities;
   return (
     <>
-      <div className="stat-grid">
-        <StatCard label="Unassigned" value={a.unassigned} tone={a.unassigned ? 'danger' : 'ok'} />
-        <StatCard label="Escalated" value={a.escalated} tone={a.escalated ? 'danger' : 'ok'} />
+      <StatGrid columns={5}>
+        <StatCard label="Unassigned" value={a.unassigned} tone={a.unassigned ? 'danger' : 'success'} />
+        <StatCard label="Escalated" value={a.escalated} tone={a.escalated ? 'danger' : 'success'} />
         <StatCard
           label="Priority requests"
           value={a.priority_requests}
-          tone={a.priority_requests ? 'warn' : 'ok'}
+          tone={a.priority_requests ? 'warning' : 'success'}
         />
         <StatCard label="Awaiting closure" value={a.awaiting_closure} tone="info" />
         <StatCard label="Active tickets" value={sumCounts(c, ['assigned', 'in_progress', 'on_hold'])} />
-      </div>
+      </StatGrid>
 
       <Section title="Needs attention">
         <IncidentTable
@@ -122,55 +189,30 @@ function AdminView({ data }) {
         />
       </Section>
 
-      <div className="two-col">
+      <Box sx={{ display: 'grid', gridTemplateColumns: compact ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', columnGap: 3 }}>
         <Section title="Engineer workload">
-          {data.engineers.length ? (
-            <ul className="workload-list">
-              {data.engineers.map((e) => {
-                const pct = Math.min(100, Math.round((e.active_tickets / e.max_active_tickets) * 100));
-                return (
-                  <li key={e.id}>
-                    <div className="workload-head">
-                      <strong>{e.name}</strong>
-                      <span className={`badge avail-${e.availability}`}>
-                        {AVAILABILITY_LABELS[e.availability]}
-                      </span>
-                    </div>
-                    <div className="muted small">{e.specializations.map(categoryLabel).join(', ')}</div>
-                    <div className="meter" aria-label={`${e.active_tickets} of ${e.max_active_tickets} tickets`}>
-                      <div className={`meter-fill ${pct >= 100 ? 'full' : ''}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="muted small">
-                      {e.active_tickets} of {e.max_active_tickets} active tickets
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="empty">No engineer profiles yet.</p>
-          )}
+          <Workload engineers={data.engineers} />
         </Section>
 
         <Section title="Facilities">
-          <div className="facility-grid">
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 1.5, mb: 3 }}>
             <StatCard label="Buildings" value={f.buildings} />
             <StatCard label="Floors" value={f.floors} />
             <StatCard label="Seats" value={f.seats} />
-          </div>
-          <h3 className="sub-heading">Tickets by status</h3>
-          <ul className="status-breakdown">
+          </Box>
+          <Typography variant="h3" component="h3" sx={{ mb: 1 }}>Tickets by status</Typography>
+          <Stack component="ul" spacing={1} sx={{ listStyle: 'none', p: 0, m: 0 }}>
             {Object.keys(STATUS_LABELS).map((s) => (
-              <li key={s}>
+              <Stack component="li" key={s} direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <StatusBadge status={s} />
-                <span>{c[s] ?? 0}</span>
-              </li>
+                <Typography component="span" sx={{ fontWeight: 600 }}>{c[s] ?? 0}</Typography>
+              </Stack>
             ))}
-          </ul>
+          </Stack>
         </Section>
-      </div>
+      </Box>
 
-      <Section title="Recently updated" aside={<a href="#/incidents">View all →</a>}>
+      <Section title="Recently updated" aside={<Link href="#/incidents" underline="hover">View all →</Link>}>
         <IncidentTable
           incidents={data.incidents}
           columns={['reporter', 'engineer']}
@@ -194,42 +236,51 @@ export default function Dashboard({ user }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      setData(await getDashboard());
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // State is set in promise callbacks, so calling this from an effect is safe.
+  const fetchDashboard = useCallback(
+    () => getDashboard()
+      .then((d) => {
+        setData(d);
+        setError('');
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false)),
+    [],
+  );
 
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  const load = () => {
+    setLoading(true);
+    fetchDashboard();
+  };
 
   const View = VIEWS[user.role];
   const firstName = user.name?.split(' ')[0] ?? '';
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1>Hello, {firstName}</h1>
-          <p className="muted">{SUBTITLES[user.role]}</p>
-        </div>
-        <div className="heading-actions">
-          <button type="button" className="btn-secondary" onClick={load} disabled={loading}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-end' }, mb: 3 }}
+      >
+        <Box>
+          <Typography variant="h1" component="h1">Hello, {firstName}</Typography>
+          <Typography color="text.secondary">{SUBTITLES[user.role]}</Typography>
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" color="inherit" startIcon={<RefreshIcon />} onClick={load} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
-          </button>
-          <a className="btn-primary" href="#/incidents/new">Report incident</a>
-        </div>
-      </div>
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} href="#/incidents/new">Report incident</Button>
+        </Stack>
+      </Stack>
 
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-      {!data && loading && <p className="muted">Loading dashboard…</p>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!data && loading && <LinearProgress aria-label="Loading dashboard…" sx={{ mb: 2 }} />}
       {data && View && <View data={data} reload={load} />}
     </>
   );

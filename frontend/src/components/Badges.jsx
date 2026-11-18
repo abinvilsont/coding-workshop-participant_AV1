@@ -1,42 +1,73 @@
+import { useId } from 'react';
+import { Box, Card, CardContent, Chip, Paper, Stack, Typography } from '@mui/material';
+import { PRIORITY_COLORS, STATUS_COLORS, TONE_COLORS } from '../theme';
 import { STATUS_LABELS, titleCase } from '../utils/format';
 
+const chipSx = ([color, bgcolor]) => ({ color, bgcolor, height: 24 });
+
 export function StatusBadge({ status }) {
-  return <span className={`badge status-${status}`}>{STATUS_LABELS[status] ?? status}</span>;
+  return (
+    <Chip
+      size="small"
+      label={STATUS_LABELS[status] ?? status}
+      sx={{
+        ...chipSx(STATUS_COLORS[status] ?? STATUS_COLORS.closed),
+        textDecoration: status === 'cancelled' ? 'line-through' : 'none',
+      }}
+    />
+  );
 }
 
 export function PriorityBadge({ priority, requested }) {
   return (
-    <span className="priority-cell">
-      <span className={`badge priority-${priority}`}>{titleCase(priority)}</span>
+    <Stack direction="row" spacing={1} alignItems="center" component="span" sx={{ flexWrap: 'wrap' }}>
+      <Chip size="small" label={titleCase(priority)} sx={chipSx(PRIORITY_COLORS[priority] ?? PRIORITY_COLORS.low)} />
       {requested && requested !== priority && (
-        <span className="requested" title="Priority requested by employee">
+        <Typography component="span" variant="caption" color="warning.dark" title="Priority requested by employee">
           → {titleCase(requested)} requested
-        </span>
+        </Typography>
       )}
-    </span>
+    </Stack>
   );
+}
+
+export function EscalatedBadge() {
+  return <Chip size="small" color="error" label="Escalated" sx={{ height: 24 }} />;
 }
 
 export function StatCard({ label, value, tone = 'neutral', hint }) {
   return (
-    <div className={`stat-card tone-${tone}`}>
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {hint && <span className="stat-hint">{hint}</span>}
-    </div>
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+        <Typography variant="body2" color="text.secondary">{label}</Typography>
+        <Typography variant="h4" component="p" sx={{ fontWeight: 700, color: TONE_COLORS[tone] ?? tone }}>
+          {value}
+        </Typography>
+        {hint && <Typography variant="caption" color="text.secondary">{hint}</Typography>}
+      </CardContent>
+    </Card>
   );
 }
 
 export function Section({ title, children, aside }) {
+  const headingId = useId();
   return (
-    <section className="panel">
+    <Paper
+      component="section"
+      variant="outlined"
+      aria-labelledby={title ? headingId : undefined}
+      sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}
+    >
       {(title || aside) && (
-        <header className="panel-header">
-          {title && <h2>{title}</h2>}
+        <Box
+          component="header"
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}
+        >
+          {title && <Typography variant="h2" component="h2" id={headingId}>{title}</Typography>}
           {aside}
-        </header>
+        </Box>
       )}
       {children}
-    </section>
+    </Paper>
   );
 }

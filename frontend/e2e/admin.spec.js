@@ -8,7 +8,7 @@ test('admin defines a building, floor and seat, then removes them', async ({ bro
 
   await page.getByRole('button', { name: 'Add building' }).click();
   await page.getByLabel('Code').fill(code);
-  await page.getByLabel('Name', { exact: true }).fill(`E2E Test Building ${code}`);
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`E2E Test Building ${code}`);
   await page.getByRole('button', { name: 'Create building' }).click();
   await expect(page.getByRole('button', { name: new RegExp(code) })).toContainText('0 floors · 0 seats');
 
@@ -19,7 +19,7 @@ test('admin defines a building, floor and seat, then removes them', async ({ bro
 
   await page.getByLabel('New seat code').fill('4A-001');
   await page.getByRole('button', { name: 'Add seat' }).click();
-  await expect(page.getByRole('cell', { name: '4A-001' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '4A-001', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: new RegExp(code) })).toContainText('1 floor · 1 seat');
 
   // the new location is offered to employees when reporting
@@ -31,8 +31,8 @@ test('admin defines a building, floor and seat, then removes them', async ({ bro
 
   // unused items can be deleted (confirm dialogs are accepted by the helper)
   await page.getByRole('row', { name: /4A-001/ }).getByRole('button', { name: 'Delete' }).click();
-  await expect(page.getByRole('cell', { name: '4A-001' })).toHaveCount(0);
-  await page.locator('.panel-header').getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByRole('cell', { name: '4A-001', exact: true })).toHaveCount(0);
+  await page.getByRole('group', { name: 'Building actions' }).getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('button', { name: new RegExp(code) })).toHaveCount(0);
 });
 
@@ -40,7 +40,7 @@ test('admin cannot delete a building that incidents use', async ({ browser }) =>
   const page = await asUser(browser, ACCOUNTS.admin);
   await page.goto('/#/admin/facilities');
   await page.getByRole('button', { name: /HQ1 ACME Headquarters/ }).click();
-  await page.locator('.panel-header').getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('group', { name: 'Building actions' }).getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('alert')).toContainText('Deactivate it instead.');
 });
 

@@ -15,7 +15,8 @@ export async function signIn(page, email, password = PASSWORD) {
   await page.getByLabel('Work email').fill(email);
   await page.locator('input[autocomplete="current-password"]').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  // The dashboard greeting appears on every screen size (Sign out moves into the menu on phones)
+  await expect(page.getByRole('heading', { level: 1, name: /^Hello, / })).toBeVisible();
 }
 
 /** A fresh, signed-in page for one persona (separate browser context = separate session). */
@@ -35,5 +36,5 @@ export async function openNotification(page, text) {
   await page.getByRole('dialog', { name: 'Notifications' }).getByRole('button', { name: text }).first().click();
 }
 
-export const actions = (page, heading) =>
-  page.locator('.action-block').filter({ has: page.getByRole('heading', { name: heading }) });
+// An action block on the incident page: a <section> labelled by its heading
+export const actions = (page, heading) => page.getByRole('region', { name: heading, exact: true });

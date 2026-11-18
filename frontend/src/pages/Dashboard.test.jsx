@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ThemeProvider } from '@mui/material/styles';
 import { describe, expect, it } from 'vitest';
+import { theme } from '../theme';
 import { USERS, mockApi } from '../test/mockApi';
 import Dashboard from './Dashboard';
 
@@ -11,7 +13,10 @@ const ROW = {
   reported_by: 'Emma Employee', assigned_engineer: 'Ethan Electrics',
 };
 
-const stat = (label) => screen.getByText(label, { selector: '.stat-label' }).parentElement;
+// A stat card: its label paragraph's card, and the big number inside it
+const stat = (label) => screen.getAllByText(label, { selector: 'p' })
+  .map((el) => el.closest('.MuiCard-root')).find(Boolean);
+const statValue = (label) => within(stat(label)).getByText(/\S/, { selector: 'p.MuiTypography-h4' });
 
 describe('Dashboard', () => {
   it('employee: status summary and own incidents', async () => {
@@ -67,14 +72,18 @@ describe('Dashboard', () => {
         incidents: [ROW],
       },
     });
-    render(<Dashboard user={USERS.admin} />);
+    render(<ThemeProvider theme={theme}><Dashboard user={USERS.admin} /></ThemeProvider>);
 
     expect(await screen.findByRole('link', { name: 'Wi-Fi drops' })).toBeInTheDocument();
-    expect(stat('Unassigned')).toHaveClass('tone-danger');
+    expect(statValue('Unassigned')).toHaveStyle({ color: 'rgb(220, 38, 38)' }); // danger tone
+    expect(statValue('Escalated')).toHaveStyle({ color: 'rgb(220, 38, 38)' });
     expect(stat('Active tickets')).toHaveTextContent('3');
-    expect(screen.getByLabelText('5 of 5 tickets').firstChild).toHaveClass('full');
+    const meter = screen.getByRole('progressbar', { name: '5 of 5 tickets' });
+    expect(meter).toHaveAttribute('aria-valuenow', '100');
+    expect(meter).toHaveClass('MuiLinearProgress-colorError'); // full engineer shows red
     expect(stat('Seats')).toHaveTextContent('9');
-    expect(screen.getByText('Unassigned', { selector: '.muted' })).toBeInTheDocument();
+    const attention = screen.getByRole('region', { name: 'Needs attention' });
+    expect(within(attention).getByRole('row', { name: /Wi-Fi drops/ })).toHaveTextContent('Unassigned');
   });
 
   it('shows load errors and can refresh', async () => {

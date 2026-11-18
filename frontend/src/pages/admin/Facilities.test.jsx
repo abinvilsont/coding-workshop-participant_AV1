@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { Context as ResponsiveContext } from 'react-responsive';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FACILITIES, mockApi } from '../../test/mockApi';
@@ -84,7 +85,7 @@ describe('Facilities admin page', () => {
     expect(await screen.findByText('Floor 3')).toBeInTheDocument();
     expect(screen.getByLabelText('New floor number')).toHaveValue(null);
 
-    const floor3 = screen.getByText('Floor 3').closest('.floor-block');
+    const floor3 = screen.getByRole('region', { name: 'Floor 3' });
     await user.type(within(floor3).getByLabelText('New seat code'), '3-001');
     await user.click(within(floor3).getByRole('button', { name: 'Add seat' }));
     expect(await within(floor3).findByText('3-001')).toBeInTheDocument();
@@ -101,7 +102,7 @@ describe('Facilities admin page', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByRole('button', { name: /HQ1 HQ Renamed/ })).toBeInTheDocument();
 
-    const floor1 = screen.getByText('Floor 1').closest('.floor-block');
+    const floor1 = screen.getByRole('region', { name: 'Floor 1' });
     await user.click(within(floor1).getAllByRole('button', { name: 'Edit' })[0]);
     await user.clear(screen.getByLabelText('Floor name'));
     await user.type(screen.getByLabelText('Floor name'), 'Finance');
@@ -122,7 +123,7 @@ describe('Facilities admin page', () => {
     const seatRow = screen.getByText('1A-001').closest('tr');
     await user.click(within(seatRow).getByRole('button', { name: 'Deactivate' }));
     expect(await within(seatRow).findByText('Inactive')).toBeInTheDocument();
-    expect(screen.getByText('Floor 1').closest('.floor-block')).toHaveTextContent('0 active seats');
+    expect(screen.getByRole('region', { name: 'Floor 1' })).toHaveTextContent('0 active seats');
 
     await user.click(screen.getAllByRole('button', { name: 'Deactivate' }).at(0));
     expect(await screen.findByText(/Inactive buildings are hidden from the report form/)).toBeInTheDocument();
@@ -159,5 +160,19 @@ describe('Facilities admin page', () => {
     mockApi({ 'GET /facilities': { status: 500, body: { message: 'Something went wrong. Please try again.' } } });
     render(<Facilities />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+
+  it('lists seats without a table on a phone and still edits them', async () => {
+    const user = userEvent.setup();
+    render(<ResponsiveContext.Provider value={{ width: 390 }}><Facilities /></ResponsiveContext.Provider>);
+    await screen.findByRole('heading', { name: 'Buildings (2)' });
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const seats = within(screen.getByRole('region', { name: 'Floor 1' })).getByRole('list', { name: 'Seats' });
+    expect(seats).toHaveTextContent('1A-001');
+    await user.click(within(seats).getByRole('button', { name: 'Edit' }));
+    await user.clear(screen.getByLabelText('Description'));
+    await user.type(screen.getByLabelText('Description'), 'Window seat');
+    await user.click(within(seats).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Window seat')).toBeInTheDocument();
   });
 });

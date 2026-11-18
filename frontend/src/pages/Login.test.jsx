@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Context as ResponsiveContext } from 'react-responsive';
 import { describe, expect, it, vi } from 'vitest';
 import { USERS, mockApi } from '../test/mockApi';
 import Login from './Login';
@@ -105,5 +106,19 @@ describe('Login page', () => {
     expect(input).toHaveAttribute('type', 'password');
     await user.click(screen.getByRole('button', { name: 'Show password' }));
     expect(input).toHaveAttribute('type', 'text');
+  });
+
+  it('drops the side panel on a phone but keeps the brand', () => {
+    const { unmount } = render(<Login />);
+    expect(screen.getByText(/Resolve assigned tickets/)).toBeInTheDocument();
+    unmount();
+
+    render(
+      <ResponsiveContext.Provider value={{ width: 390 }}>
+        <Login />
+      </ResponsiveContext.Provider>,
+    );
+    expect(screen.getByRole('heading', { name: 'ACME Facility Desk' })).toBeInTheDocument();
+    expect(screen.queryByText(/Resolve assigned tickets/)).not.toBeInTheDocument();
   });
 });

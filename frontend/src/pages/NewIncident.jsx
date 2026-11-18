@@ -1,3 +1,4 @@
+import { Box, Link, Typography } from '@mui/material';
 import { Section } from '../components/Badges';
 import IncidentForm from '../components/IncidentForm';
 import { navigate } from '../router';
@@ -11,15 +12,13 @@ export default function NewIncident({ user }) {
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <a href="#/incidents" className="back-link">← Incidents</a>
-          <h1>Report an incident</h1>
-          <p className="muted">
-            Tell us what's wrong and where. A Facility Admin will assign an engineer.
-          </p>
-        </div>
-      </div>
+      <Box sx={{ mb: 3 }}>
+        <Link href="#/incidents" underline="hover" variant="body2">← Incidents</Link>
+        <Typography variant="h1" component="h1" sx={{ mt: 0.5 }}>Report an incident</Typography>
+        <Typography color="text.secondary">
+          Tell us what's wrong and where. A Facility Admin will assign an engineer.
+        </Typography>
+      </Box>
       <Section>
         <IncidentForm
           submitLabel="Submit incident"

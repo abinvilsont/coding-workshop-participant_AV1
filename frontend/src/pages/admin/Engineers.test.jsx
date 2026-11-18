@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react';
+import { Context as ResponsiveContext } from 'react-responsive';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { FACILITIES, mockApi } from '../../test/mockApi';
@@ -39,7 +40,7 @@ describe('Engineers admin page', () => {
     const row = (await screen.findByText('Ethan Electrics')).closest('tr');
     expect(row).toHaveTextContent('Electrical, HVAC');
     expect(row).toHaveTextContent('5 / 5');
-    expect(row.querySelector('.meter-fill')).toHaveClass('full');
+    expect(within(row).getByRole('progressbar', { name: 'Workload 5 of 5' })).toHaveAttribute('aria-valuenow', '100');
     expect(screen.getByRole('heading', { name: '1 engineer' })).toBeInTheDocument();
   });
 
@@ -131,5 +132,16 @@ describe('Engineers admin page', () => {
     mockApi({ 'GET /facilities': [], 'GET /engineers': [] });
     render(<Engineers />);
     expect(await screen.findByText('No engineers yet. Add the first one.')).toBeInTheDocument();
+  });
+
+  it('shows engineers as cards on a phone', async () => {
+    backend();
+    render(<ResponsiveContext.Provider value={{ width: 390 }}><Engineers /></ResponsiveContext.Provider>);
+    const list = await screen.findByRole('list', { name: 'Engineers' });
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const card = within(list).getByText('Ethan Electrics').closest('li');
+    expect(card).toHaveTextContent('Electrical, HVAC');
+    expect(within(card).getByRole('progressbar', { name: 'Workload 5 of 5' })).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 });

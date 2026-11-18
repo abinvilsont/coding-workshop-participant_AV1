@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  Alert, Box, Button, Card, CardContent, Checkbox, Chip, FormControl, FormControlLabel, FormGroup, FormLabel, Grid,
+  LinearProgress, Stack, Switch, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import { Section } from '../../components/Badges';
 import useAction from '../../hooks/useAction';
+import { useIsPhone } from '../../hooks/useResponsive';
 import { createEngineer, listEngineers, updateEngineer } from '../../services/adminService';
 import { getFacilities } from '../../services/incidentService';
 import { AVAILABILITY_LABELS, CATEGORIES, categoryLabel } from '../../utils/format';
@@ -79,95 +85,190 @@ function EngineerForm({ engineer, buildings, onSubmit, onCancel }) {
   };
 
   return (
-    <form className="form compact" onSubmit={submit} noValidate>
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-      <div className="field-row">
-        <label className="field">
-          <span>Full name</span>
-          <input id="eng-name" value={form.name} onChange={set('name')} maxLength={150} />
-        </label>
-        {isNew ? (
-          <label className="field">
-            <span>Work email</span>
-            <input id="eng-email" type="email" value={form.email} onChange={set('email')} placeholder="name@acme.inc" />
-          </label>
-        ) : (
-          <label className="field">
-            <span>Work email</span>
-            <input id="eng-email" value={engineer.email} disabled />
-          </label>
+    <Box component="form" onSubmit={submit} noValidate>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField id="eng-name" label="Full name" value={form.name} onChange={set('name')}
+            slotProps={{ htmlInput: { maxLength: 150 } }} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          {isNew ? (
+            <TextField id="eng-email" label="Work email" type="email" value={form.email} onChange={set('email')}
+              placeholder="name@acme.inc" />
+          ) : (
+            <TextField id="eng-email" label="Work email" value={engineer.email} disabled />
+          )}
+        </Grid>
+        {isNew && (
+          <Grid size={12}>
+            <TextField id="eng-password" label="Temporary password" type="text" value={form.password}
+              onChange={set('password')} autoComplete="off"
+              placeholder="At least 8 characters — share it with the engineer" />
+          </Grid>
         )}
-      </div>
-
-      {isNew && (
-        <label className="field">
-          <span>Temporary password</span>
-          <input id="eng-password" type="text" value={form.password} onChange={set('password')} placeholder="At least 8 characters — share it with the engineer" autoComplete="off" />
-        </label>
-      )}
-
-      <fieldset className="field-group">
-        <legend>Specialisations</legend>
-        <div className="chip-checks">
-          {CATEGORIES.map((c) => (
-            <label key={c} className={`chip-check ${form.specializations.includes(c) ? 'on' : ''}`}>
-              <input type="checkbox" checked={form.specializations.includes(c)} onChange={() => toggleSpec(c)} />
-              {categoryLabel(c)}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="field-row three">
-        <label className="field">
-          <span>Availability</span>
-          <select id="eng-availability" value={form.availability} onChange={set('availability')}>
+        <Grid size={12}>
+          <FormControl component="fieldset">
+            <FormLabel component="legend" sx={{ fontSize: 14, mb: 0.5 }}>Specialisations</FormLabel>
+            <FormGroup row>
+              {CATEGORIES.map((c) => (
+                <FormControlLabel
+                  key={c}
+                  label={categoryLabel(c)}
+                  control={<Checkbox size="small" checked={form.specializations.includes(c)} onChange={() => toggleSpec(c)} />}
+                  sx={{ width: { xs: '50%', sm: 'auto' }, mr: { sm: 2 } }}
+                />
+              ))}
+            </FormGroup>
+          </FormControl>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField id="eng-availability" label="Availability" select value={form.availability}
+            onChange={set('availability')} slotProps={{ select: { native: true } }}>
             {Object.entries(AVAILABILITY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-        </label>
-        <label className="field">
-          <span>Max active tickets</span>
-          <input id="eng-max" type="number" min={1} max={50} value={form.max_active_tickets} onChange={set('max_active_tickets')} />
-        </label>
-        <label className="field">
-          <span>Home building</span>
-          <select id="eng-home" value={form.home_building_id} onChange={set('home_building_id')}>
+          </TextField>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField id="eng-max" label="Max active tickets" type="number" value={form.max_active_tickets}
+            onChange={set('max_active_tickets')} slotProps={{ htmlInput: { min: 1, max: 50 } }} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 4 }}>
+          <TextField id="eng-home" label="Home building" select value={form.home_building_id}
+            onChange={set('home_building_id')}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}>
             <option value="">—</option>
             {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </label>
-      </div>
-
-      <div className="field-row">
-        <label className="field">
-          <span>Phone <em>(optional)</em></span>
-          <input id="eng-phone" value={form.phone} onChange={set('phone')} maxLength={30} />
-        </label>
-        <label className="field">
-          <span>Department <em>(optional)</em></span>
-          <input id="eng-dept" value={form.department} onChange={set('department')} maxLength={100} />
-        </label>
-      </div>
-
-      <label className="field">
-        <span>Notes <em>(optional)</em></span>
-        <textarea id="eng-notes" rows={2} value={form.notes} onChange={set('notes')} maxLength={2000} />
-      </label>
-
-      {!isNew && (
-        <label className="checkbox">
-          <input id="eng-active" type="checkbox" checked={form.is_active} onChange={set('is_active')} />
-          Account active (unticking signs them out; only possible with no active tickets)
-        </label>
-      )}
-
-      <div className="form-actions">
-        <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>Cancel</button>
-        <button type="submit" className="btn-primary" disabled={saving}>
+          </TextField>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField id="eng-phone" label="Phone (optional)" value={form.phone} onChange={set('phone')}
+            slotProps={{ htmlInput: { maxLength: 30 } }} />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <TextField id="eng-dept" label="Department (optional)" value={form.department} onChange={set('department')}
+            slotProps={{ htmlInput: { maxLength: 100 } }} />
+        </Grid>
+        <Grid size={12}>
+          <TextField id="eng-notes" label="Notes (optional)" multiline minRows={2} value={form.notes}
+            onChange={set('notes')} slotProps={{ htmlInput: { maxLength: 2000 } }} />
+        </Grid>
+        {!isNew && (
+          <Grid size={12}>
+            <FormControlLabel
+              control={<Checkbox id="eng-active" checked={form.is_active} onChange={set('is_active')} />}
+              label="Account active (unticking signs them out; only possible with no active tickets)"
+            />
+          </Grid>
+        )}
+      </Grid>
+      <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
+        <Button variant="outlined" color="inherit" onClick={onCancel} disabled={saving}>Cancel</Button>
+        <Button type="submit" variant="contained" disabled={saving}>
           {saving ? 'Saving…' : isNew ? 'Create engineer' : 'Save changes'}
-        </button>
-      </div>
-    </form>
+        </Button>
+      </Stack>
+    </Box>
+  );
+}
+
+const AVAILABILITY_COLORS = { available: 'success', busy: 'warning', on_leave: 'default', offline: 'default' };
+
+function AvailabilityChip({ availability }) {
+  return (
+    <Chip size="small" variant="outlined" color={AVAILABILITY_COLORS[availability] ?? 'default'}
+      label={AVAILABILITY_LABELS[availability]} />
+  );
+}
+
+function Workload({ engineer: e }) {
+  const pct = Math.min(100, Math.round((e.active_tickets / e.max_active_tickets) * 100));
+  return (
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 120 }}>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        color={pct >= 100 ? 'error' : 'primary'}
+        aria-label={`Workload ${e.active_tickets} of ${e.max_active_tickets}`}
+        sx={{ flexGrow: 1, height: 8, borderRadius: 4 }}
+      />
+      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+        {e.active_tickets} / {e.max_active_tickets}
+      </Typography>
+    </Stack>
+  );
+}
+
+const specs = (e) =>
+  e.specializations.length ? e.specializations.map(categoryLabel).join(', ') : <Typography component="span" color="text.secondary">—</Typography>;
+
+function NameCell({ engineer: e }) {
+  return (
+    <>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Typography sx={{ fontWeight: 700 }}>{e.name}</Typography>
+        {!e.is_active && <Chip label="Inactive" size="small" sx={{ height: 20, fontSize: 11 }} />}
+      </Stack>
+      <Typography variant="body2" color="text.secondary">{e.email}</Typography>
+    </>
+  );
+}
+
+function EngineerTable({ engineers, onEdit }) {
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Engineer</TableCell>
+            <TableCell>Specialisations</TableCell>
+            <TableCell>Availability</TableCell>
+            <TableCell>Workload</TableCell>
+            <TableCell>Home building</TableCell>
+            <TableCell aria-label="Actions" />
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {engineers.map((e) => (
+            <TableRow key={e.id} hover sx={{ opacity: e.is_active ? 1 : 0.6 }}>
+              <TableCell><NameCell engineer={e} /></TableCell>
+              <TableCell sx={{ fontSize: 13 }}>{specs(e)}</TableCell>
+              <TableCell><AvailabilityChip availability={e.availability} /></TableCell>
+              <TableCell><Workload engineer={e} /></TableCell>
+              <TableCell sx={{ fontSize: 13 }}>
+                {e.home_building ?? <Typography component="span" color="text.secondary">—</Typography>}
+              </TableCell>
+              <TableCell align="right">
+                <Button size="small" onClick={() => onEdit(e.id)}>Edit</Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+/** Phone: one card per engineer. */
+function EngineerCards({ engineers, onEdit }) {
+  return (
+    <Stack component="ul" spacing={1.5} aria-label="Engineers" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+      {engineers.map((e) => (
+        <Card key={e.id} component="li" sx={{ opacity: e.is_active ? 1 : 0.6 }}>
+          <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <Box sx={{ minWidth: 0 }}><NameCell engineer={e} /></Box>
+              <Button size="small" onClick={() => onEdit(e.id)}>Edit</Button>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ my: 1 }}>
+              <AvailabilityChip availability={e.availability} />
+              <Box sx={{ flexGrow: 1 }}><Workload engineer={e} /></Box>
+            </Stack>
+            <Typography variant="body2">{specs(e)}</Typography>
+            {e.home_building && <Typography variant="caption" color="text.secondary">{e.home_building}</Typography>}
+          </CardContent>
+        </Card>
+      ))}
+    </Stack>
   );
 }
 
@@ -178,6 +279,7 @@ export default function Engineers() {
   const [editing, setEditing] = useState(null); // null | 'new' | engineer id
   const [notice, setNotice] = useState('');
   const { run, error } = useAction();
+  const isPhone = useIsPhone();
 
   const load = useCallback(
     () => run(async () => setEngineers(await listEngineers(includeInactive))),
@@ -206,20 +308,27 @@ export default function Engineers() {
     await load();
   };
 
+  const edit = (id) => {
+    setEditing(id);
+    setNotice('');
+  };
+
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1>Engineers</h1>
-          <p className="muted">Engineer profiles, specialisations, availability and current workload.</p>
-        </div>
-        <button type="button" className="btn-primary" onClick={() => { setEditing('new'); setNotice(''); }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-start' }, mb: 3 }}>
+        <Box>
+          <Typography variant="h1">Engineers</Typography>
+          <Typography color="text.secondary">
+            Engineer profiles, specialisations, availability and current workload.
+          </Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0 }} onClick={() => edit('new')}>
           Add engineer
-        </button>
-      </div>
+        </Button>
+      </Stack>
 
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
-      {notice && <div className="alert alert-success" role="status">{notice}</div>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {notice && <Alert severity="success" role="status" sx={{ mb: 2 }}>{notice}</Alert>}
 
       {editing !== null && (editing === 'new' || current) && (
         <Section title={editing === 'new' ? 'New engineer' : `Edit ${current.name}`}>
@@ -236,59 +345,20 @@ export default function Engineers() {
       <Section
         title={engineers ? `${engineers.length} engineer${engineers.length === 1 ? '' : 's'}` : 'Engineers'}
         aside={
-          <label className="checkbox">
-            <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
-            Show inactive
-          </label>
+          <FormControlLabel
+            control={<Switch checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />}
+            label="Show inactive"
+          />
         }
       >
         {!engineers ? (
-          <p className="muted">Loading engineers…</p>
+          <Typography color="text.secondary">Loading engineers…</Typography>
         ) : engineers.length === 0 ? (
-          <p className="empty">No engineers yet. Add the first one.</p>
+          <Typography color="text.secondary">No engineers yet. Add the first one.</Typography>
+        ) : isPhone ? (
+          <EngineerCards engineers={engineers} onEdit={edit} />
         ) : (
-          <div className="table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Engineer</th>
-                  <th>Specialisations</th>
-                  <th>Availability</th>
-                  <th>Workload</th>
-                  <th>Home building</th>
-                  <th aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {engineers.map((e) => {
-                  const pct = Math.min(100, Math.round((e.active_tickets / e.max_active_tickets) * 100));
-                  return (
-                    <tr key={e.id} className={e.is_active ? '' : 'is-inactive'}>
-                      <td>
-                        <strong>{e.name}</strong>
-                        {!e.is_active && <span className="badge tag-inactive">Inactive</span>}
-                        <div className="muted small">{e.email}</div>
-                      </td>
-                      <td className="small">
-                        {e.specializations.length ? e.specializations.map(categoryLabel).join(', ') : <span className="muted">—</span>}
-                      </td>
-                      <td><span className={`badge avail-${e.availability}`}>{AVAILABILITY_LABELS[e.availability]}</span></td>
-                      <td className="workload-cell">
-                        <div className="meter"><div className={`meter-fill ${pct >= 100 ? 'full' : ''}`} style={{ width: `${pct}%` }} /></div>
-                        <span className="small muted">{e.active_tickets} / {e.max_active_tickets}</span>
-                      </td>
-                      <td className="small">{e.home_building ?? <span className="muted">—</span>}</td>
-                      <td className="row-actions">
-                        <button type="button" className="btn-link strong" onClick={() => { setEditing(e.id); setNotice(''); }}>
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <EngineerTable engineers={engineers} onEdit={edit} />
         )}
       </Section>
     </>

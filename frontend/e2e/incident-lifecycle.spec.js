@@ -24,36 +24,36 @@ test('incident lifecycle across employee, admin and engineer', async ({ browser 
   await employee.getByRole('button', { name: 'Submit incident' }).click();
 
   await expect(employee.getByRole('heading', { name: title })).toBeVisible();
-  await expect(employee.locator('.badge-row')).toContainText('Open');
+  await expect(employee.getByTestId('incident-badges')).toContainText('Open');
   const incidentUrl = employee.url();
 
   // ...and escalates it, asking for High priority
   await employee.getByRole('button', { name: /Escalate \/ request/ }).click();
   await employee.getByPlaceholder('Why is this urgent?').fill('Client presentation at 2pm.');
-  await employee.locator('.action-block select').selectOption('high');
+  await actions(employee, 'Escalate incident').locator('select').selectOption('high');
   await employee.getByRole('button', { name: 'Escalate', exact: true }).click();
   await expect(employee.getByText('Escalation reason')).toBeVisible();
   await expect(employee.getByText('→ High requested')).toBeVisible();
 
   // --- Admin is notified, approves the priority and assigns Tom ----------------------
   const admin = await asUser(browser, ACCOUNTS.admin);
-  const needsAttention = admin.locator('section.panel').filter({ has: admin.getByRole('heading', { name: 'Needs attention' }) });
+  const needsAttention = admin.getByRole('region', { name: 'Needs attention' });
   await expect(needsAttention.getByRole('row', { name: new RegExp(title.replace(/[[\]]/g, '\\$&')) })).toContainText('Escalated');
   await openNotification(admin, new RegExp(`reported INC-\\d+: \\[e2e\\] Projector flickering`));
   await expect(admin).toHaveURL(incidentUrl);
 
   await expect(admin.getByText('Employee requested High.')).toBeVisible();
   await admin.getByRole('button', { name: 'Set priority' }).click();
-  await expect(admin.locator('.badge-row')).toContainText('High');
+  await expect(admin.getByTestId('incident-badges')).toContainText('High');
   await admin.getByRole('button', { name: 'Clear escalation' }).click();
-  await expect(admin.locator('.badge-row')).not.toContainText('Escalated');
+  await expect(admin.getByTestId('incident-badges')).not.toContainText('Escalated');
 
   const assign = actions(admin, 'Assign engineer').locator('select');
   const tomId = await assign.locator('option', { hasText: 'Tom Tech' }).getAttribute('value');
   await assign.selectOption(tomId);
   await admin.getByRole('button', { name: 'Assign', exact: true }).click();
-  await expect(admin.locator('.details')).toContainText('Tom Tech');
-  await expect(admin.locator('.badge-row')).toContainText('Assigned');
+  await expect(admin.getByTestId('incident-details')).toContainText('Tom Tech');
+  await expect(admin.getByTestId('incident-badges')).toContainText('Assigned');
 
   // --- Engineer gets the assignment, works it and resolves --------------------------
   const engineer = await asUser(browser, ACCOUNTS.engineer);
@@ -62,7 +62,7 @@ test('incident lifecycle across employee, admin and engineer', async ({ browser 
   await expect(engineer.getByRole('button', { name: 'Delete incident' })).toHaveCount(0);
 
   await engineer.getByRole('button', { name: 'Start work' }).click();
-  await expect(engineer.locator('.badge-row')).toContainText('In progress');
+  await expect(engineer.getByTestId('incident-badges')).toContainText('In progress');
 
   await engineer.getByPlaceholder('Write a note…').fill('Lamp module is failing, swapping it now.');
   await engineer.getByRole('button', { name: 'Add note' }).click();
@@ -74,7 +74,7 @@ test('incident lifecycle across employee, admin and engineer', async ({ browser 
 
   await engineer.getByPlaceholder(/Optional comment/).fill('New lamp fitted and tested.');
   await engineer.getByRole('button', { name: 'Mark resolved' }).click();
-  await expect(engineer.locator('.badge-row')).toContainText('Resolved');
+  await expect(engineer.getByTestId('incident-badges')).toContainText('Resolved');
 
   // --- Employee is asked to confirm, sees only public notes, and closes -------------
   await employee.goto('/');
@@ -83,7 +83,7 @@ test('incident lifecycle across employee, admin and engineer', async ({ browser 
   await expect(employee.getByText('Spare lamp taken from store room B.')).toHaveCount(0); // internal
   await employee.getByRole('button', { name: 'Confirm fixed & close' }).click();
 
-  await expect(employee.locator('.badge-row')).toContainText('Closed');
+  await expect(employee.getByTestId('incident-badges')).toContainText('Closed');
   await expect(employee.getByText('Notes are closed for this incident.')).toBeVisible();
   await expect(employee.getByText('Changed status: Resolved → Closed')).toBeVisible();
   await expect(employee.getByText('Changed priority: Medium → High')).toBeVisible();

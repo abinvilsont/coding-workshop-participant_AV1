@@ -18,8 +18,9 @@ function setup(inc, extraRoutes = {}) {
     [`GET /incidents/${inc.id}`]: inc,
     'POST /notifications/read-all': { unread_count: 0 },
     'GET /engineers': [
-      { id: 2, name: 'Ethan Electrics', availability: 'available', active_tickets: 1, max_active_tickets: 5, specializations: ['hvac'] },
-      { id: 4, name: 'Tom Tech', availability: 'busy', active_tickets: 2, max_active_tickets: 6, specializations: [] },
+      { id: 2, name: 'Ethan Electrics', availability: 'available', active_tickets: 1, max_active_tickets: 5, remaining_capacity: 4, specializations: ['hvac'] },
+      { id: 4, name: 'Tom Tech', availability: 'busy', active_tickets: 2, max_active_tickets: 6, remaining_capacity: 4, specializations: [] },
+      { id: 3, name: 'Priya Plumbing', availability: 'available', active_tickets: 4, max_active_tickets: 4, remaining_capacity: 0, specializations: [] },
     ],
     ...extraRoutes,
   });
@@ -77,7 +78,7 @@ describe('IncidentDetail', () => {
     await user.click(screen.getByRole('button', { name: 'Mark resolved' }));
 
     expect(api.calls.at(-1).body).toEqual({ status: 'resolved', comment: 'Fixed the compressor' });
-    expect(await screen.findByText('Resolved', { selector: '.badge' })).toBeInTheDocument();
+    expect(await within(screen.getByTestId('incident-badges')).findByText('Resolved')).toBeInTheDocument();
   });
 
   it('asks before cancelling', async () => {
@@ -140,7 +141,7 @@ describe('IncidentDetail', () => {
     render(<IncidentDetail id={4} user={USERS.admin} />);
 
     expect(await screen.findByText(/Employee requested/)).toHaveTextContent('Employee requested High.');
-    const assignBlock = screen.getByRole('heading', { name: 'Assign engineer' }).closest('.action-block');
+    const assignBlock = screen.getByRole('heading', { name: 'Assign engineer' }).closest('section');
     await within(assignBlock).findByRole('option', { name: /Tom Tech/ });
     await user.selectOptions(within(assignBlock).getByRole('combobox'), '4');
     await user.click(screen.getByRole('button', { name: 'Assign' }));
@@ -149,6 +150,43 @@ describe('IncidentDetail', () => {
 
     await user.click(screen.getByRole('button', { name: 'Set priority' }));
     expect(api.calls.at(-1).body).toEqual({ priority: 'high' });
+  });
+
+  it('marks engineers at full capacity and stops them being picked', async () => {
+    const perms = { can_assign: true };
+    setup(incident({ assigned_engineer_id: null, assigned_engineer: null, status: 'open', permissions: perms }));
+    render(<IncidentDetail id={4} user={USERS.admin} />);
+
+    const assignBlock = (await screen.findByRole('heading', { name: 'Assign engineer' })).closest('section');
+    const full = await within(assignBlock).findByRole('option', { name: /Priya Plumbing/ });
+    expect(full).toHaveTextContent('4/4 (full)');
+    expect(full).toBeDisabled();
+    expect(within(assignBlock).getByRole('option', { name: /Tom Tech/ })).toBeEnabled();
+  });
+
+  it('keeps the current engineer selectable even when they are full', async () => {
+    const perms = { can_assign: true };
+    setup(incident({ assigned_engineer_id: 3, assigned_engineer: 'Priya Plumbing', status: 'assigned', permissions: perms }));
+    render(<IncidentDetail id={4} user={USERS.admin} />);
+
+    const assignBlock = (await screen.findByRole('heading', { name: 'Reassign engineer' })).closest('section');
+    expect(await within(assignBlock).findByRole('option', { name: /Priya Plumbing/ })).toBeEnabled();
+  });
+
+  it('shows the capacity error if the engineer filled up meanwhile', async () => {
+    const user = userEvent.setup();
+    const perms = { can_assign: true };
+    const message = 'Tom Tech is at full capacity (6/6 active tickets). Choose another engineer, or raise their limit on the Engineers page.';
+    setup(incident({ assigned_engineer_id: null, assigned_engineer: null, status: 'open', permissions: perms }), {
+      'POST /incidents/4/assign': { status: 409, body: { message } },
+    });
+    render(<IncidentDetail id={4} user={USERS.admin} />);
+
+    const assignBlock = (await screen.findByRole('heading', { name: 'Assign engineer' })).closest('section');
+    await within(assignBlock).findByRole('option', { name: /Tom Tech/ });
+    await user.selectOptions(within(assignBlock).getByRole('combobox'), '4');
+    await user.click(screen.getByRole('button', { name: 'Assign' }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
   });
 
   it('edits details in place', async () => {

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Badge, Box, Button, Divider, IconButton, List, ListItem, ListItemButton, Paper, Stack, Typography,
+} from '@mui/material';
+import NotificationsNoneOutlined from '@mui/icons-material/NotificationsNoneOutlined';
+import { useIsPhone } from '../hooks/useResponsive';
 import { navigate } from '../router';
 import {
   NOTIFICATIONS_CHANGED, getUnreadCount, listNotifications, markAllRead, markRead,
@@ -7,7 +12,12 @@ import { formatDateTime, timeAgo } from '../utils/format';
 
 const POLL_MS = 30000;
 
+function Empty({ children }) {
+  return <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{children}</Typography>;
+}
+
 export default function NotificationBell({ path }) {
+  const isPhone = useIsPhone();
   const [count, setCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState(null);
@@ -45,9 +55,15 @@ export default function NotificationBell({ path }) {
     };
   }, [refreshCount, loadList, open]);
 
+  // Navigating closes the panel (adjusting state during render, not in an effect)
+  const [shownPath, setShownPath] = useState(path);
+  if (path !== shownPath) {
+    setShownPath(path);
+    setOpen(false);
+  }
+
   useEffect(() => {
     refreshCount();
-    setOpen(false);
   }, [path, refreshCount]);
 
   // Close on outside click or Escape
@@ -86,65 +102,79 @@ export default function NotificationBell({ path }) {
 
   const label = count ? `Notifications, ${count} unread` : 'Notifications';
 
+  // Phone: panel spans the screen under the app bar; desktop: drops down from the bell
+  const panelPosition = isPhone
+    ? { position: 'fixed', top: 56, left: 8, right: 8 }
+    : { position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: 380 };
+
   return (
-    <div className="bell" ref={rootRef}>
-      <button
-        type="button"
-        className={`bell-button ${open ? 'open' : ''}`}
+    <Box ref={rootRef} sx={{ position: 'relative' }}>
+      <IconButton
         onClick={toggle}
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="true"
         title={label}
+        color={open ? 'primary' : 'default'}
       >
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path
-            d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.5 15.5a2.5 2.5 0 0 0 5 0"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        {count > 0 && <span className="bell-count">{count > 99 ? '99+' : count}</span>}
-      </button>
+        <Badge badgeContent={count} max={99} color="error">
+          <NotificationsNoneOutlined />
+        </Badge>
+      </IconButton>
 
       {open && (
-        <div className="bell-panel" role="dialog" aria-label="Notifications">
-          <div className="bell-head">
-            <strong>Notifications</strong>
-            <button type="button" className="btn-link" onClick={readAll} disabled={!count}>
-              Mark all as read
-            </button>
-          </div>
-          {error && <p className="bell-empty">{error}</p>}
-          {!error && items === null && <p className="bell-empty">Loading…</p>}
+        <Paper
+          role="dialog"
+          aria-label="Notifications"
+          elevation={8}
+          sx={{ ...panelPosition, zIndex: (t) => t.zIndex.modal, maxHeight: '70vh', display: 'flex', flexDirection: 'column' }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, py: 1 }}>
+            <Typography sx={{ fontWeight: 700 }}>Notifications</Typography>
+            <Button size="small" onClick={readAll} disabled={!count}>Mark all as read</Button>
+          </Stack>
+          <Divider />
+          {error && <Empty>{error}</Empty>}
+          {!error && items === null && <Empty>Loading…</Empty>}
           {!error && items?.length === 0 && (
-            <p className="bell-empty">You're all caught up. Updates about your incidents will appear here.</p>
+            <Empty>You're all caught up. Updates about your incidents will appear here.</Empty>
           )}
           {items?.length > 0 && (
-            <ul className="bell-list">
+            <List disablePadding sx={{ overflowY: 'auto' }}>
               {items.map((n) => (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    className={`bell-item ${n.is_read ? '' : 'unread'}`}
+                <ListItem key={n.id} disablePadding divider>
+                  <ListItemButton
+                    component="button"
                     onClick={() => openItem(n)}
                     disabled={!n.incident_id && n.is_read}
+                    sx={{
+                      alignItems: 'flex-start', gap: 1.5, width: '100%', textAlign: 'left',
+                      bgcolor: n.is_read ? 'transparent' : 'action.hover',
+                    }}
                   >
-                    {!n.is_read && <span className="unread-dot" aria-label="Unread" />}
-                    <span className="bell-text">
-                      <span className="bell-message">{n.message}</span>
-                      <span className="bell-time" title={formatDateTime(n.created_at)}>{timeAgo(n.created_at)}</span>
-                    </span>
-                  </button>
-                </li>
+                    <Box
+                      component="span"
+                      aria-label={n.is_read ? undefined : 'Unread'}
+                      sx={{
+                        mt: 0.75, flex: '0 0 8px', width: 8, height: 8, borderRadius: '50%',
+                        bgcolor: n.is_read ? 'transparent' : 'primary.main',
+                      }}
+                    />
+                    <Box component="span" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <Typography component="span" variant="body2" sx={{ fontWeight: n.is_read ? 400 : 600 }}>
+                        {n.message}
+                      </Typography>
+                      <Typography component="span" variant="caption" color="text.secondary" title={formatDateTime(n.created_at)}>
+                        {timeAgo(n.created_at)}
+                      </Typography>
+                    </Box>
+                  </ListItemButton>
+                </ListItem>
               ))}
-            </ul>
+            </List>
           )}
-        </div>
+        </Paper>
       )}
-    </div>
+    </Box>
   );
 }

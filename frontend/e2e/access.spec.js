@@ -57,7 +57,9 @@ test('engineers only see their own tickets', async ({ browser }) => {
   const page = await asUser(browser, ACCOUNTS.engineer);
   await page.getByRole('link', { name: 'Incidents' }).click();
   await expect(page.getByRole('heading', { name: 'My tickets' })).toBeVisible();
-  const engineers = page.locator('.incident-table tbody tr');
+  const results = page.getByRole('region', { name: /^\d+ incidents?$/ });
+  await expect(results).toBeVisible();
+  const engineers = results.locator('tbody tr');
   for (const row of await engineers.all()) await expect(row).toContainText('Tom Tech');
 });
 

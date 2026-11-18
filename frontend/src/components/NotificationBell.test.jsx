@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Context as ResponsiveContext } from 'react-responsive';
 import { describe, expect, it, vi } from 'vitest';
 import { mockApi } from '../test/mockApi';
 import NotificationBell from './NotificationBell';
@@ -89,5 +90,20 @@ describe('NotificationBell', () => {
     await act(() => vi.advanceTimersByTimeAsync(30000));
     expect(await screen.findByRole('button', { name: 'Notifications, 3 unread' })).toBeInTheDocument();
     vi.useRealTimers();
+  });
+
+  it('opens full width on a phone', async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /notifications/unread-count': { unread_count: 0 },
+      'GET /notifications': { items: [], unread_count: 0 },
+    });
+    render(
+      <ResponsiveContext.Provider value={{ width: 390 }}>
+        <NotificationBell path="/" />
+      </ResponsiveContext.Provider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    expect(await screen.findByRole('dialog', { name: 'Notifications' })).toHaveStyle({ position: 'fixed', left: '8px', right: '8px' });
   });
 });

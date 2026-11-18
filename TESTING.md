@@ -28,8 +28,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 198 | all pass, ~6 s | **99 %** of `app/` (1186 statements, 9 missed) |
-| Frontend (Vitest) | 80 | all pass, ~6 s | **99 %** lines, 93 % branches, 89 % functions |
+| Backend (pytest) | 202 | all pass, ~6 s | **99 %** of `app/` (1192 statements, 9 missed) |
+| Frontend (Vitest) | 92 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 12 | all pass, ~30 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -65,7 +65,7 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 |---|---|
 | `test_auth.py` | register (incl. ignoring a forged `role`), duplicates, login, generic login errors, disabled accounts, missing/invalid/expired tokens, deactivated users |
 | `test_incidents.py` | CRUD per role, visibility, filters, search, pagination, location validation, inactive buildings, edit rules, priority rules, delete with cascade |
-| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer), escalation rules, notes and internal-note visibility |
+| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer / at full capacity, last slot, freed slot), escalation rules, notes and internal-note visibility |
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
@@ -73,19 +73,20 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 
 ### Frontend: `frontend/src/**/*.test.{js,jsx}`
 
-These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so they run offline.
+These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so they run offline. Phone layouts are tested by wrapping a component in React Responsive's `Context` with a 390 px width.
 
 | Area | Covers |
 |---|---|
 | `services/` | auth header, query strings, 204, error messages, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
 | `Login` | sign in, client-side validation, server errors, loading state, registration, show password |
 | `IncidentForm` | required fields, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
-| `IncidentDetail` | role-based actions shown/hidden, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
+| `IncidentDetail` | role-based actions shown/hidden, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
 | `IncidentList` | filters and search sent to the API, role headings, paging, errors |
 | `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation, conflict messages, inactive toggle |
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
+| `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive), table vs phone cards |
 
 ### End-to-end: `frontend/e2e/`
 
@@ -96,7 +97,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `incident-lifecycle.spec.js` | the full flow below, with each hand-off reached through the notification bell |
 | `access.spec.js` | registration (domain check, duplicate), wrong password, employee blocked from admin pages, engineer sees only own tickets, "cannot reach the server" message |
 | `admin.spec.js` | admin builds a building/floor/seat, the employee can pick it, then it is deleted; building in use cannot be deleted; admin creates an engineer who signs in and sets availability |
-| `responsive.spec.js` | every role's main pages have no horizontal scroll on a phone (Pixel 7) |
+| `responsive.spec.js` | every role's main pages have no horizontal scroll on a phone (Pixel 7), using the phone menu layout |
 
 The full lifecycle in `incident-lifecycle.spec.js`:
 1. The employee reports an incident and escalates it.

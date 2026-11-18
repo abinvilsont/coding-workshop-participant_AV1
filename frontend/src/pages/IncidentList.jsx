@@ -1,6 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Alert, Box, Button, Checkbox, FormControlLabel, InputAdornment, Stack, TextField, Typography,
+} from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import { Section } from '../components/Badges';
 import IncidentTable from '../components/IncidentTable';
+import { useIsPhone } from '../hooks/useResponsive';
 import { listIncidents } from '../services/incidentService';
 import { PRIORITIES, STATUS_LABELS, titleCase } from '../utils/format';
 
@@ -12,13 +18,16 @@ const HEADINGS = {
   facility_admin: ['All incidents', 'Every incident across all facilities.'],
 };
 
+const NATIVE = { select: { native: true }, inputLabel: { shrink: true } };
+
 export default function IncidentList({ user }) {
+  const isPhone = useIsPhone();
   const [filters, setFilters] = useState({ status: '', priority: '', q: '', escalated: false, unassigned: false });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  // The last finished request: which query it answered, and its result or error.
+  // Loading is derived: true until a response for the current query arrives.
+  const [response, setResponse] = useState({ query: null, result: null, error: '' });
 
   // Debounce the search box
   useEffect(() => {
@@ -29,26 +38,29 @@ export default function IncidentList({ user }) {
     return () => clearTimeout(t);
   }, [search]);
 
+  const query = useMemo(() => ({
+    status: filters.status || undefined,
+    priority: filters.priority || undefined,
+    q: filters.q.trim() || undefined,
+    escalated: filters.escalated || undefined,
+    unassigned: filters.unassigned || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  }), [filters, page]);
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError('');
-    listIncidents({
-      status: filters.status || undefined,
-      priority: filters.priority || undefined,
-      q: filters.q.trim() || undefined,
-      escalated: filters.escalated || undefined,
-      unassigned: filters.unassigned || undefined,
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-    })
-      .then((r) => !cancelled && setResult(r))
-      .catch((err) => !cancelled && setError(err.message))
-      .finally(() => !cancelled && setLoading(false));
+    listIncidents(query)
+      .then((r) => !cancelled && setResponse({ query, result: r, error: '' }))
+      .catch((err) => !cancelled && setResponse((prev) => ({ ...prev, query, error: err.message })));
     return () => {
       cancelled = true;
     };
-  }, [filters, page]);
+  }, [query]);
+
+  const loading = response.query !== query;
+  const result = response.result; // the previous page stays visible while the next one loads
+  const error = loading ? '' : response.error;
 
   const update = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -63,51 +75,72 @@ export default function IncidentList({ user }) {
 
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1>{title}</h1>
-          <p className="muted">{subtitle}</p>
-        </div>
-        <a className="btn-primary" href="#/incidents/new">Report incident</a>
-      </div>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        sx={{ justifyContent: 'space-between', alignItems: { sm: 'flex-end' }, mb: 3 }}
+      >
+        <Box>
+          <Typography variant="h1" component="h1">{title}</Typography>
+          <Typography color="text.secondary">{subtitle}</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} href="#/incidents/new" sx={{ alignSelf: { xs: 'flex-start', sm: 'auto' } }}>
+          Report incident
+        </Button>
+      </Stack>
 
-      <div className="filters">
-        <input
+      {/* Filters: one column on phones, one row on wider screens */}
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 1.5,
+          alignItems: 'center',
+          mb: 2,
+          gridTemplateColumns: isPhone ? 'minmax(0, 1fr)' : 'minmax(200px, 2fr) repeat(2, minmax(140px, 1fr)) auto',
+        }}
+      >
+        <TextField
           type="search"
           placeholder="Search title or INC-…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search incidents"
+          slotProps={{
+            htmlInput: { 'aria-label': 'Search incidents' },
+            input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> },
+          }}
+          sx={{ bgcolor: 'background.paper' }}
         />
-        <select value={filters.status} onChange={update('status')} aria-label="Status">
+        <TextField select label="Status" value={filters.status} onChange={update('status')} slotProps={NATIVE} sx={{ bgcolor: 'background.paper' }}>
           <option value="">All statuses</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => (
             <option key={v} value={v}>{l}</option>
           ))}
-        </select>
-        <select value={filters.priority} onChange={update('priority')} aria-label="Priority">
+        </TextField>
+        <TextField select label="Priority" value={filters.priority} onChange={update('priority')} slotProps={NATIVE} sx={{ bgcolor: 'background.paper' }}>
           <option value="">All priorities</option>
           {PRIORITIES.map((p) => (
             <option key={p} value={p}>{titleCase(p)}</option>
           ))}
-        </select>
-        <label className="checkbox">
-          <input type="checkbox" checked={filters.escalated} onChange={update('escalated')} />
-          Escalated
-        </label>
-        {isAdmin && (
-          <label className="checkbox">
-            <input type="checkbox" checked={filters.unassigned} onChange={update('unassigned')} />
-            Unassigned
-          </label>
-        )}
-      </div>
+        </TextField>
+        <Stack direction="row" sx={{ flexWrap: 'wrap' }}>
+          <FormControlLabel
+            control={<Checkbox size="small" checked={filters.escalated} onChange={update('escalated')} />}
+            label="Escalated"
+          />
+          {isAdmin && (
+            <FormControlLabel
+              control={<Checkbox size="small" checked={filters.unassigned} onChange={update('unassigned')} />}
+              label="Unassigned"
+            />
+          )}
+        </Stack>
+      </Box>
 
-      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Section
         title={result ? `${total} incident${total === 1 ? '' : 's'}` : 'Incidents'}
-        aside={loading && <span className="muted small">Loading…</span>}
+        aside={loading && <Typography variant="body2" color="text.secondary">Loading…</Typography>}
       >
         {result && (
           <IncidentTable
@@ -117,15 +150,15 @@ export default function IncidentList({ user }) {
           />
         )}
         {pages > 1 && (
-          <div className="pager">
-            <button type="button" className="btn-secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', mt: 2 }}>
+            <Button variant="outlined" color="inherit" disabled={page === 0} onClick={() => setPage(page - 1)}>
               ← Previous
-            </button>
-            <span className="muted small">Page {page + 1} of {pages}</span>
-            <button type="button" className="btn-secondary" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>
+            </Button>
+            <Typography variant="body2" color="text.secondary">Page {page + 1} of {pages}</Typography>
+            <Button variant="outlined" color="inherit" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>
               Next →
-            </button>
-          </div>
+            </Button>
+          </Stack>
         )}
       </Section>
     </>
