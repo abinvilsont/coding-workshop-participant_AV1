@@ -5,9 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { USERS, mockApi } from '../test/mockApi';
 import Login from './Login';
 
+const input = (label) => screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+
 const fill = async (user, fields) => {
   for (const [label, value] of Object.entries(fields)) {
-    await user.type(screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' }), value);
+    await user.clear(input(label));
+    await user.type(input(label), value);
   }
 };
 
@@ -30,11 +33,15 @@ describe('Login page', () => {
     render(<Login />);
 
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Email and password are required.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    expect(input('Work email')).toHaveAccessibleDescription('Enter your work email.');
+    expect(input('Password')).toHaveAccessibleDescription('Enter your password.');
+    expect(input('Work email')).toBeRequired();
 
     await fill(user, { 'Work email': 'me@gmail.com', Password: 'Password123!' });
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please use your @acme.inc email address.');
+    expect(input('Work email')).toHaveAccessibleDescription('Please use your @acme.inc email address.');
+    expect(input('Password')).not.toHaveAttribute('aria-invalid', 'true');
     expect(api.calls).toHaveLength(0);
   });
 
@@ -64,6 +71,22 @@ describe('Login page', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
+  it('puts server validation errors on the matching field', async () => {
+    const user = userEvent.setup();
+    mockApi({ 'POST /auth/register': { status: 400, body: {
+      message: 'Password must be at most 72 characters.',
+      errors: [{ loc: ['body', 'password'], msg: 'Value error, Password must be at most 72 characters.' }],
+    } } });
+    render(<Login />);
+    await user.click(screen.getByRole('tab', { name: 'Register' }));
+    await fill(user, {
+      'Full name': 'Jane Doe', 'Work email': 'jane@acme.inc', Password: 'Password123!', 'Confirm password': 'Password123!',
+    });
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    expect(input('Password')).toHaveAccessibleDescription('Password must be at most 72 characters.');
+  });
+
   it('registers an employee, then returns to sign in', async () => {
     const user = userEvent.setup();
     const api = mockApi({ 'POST /auth/register': { status: 201, body: { user: USERS.employee } } });
@@ -88,15 +111,17 @@ describe('Login page', () => {
 
     await fill(user, { 'Work email': 'jane@acme.inc', Password: 'short', 'Confirm password': 'short' });
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please enter your full name.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    expect(input('Full name')).toHaveAccessibleDescription('Please enter your full name.');
+    expect(input('Password')).toHaveAccessibleDescription('Password must be at least 8 characters.');
 
     await fill(user, { 'Full name': 'Jane' });
-    await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('at least 8 characters');
+    expect(input('Full name')).not.toHaveAttribute('aria-invalid', 'true'); // fixed as you type
 
     await fill(user, { Password: '-long-enough', 'Confirm password': '-different!' });
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Passwords do not match.');
+    expect(input('Confirm password')).toHaveAccessibleDescription('Passwords do not match.');
+    expect(input('Password')).not.toHaveAttribute('aria-invalid', 'true');
   });
 
   it('can reveal the password', async () => {

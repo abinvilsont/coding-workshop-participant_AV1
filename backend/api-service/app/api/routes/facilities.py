@@ -109,6 +109,7 @@ def create_building(body: BuildingCreate, db: DbSession, user: AdminUser):
     return _building_out(b, True)
 
 
+@router.put("/buildings/{building_id}")  # PUT is accepted as an alias of PATCH
 @router.patch("/buildings/{building_id}")
 def update_building(building_id: int, body: BuildingUpdate, db: DbSession, _user: AdminUser):
     b = _get_or_404(db, Building, building_id, "Building")
@@ -144,6 +145,7 @@ def create_floor(body: FloorCreate, db: DbSession, _user: AdminUser):
     return _floor_out(f)
 
 
+@router.put("/floors/{floor_id}")  # PUT is accepted as an alias of PATCH
 @router.patch("/floors/{floor_id}")
 def update_floor(floor_id: int, body: FloorUpdate, db: DbSession, _user: AdminUser):
     f = _get_or_404(db, Floor, floor_id, "Floor")
@@ -178,6 +180,7 @@ def create_seat(body: SeatCreate, db: DbSession, _user: AdminUser):
     return _seat_out(s)
 
 
+@router.put("/seats/{seat_id}")  # PUT is accepted as an alias of PATCH
 @router.patch("/seats/{seat_id}")
 def update_seat(seat_id: int, body: SeatUpdate, db: DbSession, _user: AdminUser):
     s = _get_or_404(db, Seat, seat_id, "Seat")

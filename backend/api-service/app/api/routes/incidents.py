@@ -105,6 +105,7 @@ def get_incident(incident_id: int, db: DbSession, user: CurrentUser):
     return svc.detail(db, inc, user)
 
 
+@router.put("/{incident_id}", response_model=IncidentDetail)  # PUT is accepted as an alias of PATCH
 @router.patch("/{incident_id}", response_model=IncidentDetail)
 def update_incident(incident_id: int, body: IncidentUpdate, db: DbSession, user: CurrentUser):
     """Edit details. Reporter: while 'open'. Admin: any time, incl. priority / de-escalation."""

@@ -45,7 +45,7 @@ def test_pagination_reports_total(client, as_):
 
 def test_invalid_filter_is_rejected(client, as_):
     r = client.get("/incidents", headers=as_("alice"), params={"status": "lost"})
-    assert r.status_code == 422 and "message" in r.json()
+    assert r.status_code == 400 and "message" in r.json()
 
 
 # ---------------------------------------------------------------- read
@@ -127,9 +127,9 @@ def test_create_rejects_inactive_building(client, as_, facilities):
 def test_create_validation_errors(client, as_):
     r = client.post("/incidents", headers=as_("emma"), json={"title": "  ", "description": "x",
                                                             "category": "plumbing", "building_id": 1})
-    assert r.status_code == 422 and r.json()["message"] == "This field is required."
+    assert r.status_code == 400 and r.json()["message"] == "This field is required."
     r = client.post("/incidents", headers=as_("emma"), content=b"{not json", )
-    assert r.status_code == 422
+    assert r.status_code == 400
 
 
 # ---------------------------------------------------------------- update

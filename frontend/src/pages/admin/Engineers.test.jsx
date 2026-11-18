@@ -76,16 +76,25 @@ describe('Engineers admin page', () => {
     await user.click(await screen.findByRole('button', { name: 'Add engineer' }));
 
     await user.click(screen.getByRole('button', { name: 'Create engineer' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter the engineer’s name.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    expect(field('Full name')).toHaveAccessibleDescription('Enter the engineer’s name.');
+    expect(field('Work email')).toHaveAccessibleDescription('Use an @acme.inc email address.');
+    expect(field('Temporary password')).toHaveAccessibleDescription('The temporary password needs at least 8 characters.');
+
     await user.type(field('Full name'), 'Grace');
+    expect(field('Full name')).not.toHaveAttribute('aria-invalid', 'true');
     await user.type(field('Work email'), 'grace@gmail.com');
     await user.click(screen.getByRole('button', { name: 'Create engineer' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Use an @acme.inc email address.');
+    expect(field('Work email')).toHaveAccessibleDescription('Use an @acme.inc email address.');
     await user.clear(field('Work email'));
     await user.type(field('Work email'), 'grace@acme.inc');
     await user.type(field('Temporary password'), 'short');
+    await user.clear(field('Max active tickets'));
+    await user.type(field('Max active tickets'), '0');
     await user.click(screen.getByRole('button', { name: 'Create engineer' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('at least 8 characters');
+    expect(field('Temporary password')).toHaveAccessibleDescription('The temporary password needs at least 8 characters.');
+    expect(field('Max active tickets')).toHaveAccessibleDescription('Enter a whole number from 1 to 50.');
+    expect(field('Work email')).not.toHaveAttribute('aria-invalid', 'true');
     expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));

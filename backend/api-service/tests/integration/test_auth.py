@@ -42,9 +42,9 @@ def test_register_duplicate_email_is_conflict(client):
 
 def test_register_validation_errors(client):
     r = register(client, email="someone@gmail.com")
-    assert r.status_code == 422 and "acme.inc" in r.json()["message"]
+    assert r.status_code == 400 and "acme.inc" in r.json()["message"]
     r = client.post("/auth/register", json={"email": "x@acme.inc"})
-    assert r.status_code == 422 and r.json()["errors"]
+    assert r.status_code == 400 and r.json()["errors"]
 
 
 def test_login_returns_token_and_user(client):

@@ -4,10 +4,22 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const API_BASE = `${API_URL}/api/api-service`;
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, fields = {}) {
     super(message);
     this.status = status;
+    this.fields = fields; // { fieldName: message } for validation errors (400)
   }
+}
+
+/** Turn the API's `errors` list ([{ loc: ['body', 'title'], msg }]) into { title: msg }. */
+export function fieldErrors(errors) {
+  const out = {};
+  for (const e of Array.isArray(errors) ? errors : []) {
+    // loc is e.g. ['body', 'title']; a bare ['body'] is about the whole request, not a field
+    const field = Array.isArray(e?.loc) && e.loc.length > 1 ? e.loc.at(-1) : null;
+    if (typeof field === 'string' && !out[field]) out[field] = String(e.msg ?? '').replace(/^Value error, /, '');
+  }
+  return out;
 }
 
 export function getToken() {
@@ -62,7 +74,11 @@ export async function apiRequest(path, { method = 'GET', body, params } = {}) {
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized();
     const detail = typeof data.detail === 'string' ? data.detail : null;
-    throw new ApiError(res.status, data.message || detail || 'Something went wrong. Please try again.');
+    throw new ApiError(
+      res.status,
+      data.message || detail || 'Something went wrong. Please try again.',
+      fieldErrors(data.errors),
+    );
   }
   return data;
 }

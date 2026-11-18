@@ -1,113 +1,190 @@
-# Coding Workshop
+# ACME Facility Desk
 
-The goal of this coding workshop is to enable and assess the hands-on skills
-of participants through development of a practical technical solution that
-solves a theoretical business problem.
+An incident desk for ACME's offices. Employees report facility and workplace-tech
+problems (a broken chair, no Wi-Fi, a leaking tap). Facility Admins triage and assign
+them, and Engineers fix them. Everyone involved is kept informed in the app.
 
-## Getting Started
+Built for the coding workshop. The workshop brief and evaluation guides are in
+[`docs/`](docs/README.md); the original brief is in
+[`docs/WORKSHOP-BRIEF.md`](docs/WORKSHOP-BRIEF.md).
 
-Navigate to [Coding Workshop - Main Guide](./docs/README.md) to get started.
+## What it does
 
-## Coding Workshop Example
+| Role | Can do |
+|---|---|
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen |
+| **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), manage buildings / floors / seats and engineer accounts, delete incidents |
 
-Coding workshop organizer(s) will provide instructions to follow by email. Here
-below is a real example of requirements and expectations for participant(s):
+An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
+reporter, not the engineer, confirms the fix. Every change is written to the
+incident's history, and the people involved are notified through the bell
+(it polls every 30 s).
 
-### Requirements: Business Problem
+## Architecture
 
-Our company ACME Inc. is going through a massive organizational transformation
-to become a more data-driven organization. Information about teams structure
-and performance is currently scattered across multiple systems, making it
-difficult to get a comprehensive view of team dynamics and achievements.
+```
+ Browser ──► CloudFront ──► S3                    (React app)
+                   │
+                   └── /api/api-service/* ──► Lambda (FastAPI + Mangum) ──► PostgreSQL (Aurora)
+```
 
-We are struggling to answer simple questions like:
+- **Frontend:** React 19, Material UI 7, React Responsive, Vite. Hash routing, so it
+  works on S3 without rewrite rules.
+- **Backend:** one FastAPI service (`backend/api-service`) running on Lambda through
+  Mangum. It uses SQLAlchemy 2, Pydantic 2, JWT auth and bcrypt hashing.
+- **Database:** PostgreSQL. The schema is in [`backend/db/schema.sql`](backend/db/schema.sql),
+  with constraints and a trigger that records incident history.
+- **Locally:** LocalStack runs the Lambda, and `bin/proxy-server.js` (`:3001`) stands
+  in for CloudFront. Vite serves the app on `:3000`, and PostgreSQL runs on the host.
 
-* Who are the members of each team?
-* Where are the teams located?
-* What are the key achievements of each team on a monthly basis?
-* How many teams have team leader not co-located with team members?
-* How many teams have team leader as a non-direct staff?
-* How many teams have non-direct staff to employees ratio above 20%?
-* How many teams are reporting to an organization leader?
+Every request follows the same steps:
+1. Check the JWT.
+2. Load the user.
+3. Check the role rules in `app/services/permissions.py`.
+4. Make the change and write the notifications in **one transaction**.
+5. Return the updated record plus the actions the user may take next. The UI shows
+   buttons from that list, so the API and the UI never disagree.
 
-### Requirements: Technical Solution
+## Getting started (local)
 
-As part of this transformation, we are looking to build a centralized team
-management tool that will allow us to track team members, team locations,
-monthly team achievements, as well as individual-level and team-level metadata.
-Initial focus is to provide a self-service capability without any integrations
-with other tools such as Employee Directory, Project Tracking, or Performance
-Management.
+Prerequisites: run the workshop's `./bin/setup-environment.sh` once. It installs
+Node, Python 3.13, PostgreSQL, Terraform and LocalStack.
 
-The technical solution involves developing a stand-alone web application using
-modern technologies. The application will have the following features:
+```sh
+# 1. Create the tables and load sample data (WARNING: seed.sql wipes existing rows)
+psql -h localhost -U postgres -d postgres -f backend/db/schema.sql
+psql -h localhost -U postgres -d postgres -f backend/db/seed.sql
 
-* User authentication and authorization
-* Role-based access control
-* CRUD operations for individuals, teams, achievements and metadata
-* Search and filter functionality
-* Responsive design for mobile and desktop usage
+# 2. Start everything: LocalStack + Lambda, proxy, React dev server
+./bin/start-dev.sh
 
-### Requirements: Technology Stack
+# 3. Open the app
+open http://localhost:3000
+```
 
-The following technologies are required to build the application:
+Sample accounts (password `Password123!` for all):
 
-* Frontend: HTML, CSS, React.js with React Responsive and Material UI Components
-* Backend: Python
-* Database: PostgreSQL
+| Role | Email |
+|---|---|
+| Facility Admin | `alice.admin@acme.inc` |
+| Engineer | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave) |
+| Employee | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc` |
 
-The following technologies are good to know, as they are used to manage and
-deploy code:
+**To redeploy backend changes to LocalStack**, run `./bin/start-dev.sh` again. If you
+call `./bin/deploy-backend.sh` yourself:
+- Pass `local`. Without it, the script deploys to **AWS**.
+- Load `ENVIRONMENT.config` first, as `start-dev.sh` does.
 
-* Version Control: Git, GitHub
-* Infrastructure: Terraform
-* Deployment Mode: Shell Scripts
-* Deployment Target: AWS Serverless (e.g. S3, CloudFront, Lambda, RDS)
+**To run the API without LocalStack**, with interactive docs at `/docs`, see
+[`backend/api-service/README.md`](backend/api-service/README.md).
 
-### Expectations: Value-Based Outcomes
+## Project layout
 
-By the end of the workshop, participants will have developed a functional
-web application that meets the requirements outlined above. The application
-will be deployed to a cloud environment and accessible via a web browser.
-Participants will also gain hands-on experience with modern web development
-technologies and best practices.
+```
+backend/
+  api-service/        FastAPI app (routes, schemas, models, permissions, notifications) + tests
+  db/                 schema.sql, seed.sql, migrations/
+frontend/
+  src/pages/          Login, Dashboard, IncidentList, IncidentDetail, NewIncident, admin/
+  src/components/     AppLayout, IncidentTable, IncidentForm, NotificationBell, Badges
+  src/hooks/          useAction, useFieldErrors, useResponsive (breakpoints)
+  src/services/       API client + one module per resource
+  src/theme.js        Material UI theme
+  e2e/                Playwright journeys
+infra/                Terraform (S3, CloudFront, Lambda, Aurora, IAM)
+bin/                  setup, start, deploy and test scripts
+```
 
-## Contributing
+## API
 
-See the [CONTRIBUTING](./CONTRIBUTING.md) resource for more details.
+REST + JSON under `/api/api-service`. The full endpoint table is in
+[`backend/api-service/README.md`](backend/api-service/README.md).
 
-## License
+- **Methods and status codes:** `POST` creates (201), `GET` reads (200),
+  `PUT`/`PATCH` update (200; `PUT` is an alias of `PATCH`), `DELETE` removes (204).
+  Workflow actions are `POST /incidents/{id}/status|assign|escalate|notes`.
+- **Errors** always come back as `{"message": "..."}`. Validation errors also carry
+  `errors: [{loc, msg}]`, which the forms show under the matching field.
 
-This library is licensed under the MIT-0 License.
-See the [LICENSE](./LICENSE) resource for more details.
+  | Code | Meaning |
+  |---|---|
+  | 400 | Invalid input |
+  | 401 | Not signed in or session expired |
+  | 403 | Not allowed for your role |
+  | 404 | Not found, or not yours to see |
+  | 409 | Conflict, e.g. a duplicate, or an item still in use |
+  | 503 | Database busy or down, with `Retry-After` |
+  | 500 | Unexpected error, never with a stack trace |
 
-## Roadmap
+## Testing
 
-See the
-[open issues](https://github.com/citi/coding-workshop-participant/issues)
-for a list of proposed roadmap features (and known issues).
+```sh
+./bin/run-tests.sh          # backend + frontend with coverage
+./bin/run-tests.sh --e2e    # plus Playwright journeys (needs ./bin/start-dev.sh running)
+cd frontend && npm run lint
+```
 
-## Security
+| Suite | Count | Coverage |
+|---|---|---|
+| Backend: pytest, unit + integration on a throwaway database | 210 | 99 % |
+| Frontend: Vitest + React Testing Library | 97 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 12 | every critical journey |
+| Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
-See the
-[Security Issue Notifications](./CONTRIBUTING.md#security-issue-notifications)
-resource for more details.
+Details, known gaps and the load-test story (it found a real connection-pool bug)
+are in [`TESTING.md`](TESTING.md).
 
-## Authors
+## Deploying to AWS
 
-The following people have contributed to this workshop:
+The infrastructure is defined in `infra/` and deployed by the workshop scripts:
 
-* Colin Heilman - [@heilmancs](https://github.com/heilmancs)
-* Eugene Istrati - [@eistrati](https://github.com/eistrati)
-* Isaiah Cornelius Smith - [@corneliusmith](https://github.com/corneliusmith)
-* Juan Arevalo - [@jparevalo27](https://github.com/jparevalo27)
-* Michael Annucci - [@michael-annucci](https://github.com/michael-annucci)
+```sh
+./bin/deploy-backend.sh aws     # Terraform: Lambda, Aurora, CloudFront, S3
+./bin/deploy-frontend.sh aws    # build React and upload to S3
+```
 
-## Feedback
+Before the first cloud deploy:
+1. Connect to Aurora over TLS (`sslmode=require` when `IS_LOCAL` is `false`).
+2. Create the tables in Aurora: run `schema.sql`, and for sample data, `seed.sql`.
+   Change the sample passwords first.
+3. Set a strong `JWT_SECRET`.
 
-We'd love to hear your feedback! Please:
+**Status:** the app has not yet been deployed to AWS. All three steps are still open.
 
-* ⭐ Star the repository if you find it helpful
-* 🐛 Report issues on GitHub
-* 💡 Suggest improvements
-* 📝 Share your experience
+## Design decisions and trade-offs
+
+- **One API service, not several.** It's one codebase and one deploy, and the domain
+  is small enough. Routes are split by feature inside it.
+- **JWT instead of server sessions.** Lambda instances share no memory. Tokens last
+  8 hours (a working day) and live in `sessionStorage`, so closing the tab signs you
+  out, which suits shared office PCs. There is no refresh token yet; an expired
+  session sends you back to sign-in.
+- **Notifications are polled every 30 s, not pushed.** Lambda can't hold WebSockets
+  open, and the polling query only counts rows.
+- **History is written by a database trigger.** No code path can forget to log a
+  change.
+- **Deactivate rather than delete** buildings, floors, seats and engineers that are
+  in use, so old incidents stay valid.
+- **The connection pool depends on where the API runs:** 1+1 connections on Lambda,
+  10+30 under uvicorn. This was found by the load test.
+- **Native `<select>` styled by Material UI** so phones show their own pickers.
+- **Engineer capacity is enforced on the server** with a row lock, so two admins
+  can't both fill an engineer's last slot.
+
+## Assumptions
+
+- Only `@acme.inc` staff use the app. Employees self-register; admins create
+  Engineer accounts. Admin accounts are seeded, and there is no admin-creation
+  screen yet.
+- One incident has one engineer at a time. Reassignment is allowed.
+- Critical priority is only set by admins. Employees ask for it by escalating.
+- "Active tickets" means assigned, in progress or on hold. Resolved tickets don't
+  count against capacity.
+
+## Known gaps
+
+- Not yet deployed to AWS (see above).
+- No token refresh, password change or password reset.
+- No push notifications, PWA or offline mode.
+- No admin-account management screen.

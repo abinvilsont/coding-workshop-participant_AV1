@@ -148,7 +148,7 @@ def test_create_engineer_errors(client, as_):
     base = {"name": "Dup", "password": PASSWORD}
     assert client.post("/engineers", headers=alice, json={**base, "email": "tom.eng@acme.inc"}).status_code == 409
     assert client.post("/engineers", headers=alice, json={**base, "email": "x@acme.inc", "home_building_id": 999}).status_code == 400
-    assert client.post("/engineers", headers=alice, json={**base, "email": "x@gmail.com"}).status_code == 422
+    assert client.post("/engineers", headers=alice, json={**base, "email": "x@gmail.com"}).status_code == 400
 
 
 def test_update_engineer_profile(client, as_):
@@ -192,4 +192,4 @@ def test_engineer_sets_own_availability(client, as_):
 def test_availability_is_engineers_only(client, as_):
     r = client.patch("/engineers/me/availability", headers=as_("emma"), json={"availability": "busy"})
     assert r.status_code == 403
-    assert client.patch("/engineers/me/availability", headers=as_("tom"), json={"availability": "sleeping"}).status_code == 422
+    assert client.patch("/engineers/me/availability", headers=as_("tom"), json={"availability": "sleeping"}).status_code == 400

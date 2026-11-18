@@ -28,8 +28,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 202 | all pass, ~6 s | **99 %** of `app/` (1192 statements, 9 missed) |
-| Frontend (Vitest) | 92 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| Backend (pytest) | 210 | all pass, ~6 s | **99 %** of `app/` (1198 statements, 9 missed) |
+| Frontend (Vitest) | 97 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 12 | all pass, ~30 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -69,7 +69,7 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
-| `test_api_contract.py` | `{"message": ...}` error shape (404/405/422/500/503), CloudFront path prefix, the Lambda handler with a real Function-URL event |
+| `test_api_contract.py` | `{"message": ...}` error shape (400/404/405/500/503), malformed JSON and bad query values return 400, `PUT` works as an alias of every `PATCH` route, CloudFront path prefix, the Lambda handler with a real Function-URL event |
 
 ### Frontend: `frontend/src/**/*.test.{js,jsx}`
 
@@ -77,14 +77,14 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 
 | Area | Covers |
 |---|---|
-| `services/` | auth header, query strings, 204, error messages, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
-| `Login` | sign in, client-side validation, server errors, loading state, registration, show password |
-| `IncidentForm` | required fields, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
+| `services/` | auth header, query strings, 204, error messages, validation errors mapped onto fields, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
+| `Login` | sign in, client-side validation with messages under each field, server field errors, loading state, registration, show password |
+| `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
 | `IncidentDetail` | role-based actions shown/hidden, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
 | `IncidentList` | filters and search sent to the API, role headings, paging, errors |
-| `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation, conflict messages, inactive toggle |
+| `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation with per-field messages (incl. server field errors), conflict messages, inactive toggle |
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
 | `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive), table vs phone cards |
 
