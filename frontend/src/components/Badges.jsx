@@ -1,9 +1,10 @@
 import { useId } from 'react';
 import { Box, Card, CardContent, Chip, Paper, Stack, Typography } from '@mui/material';
-import { PRIORITY_COLORS, STATUS_COLORS, TONE_COLORS } from '../theme';
+import { PRIORITY_COLORS, STATUS_COLORS, TONE_COLORS, schemeSx } from '../theme';
 import { STATUS_LABELS, titleCase } from '../utils/format';
 
-const chipSx = ([color, bgcolor]) => ({ color, bgcolor, height: 24 });
+const chipSx = ([color, bgcolor, darkColor, darkBg]) =>
+  schemeSx({ color, bgcolor, height: 24 }, { color: darkColor, bgcolor: darkBg });
 
 /** A merged duplicate is stored as cancelled but shown as "Merged". */
 export function StatusBadge({ status, merged = false }) {
@@ -14,10 +15,10 @@ export function StatusBadge({ status, merged = false }) {
     <Chip
       size="small"
       label={STATUS_LABELS[status] ?? status}
-      sx={{
-        ...chipSx(STATUS_COLORS[status] ?? STATUS_COLORS.closed),
-        textDecoration: status === 'cancelled' ? 'line-through' : 'none',
-      }}
+      sx={[
+        chipSx(STATUS_COLORS[status] ?? STATUS_COLORS.closed),
+        { textDecoration: status === 'cancelled' ? 'line-through' : 'none' },
+      ]}
     />
   );
 }
@@ -40,11 +41,13 @@ export function EscalatedBadge() {
 }
 
 export function StatCard({ label, value, tone = 'neutral', hint }) {
+  const color = TONE_COLORS[tone] ?? tone;
+  const colorSx = Array.isArray(color) ? schemeSx({ color: color[0] }, { color: color[1] }) : { color };
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent sx={{ '&:last-child': { pb: 2 } }}>
         <Typography variant="body2" color="text.secondary">{label}</Typography>
-        <Typography variant="h4" component="p" sx={{ fontWeight: 700, color: TONE_COLORS[tone] ?? tone }}>
+        <Typography variant="h4" component="p" sx={[{ fontWeight: 700 }, colorSx]}>
           {value}
         </Typography>
         {hint && <Typography variant="caption" color="text.secondary">{hint}</Typography>}

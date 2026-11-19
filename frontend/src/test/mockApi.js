@@ -58,7 +58,7 @@ export const USERS = {
 
 const NO_PERMISSIONS = {
   can_edit: false, can_set_priority: false, can_assign: false, can_escalate: false,
-  can_add_note: false, can_add_internal_note: false, can_delete: false, can_merge: false, status_transitions: [],
+  can_add_note: false, can_add_internal_note: false, can_delete: false, can_merge: false, can_review: false, status_transitions: [],
 };
 
 export function incident(overrides = {}) {
@@ -72,7 +72,7 @@ export function incident(overrides = {}) {
     reported_by: 'Emma Employee', assigned_engineer: 'Ethan Electrics',
     building_id: 1, floor_id: 10, seat_id: 100, reported_by_id: 6, assigned_engineer_id: 2,
     assigned_at: null, escalation_reason: null, escalated_at: null, resolved_at: null, closed_at: null,
-    notes: [], history: [], merged_into: null, merged_from: [], followers: [],
+    notes: [], history: [], merged_into: null, merged_from: [], followers: [], reviews: [],
     permissions: { ...NO_PERMISSIONS, ...permissions },
     ...rest,
   };

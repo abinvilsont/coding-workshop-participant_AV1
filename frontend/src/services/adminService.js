@@ -24,3 +24,9 @@ export const updateEngineer = (id, body) => apiRequest(`/engineers/${id}`, { met
 // Engineer self-service
 export const setMyAvailability = (availability) =>
   apiRequest('/engineers/me/availability', { method: 'PATCH', body: { availability } });
+export const getEngineerReviews = (id) => apiRequest(`/engineers/${id}/reviews`);
+
+// People (admin): every account; change employee/admin roles, (de)activate
+export const listUsers = ({ role, includeInactive, q } = {}) =>
+  apiRequest('/users', { params: { role: role || undefined, include_inactive: includeInactive || undefined, q: q || undefined } });
+export const updateUser = (id, body) => apiRequest(`/users/${id}`, { method: 'PATCH', body });

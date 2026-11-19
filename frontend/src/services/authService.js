@@ -27,6 +27,9 @@ export async function register(name, email, password) {
   });
 }
 
+/** The signed-in person's account, fresh from the server (e.g. their usual building). */
+export const getMe = () => apiRequest('/auth/me');
+
 export function logout() {
   clearSession();
 }

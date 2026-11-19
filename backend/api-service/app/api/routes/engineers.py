@@ -6,12 +6,15 @@ engineers keep their own availability up to date.
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.core.errors import FieldError
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.core.security import hash_password
-from app.models import ACTIVE_STATUSES, Building, EngineerProfile, Incident, User, UserRole
+from app.models import ACTIVE_STATUSES, Building, EngineerProfile, EngineerReview, Incident, User, UserRole
 from app.schemas.admin import AvailabilityUpdate, EngineerCreate, EngineerUpdate
+from app.schemas.incident import EngineerReviewOut
+from app.services.incidents import review_out
 
 router = APIRouter(prefix="/engineers", tags=["engineers"])
 
@@ -20,12 +23,20 @@ _ENGINEER_SQL = """
            ep.availability::text, ep.specializations::text[] AS specializations,
            ep.max_active_tickets, ep.home_building_id, b.name AS home_building, ep.notes,
            COALESCE(w.active_tickets, 0) AS active_tickets,
-           ep.max_active_tickets - COALESCE(w.active_tickets, 0) AS remaining_capacity
+           ep.max_active_tickets - COALESCE(w.active_tickets, 0) AS remaining_capacity,
+           r.avg_rating::float AS avg_rating, COALESCE(r.review_count, 0) AS review_count
     FROM engineer_profiles ep
     JOIN users u ON u.id = ep.user_id
     LEFT JOIN buildings b ON b.id = ep.home_building_id
     LEFT JOIN engineer_workload w ON w.engineer_id = ep.user_id
+    LEFT JOIN (
+        SELECT engineer_id, round(avg(rating), 1) AS avg_rating, count(*) AS review_count
+        FROM engineer_reviews GROUP BY engineer_id
+    ) r ON r.engineer_id = ep.user_id
 """
+
+# Employees' ratings are for admins; strip them from anything an engineer receives
+RATING_FIELDS = ("avg_rating", "review_count")
 
 
 def _engineers(db: Session, where: str = "TRUE", params: dict | None = None) -> list[dict]:
@@ -42,7 +53,7 @@ def _engineer_or_404(db: Session, engineer_id: int) -> dict:
 
 def _check_building(db: Session, building_id: int | None):
     if building_id is not None and db.get(Building, building_id) is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Home building not found.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "home_building_id", "Home building not found.")
 
 
 @router.get("")
@@ -68,7 +79,7 @@ def create_engineer(body: EngineerCreate, db: DbSession, admin: AdminUser):
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.") from exc
+        raise FieldError(status.HTTP_409_CONFLICT, "email", "An account with this email already exists.") from exc
 
     db.add(EngineerProfile(
         user_id=user.id,
@@ -92,12 +103,37 @@ def update_my_availability(body: AvailabilityUpdate, db: DbSession, user: Curren
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only engineers have an availability status.")
     profile.availability = body.availability
     db.commit()
-    return _engineer_or_404(db, user.id)
+    me = _engineer_or_404(db, user.id)
+    return {k: v for k, v in me.items() if k not in RATING_FIELDS}
 
 
 @router.get("/{engineer_id}")
 def get_engineer(engineer_id: int, db: DbSession, _user: AdminUser):
     return _engineer_or_404(db, engineer_id)
+
+
+@router.get("/{engineer_id}/reviews", response_model=list[EngineerReviewOut])
+def engineer_reviews(engineer_id: int, db: DbSession, _user: AdminUser):
+    """Every employee review of this engineer, newest first (admin only)."""
+    _engineer_or_404(db, engineer_id)
+    rows = db.scalars(
+        select(EngineerReview)
+        .options(
+            joinedload(EngineerReview.reviewer), joinedload(EngineerReview.engineer),
+            joinedload(EngineerReview.incident),
+        )
+        .where(EngineerReview.engineer_id == engineer_id)
+        .order_by(EngineerReview.created_at.desc(), EngineerReview.id.desc())
+    ).all()
+    return [
+        {
+            **review_out(r),
+            "incident_id": r.incident_id,
+            "incident_reference": r.incident.reference,
+            "incident_title": r.incident.title,
+        }
+        for r in rows
+    ]
 
 
 @router.put("/{engineer_id}")  # PUT is accepted as an alias of PATCH
@@ -112,11 +148,11 @@ def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin
 
     for k in ("name", "specializations", "availability", "max_active_tickets", "is_active"):
         if k in changes and changes[k] is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{k} cannot be cleared.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, k, f"{k} cannot be cleared.")
     if "home_building_id" in changes:
         _check_building(db, changes["home_building_id"])
     if user.id == admin.id and changes.get("is_active") is False:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't deactivate yourself.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "is_active", "You can't deactivate yourself.")
     if changes.get("is_active") is False:
         active = db.scalar(
             select(func.count()).select_from(Incident).where(
@@ -124,8 +160,8 @@ def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin
             )
         )
         if active:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
+            raise FieldError(
+                status.HTTP_409_CONFLICT, "is_active",
                 f"{user.full_name} still has {active} active ticket(s). Reassign them first.",
             )
 

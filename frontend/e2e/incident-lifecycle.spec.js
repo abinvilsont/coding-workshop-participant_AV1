@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ACCOUNTS, actions, asUser, openNotification, stamp } from './helpers.js';
+import { ACCOUNTS, actions, asUser, openNotification, stamp, submitReport } from './helpers.js';
 
 /**
  * The core journey across all three personas, through the real UI, API and database:
@@ -21,7 +21,7 @@ test('incident lifecycle across employee, admin and engineer', async ({ browser 
   await employee.getByLabel('Category').selectOption('audio_visual');
   await employee.getByLabel('Building').selectOption({ label: 'ACME Headquarters' });
   await employee.getByLabel(/^Floor/).selectOption({ index: 1 });
-  await employee.getByRole('button', { name: 'Submit incident' }).click();
+  await submitReport(employee);
 
   await expect(employee.getByRole('heading', { name: title })).toBeVisible();
   await expect(employee.getByTestId('incident-badges')).toContainText('Open');

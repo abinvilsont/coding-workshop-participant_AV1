@@ -27,6 +27,11 @@ export default defineConfig([
     },
   },
   {
+    // The service worker runs in its own scope (self, caches, clients)
+    files: ['public/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     // Playwright config and E2E helpers run in Node, not the browser
     files: ['playwright.config.js', 'e2e/**/*.js'],
     languageOptions: { globals: globals.node },

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
-import useFieldErrors from '../hooks/useFieldErrors';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Button, Stack, Typography } from '@mui/material';
+import useFieldErrors, { focusFirstError } from '../hooks/useFieldErrors';
+import Field, { ErrorText } from './Field';
 import { useIsPhone } from '../hooks/useResponsive';
 import { getFacilities } from '../services/incidentService';
 import { CATEGORIES, PRIORITIES, categoryLabel, titleCase } from '../utils/format';
@@ -24,12 +25,15 @@ const toId = (v) => (v === '' || v === null || v === undefined ? null : Number(v
 /**
  * Create / edit form. `initial` pre-fills for edits; `showPriority` controls
  * whether the priority picker appears; `allowCritical` is for admins.
+ * `defaultBuildingId` (the reporter's usual building, read when the form opens) is
+ * chosen once the buildings load, if it's still an active building.
  */
 export default function IncidentForm({
   initial,
   submitLabel = 'Submit',
   showPriority = true,
   allowCritical = false,
+  defaultBuildingId = null,
   onSubmit,
   onCancel,
 }) {
@@ -41,11 +45,19 @@ export default function IncidentForm({
   const [facilities, setFacilities] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [usualBuilding, setUsualBuilding] = useState(null); // id we filled in for them
   const fe = useFieldErrors();
 
+  const usual = useRef(defaultBuildingId); // read once, when the form opens
   useEffect(() => {
     getFacilities()
-      .then(setFacilities)
+      .then((list) => {
+        setFacilities(list);
+        const id = usual.current;
+        if (!id || !list.some((b) => b.id === id)) return; // none, or deactivated since
+        setUsualBuilding(id);
+        setForm((f) => (f.building_id === '' ? { ...f, building_id: String(id) } : f));
+      })
       .catch((err) => setError(err.message));
   }, []);
 
@@ -54,6 +66,7 @@ export default function IncidentForm({
     [facilities, form.building_id],
   );
   const floor = building?.floors.find((f) => f.id === Number(form.floor_id));
+  const usualName = facilities?.find((b) => b.id === usualBuilding)?.name;
 
   const set = (field) => (e) => {
     const value = e.target.value;
@@ -69,6 +82,7 @@ export default function IncidentForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const formEl = e.currentTarget;
     setError('');
     const problems = {};
     if (!form.title.trim()) problems.title = 'Enter a short title.';
@@ -77,7 +91,7 @@ export default function IncidentForm({
     if (!form.building_id) problems.building_id = 'Choose a building.';
     fe.set(problems);
     if (Object.keys(problems).length) {
-      setError('Please fix the highlighted fields.');
+      focusFirstError(formEl);
       return;
     }
     const payload = {
@@ -94,8 +108,11 @@ export default function IncidentForm({
     setSaving(true);
     try {
       await onSubmit(payload);
+      setSaving(false); // the page may stay (e.g. it asks first whether this is already reported)
     } catch (err) {
-      setError(fe.fromApi(err) ? 'Please fix the highlighted fields.' : err.message);
+      // A problem with one field is shown above that field; anything else above the buttons
+      if (fe.fromApi(err)) focusFirstError(formEl);
+      else setError(err.message);
       setSaving(false);
     }
   };
@@ -106,9 +123,7 @@ export default function IncidentForm({
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
       <Stack spacing={2.5}>
-        {error && <Alert severity="error">{error}</Alert>}
-
-        <TextField
+        <Field
           label="Title"
           required
           disabled={saving}
@@ -119,7 +134,7 @@ export default function IncidentForm({
           slotProps={{ htmlInput: { maxLength: 200 } }}
         />
 
-        <TextField
+        <Field
           label="Description"
           required
           disabled={saving}
@@ -132,8 +147,8 @@ export default function IncidentForm({
           slotProps={{ htmlInput: { maxLength: 5000 } }}
         />
 
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: cols(showPriority ? 2 : 1) }}>
-          <TextField
+        <Box sx={{ display: 'grid', gap: 2, alignItems: 'end', gridTemplateColumns: cols(showPriority ? 2 : 1) }}>
+          <Field
             select
             label="Category"
             required
@@ -147,9 +162,9 @@ export default function IncidentForm({
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{categoryLabel(c)}</option>
             ))}
-          </TextField>
+          </Field>
           {showPriority && (
-            <TextField
+            <Field
               select
               label="Priority"
               disabled={saving}
@@ -161,15 +176,15 @@ export default function IncidentForm({
               {priorities.map((p) => (
                 <option key={p} value={p}>{titleCase(p)}</option>
               ))}
-            </TextField>
+            </Field>
           )}
         </Box>
 
         <Box component="fieldset" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2, m: 0, minWidth: 0 }}>
           <Typography component="legend" variant="subtitle2" sx={{ px: 0.5 }}>Location</Typography>
           <Stack spacing={2}>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: cols(3) }}>
-              <TextField
+            <Box sx={{ display: 'grid', gap: 2, alignItems: 'end', gridTemplateColumns: cols(3) }}>
+              <Field
                 select
                 label="Building"
                 required
@@ -183,8 +198,8 @@ export default function IncidentForm({
                 {facilities?.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
-              </TextField>
-              <TextField
+              </Field>
+              <Field
                 select
                 label="Floor (optional)"
                 value={form.floor_id}
@@ -197,8 +212,8 @@ export default function IncidentForm({
                 {building?.floors.map((f) => (
                   <option key={f.id} value={f.id}>{f.name || `Floor ${f.floor_number}`}</option>
                 ))}
-              </TextField>
-              <TextField
+              </Field>
+              <Field
                 select
                 label="Seat (optional)"
                 value={form.seat_id}
@@ -213,9 +228,19 @@ export default function IncidentForm({
                     {s.seat_code}{s.description ? ` – ${s.description}` : ''}
                   </option>
                 ))}
-              </TextField>
+              </Field>
             </Box>
-            <TextField
+            {usualBuilding && (
+              // A nudge, never a block: people do report problems in other buildings
+              <Typography variant="body2" color="text.secondary" aria-live="polite" sx={{ mt: -1 }}>
+                {form.building_id === String(usualBuilding)
+                  ? 'Your usual building is filled in. Change it if the problem is somewhere else.'
+                  : form.building_id
+                    ? `This isn't your usual building (${usualName}). That's fine if the problem is here.`
+                    : ''}
+              </Typography>
+            )}
+            <Field
               label="More details (optional)"
               value={form.location_details}
               onChange={set('location_details')}
@@ -227,16 +252,19 @@ export default function IncidentForm({
           </Stack>
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          {onCancel && (
-            <Button variant="outlined" color="inherit" onClick={onCancel} disabled={saving}>
-              Cancel
+        <Box>
+          <ErrorText alert>{error}</ErrorText>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+            {onCancel && (
+              <Button variant="outlined" color="inherit" onClick={onCancel} disabled={saving}>
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" variant="contained" disabled={saving}>
+              {saving ? 'Saving…' : submitLabel}
             </Button>
-          )}
-          <Button type="submit" variant="contained" disabled={saving}>
-            {saving ? 'Saving…' : submitLabel}
-          </Button>
-        </Stack>
+          </Stack>
+        </Box>
       </Stack>
     </Box>
   );

@@ -38,3 +38,18 @@ export async function openNotification(page, text) {
 
 // An action block on the incident page: a <section> labelled by its heading
 export const actions = (page, heading) => page.getByRole('region', { name: heading, exact: true });
+
+/**
+ * Submit the report form. If the app asks whether the problem is already reported,
+ * answer "it's a different problem" (journeys that test that prompt drive it themselves).
+ */
+export async function submitReport(page) {
+  await page.getByRole('button', { name: 'Submit incident' }).click();
+  const prompt = page.getByRole('dialog', { name: 'This may already be reported' });
+  const saved = page.waitForURL(/#\/incidents\/\d+$/).then(() => 'saved', () => null);
+  const asked = prompt.waitFor().then(() => 'asked', () => null);
+  if ((await Promise.race([saved, asked])) === 'asked') {
+    await prompt.getByRole('button', { name: /different problem, report it/ }).click();
+    await page.waitForURL(/#\/incidents\/\d+$/);
+  }
+}

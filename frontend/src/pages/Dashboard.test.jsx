@@ -75,8 +75,8 @@ describe('Dashboard', () => {
     render(<ThemeProvider theme={theme}><Dashboard user={USERS.admin} /></ThemeProvider>);
 
     expect(await screen.findByRole('link', { name: 'Wi-Fi drops' })).toBeInTheDocument();
-    expect(statValue('Unassigned')).toHaveStyle({ color: 'rgb(220, 38, 38)' }); // danger tone
-    expect(statValue('Escalated')).toHaveStyle({ color: 'rgb(220, 38, 38)' });
+    expect(statValue('Unassigned')).toHaveStyle({ color: 'var(--mui-palette-error-main)' }); // danger tone (a CSS variable: light or dark)
+    expect(statValue('Escalated')).toHaveStyle({ color: 'var(--mui-palette-error-main)' });
     expect(stat('Active tickets')).toHaveTextContent('3');
     const meter = screen.getByRole('progressbar', { name: '5 of 5 tickets' });
     expect(meter).toHaveAttribute('aria-valuenow', '100');

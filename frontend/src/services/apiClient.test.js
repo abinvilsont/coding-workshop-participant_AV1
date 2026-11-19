@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mockApi } from '../test/mockApi';
-import { ApiError, apiRequest, fieldErrors, saveSession, setUnauthorizedHandler } from './apiClient';
+import {
+  ApiError, apiRequest, fieldErrors, getToken, saveSession, setUnauthorizedHandler, tokenSecondsLeft,
+} from './apiClient';
 
 describe('apiRequest', () => {
   it('sends JSON with the bearer token and returns the parsed body', async () => {
@@ -86,3 +88,56 @@ describe('apiRequest', () => {
     expect(fieldErrors([{ loc: ['body'], msg: 'x' }, null])).toEqual({});
   });
 });
+
+/** A JWT-shaped token expiring in `seconds` (the signature isn't checked client-side). */
+const tokenExpiringIn = (seconds, tag = 'a') => {
+  const payload = btoa(JSON.stringify({ sub: '6', exp: Math.floor(Date.now() / 1000) + seconds }));
+  return `h.${payload}.${tag}`;
+};
+
+describe('token refresh', () => {
+  it('reads how long a token has left', () => {
+    expect(tokenSecondsLeft(tokenExpiringIn(600))).toBeGreaterThan(590);
+    expect(tokenSecondsLeft('not-a-jwt')).toBeNull();
+    expect(tokenSecondsLeft(null)).toBeNull();
+  });
+
+  it('quietly renews a token that is about to expire, once for concurrent requests', async () => {
+    saveSession(tokenExpiringIn(30 * 60, 'old'), { id: 6 });
+    const fresh = tokenExpiringIn(8 * 3600, 'new');
+    const api = mockApi({
+      'POST /auth/refresh': { token: fresh, user: { id: 6, name: 'Emma' } },
+      'GET /incidents': { items: [], total: 0 },
+    });
+    await Promise.all([apiRequest('/incidents'), apiRequest('/incidents')]);
+
+    expect(api.calls.filter((c) => c.path === '/auth/refresh')).toHaveLength(1);
+    expect(getToken()).toBe(fresh);
+    expect(api.calls.filter((c) => c.path === '/incidents').every((c) => c.headers.Authorization === `Bearer ${fresh}`)).toBe(true);
+  });
+
+  it('leaves a token with plenty of time alone', async () => {
+    const token = tokenExpiringIn(5 * 3600);
+    saveSession(token, { id: 6 });
+    const api = mockApi({ 'GET /incidents': { items: [], total: 0 } });
+    await apiRequest('/incidents');
+    expect(api.calls.map((c) => c.path)).toEqual(['/incidents']);
+  });
+
+  it('carries on with the old token when renewal is refused or offline', async () => {
+    const old = tokenExpiringIn(10 * 60);
+    saveSession(old, { id: 6 });
+    mockApi({
+      'POST /auth/refresh': { status: 401, body: { message: 'Your session has reached its 24-hour limit.' } },
+      'GET /incidents': { items: [], total: 0 },
+    });
+    await apiRequest('/incidents');
+    expect(getToken()).toBe(old);
+
+    vi.stubGlobal('fetch', vi.fn()
+      .mockRejectedValueOnce(new TypeError('offline'))
+      .mockResolvedValueOnce(new Response('{"items":[],"total":0}', { status: 200 })));
+    await expect(apiRequest('/incidents')).resolves.toEqual({ items: [], total: 0 });
+  });
+});
+

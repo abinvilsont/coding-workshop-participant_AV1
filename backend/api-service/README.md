@@ -34,12 +34,14 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 `Authorization: Bearer <token>`.
 - Errors come back as `{"message": "..."}`.
 - Invalid input returns **400** with an `errors: [{loc, msg}]` list, one entry per field.
+- Rule errors about one field (raised as `FieldError`, `app/core/errors.py`) carry the same list with that field, e.g. `409` duplicate email → `email`, a full engineer → `engineer_id`, a floor from another building → `floor_id`. The UI shows the message above that field.
 - `PUT` is accepted as an alias of every `PATCH` route.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
 | POST | `/auth/register` | public | Employee sign-up (`@acme.inc` only) |
-| POST | `/auth/login` | public | Returns `{token, user}` (8h token) |
+| POST | `/auth/login` | public | Returns `{token, user, session_expires_at}` (8h token) |
+| POST | `/auth/refresh` | any | Swap a valid token for a fresh 8h one; refused 24h after the original sign-in; role and active status re-read |
 | GET | `/auth/me` | any | Current user |
 | GET | `/incidents` | any | List (scoped by role); filters `status`, `priority`, `escalated`, `unassigned`, `q`, `limit`, `offset` |
 | POST | `/incidents` | any | Report an incident |
@@ -50,6 +52,10 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST | `/incidents/{id}/assign` | admin | Assign / reassign; refuses on-leave, offline, inactive (400) or full (409) engineers |
 | POST | `/incidents/{id}/escalate` | reporter | Escalate, optionally request higher priority |
 | POST | `/incidents/{id}/notes` | can view, not closed | Add note (`is_internal` for engineers/admins) |
+| POST | `/incidents/{id}/review` | reporter / follower, closed | `{rating 1-5, comment?}`: rate the engineer (one each) |
+| PUT / PATCH, DELETE | `/incidents/{id}/review` | the reviewer | Change or withdraw your review |
+| GET | `/incidents/similar?building_id&category&floor_id` | any | Open incidents (open → on hold, not merged) that may already report this problem; brief: no reporter or description, plus `relation` (`reporter` / `follower`) |
+| POST | `/incidents/{id}/escalation-request` | employee, not the reporter | `{reason?}`: follow the incident, escalate it if not already, add a note, notify; once per employee (409 after) |
 | GET | `/incidents/{id}/merge-candidates` | admin | Open incidents to merge into, same building + category first |
 | POST | `/incidents/{id}/merge` | admin | `{target_id}`: merge this duplicate into another open incident; its reporter follows the target |
 | GET | `/dashboard` | any | Role-specific summary |
@@ -57,6 +63,9 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST, PATCH / PUT, DELETE | `/buildings`, `/floors`, `/seats` (`/{id}`) | admin | Manage locations; delete refused (409) while in use |
 | GET, POST | `/engineers` | admin | List with workload / create engineer account |
 | GET, PATCH / PUT | `/engineers/{id}` | admin | View / update profile, capacity, availability, active flag |
+| GET | `/users?role&include_inactive&q` | admin | Every account, admins first |
+| PATCH / PUT | `/users/{id}` | admin | `{role: employee \| facility_admin, is_active}`; not yourself, not engineers, never zero active admins (409) |
+| GET | `/engineers/{id}/reviews` | admin | Every review of the engineer, newest first (`GET /engineers` also returns `avg_rating`, `review_count`) |
 | PATCH / PUT | `/engineers/me/availability` | engineer | Set own availability |
 | GET | `/notifications` | any | Own notifications, newest first, + unread count |
 | GET | `/notifications/unread-count` | any | Cheap badge count (polled every 30 s) |
@@ -71,6 +80,16 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 - **Facility Admin** sees and manages everything, including merging duplicates.
 - **Follower** (reporter of a duplicate merged into the incident) can view it, add
   notes and gets every update the reporter gets, but can't confirm, reopen or cancel.
+- **Reviews**: once an incident is closed, its reporter and followers may each rate
+  the engineer. Admins see every review, an employee sees their own, and engineers
+  see none (`visible_reviews()`).
+
+**Concurrency.** Every route that changes an incident loads it with
+`get_incident_or_404(..., for_update=True)`, which locks the row until the
+transaction ends. Concurrent changes therefore run one at a time, and each re-checks
+its rules against the latest saved state. `PATCH /incidents/{id}` also accepts
+`expected_updated_at`; if the incident changed since that time, the answer is 409
+and nothing is saved.
 
 Status, assignment, priority and escalation changes are written to
 `incident_history` by a database trigger; the API sets `app.user_id` per request
@@ -93,3 +112,10 @@ python3.13 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt uvicorn
 CORS_ORIGINS=http://localhost:3000 uvicorn app.main:app --reload --port 8000
 ```
+
+## Database tasks on AWS
+
+`function.handler` also accepts a direct invocation `{"action": "status" | "init_db" | "migrate"}`
+(see `app/admin_tasks.py`). These run the SQL in `sql/`, which is a copy of `backend/db` kept in
+sync by `./bin/sync-db-sql.sh` (`tests/unit/test_packaged_sql.py` fails if it drifts). Requests
+through the Function URL always reach the web API, never these tasks.

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, FetchedValue, Identity, String, func, true
+from sqlalchemy import BigInteger, DateTime, FetchedValue, ForeignKey, Identity, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -19,6 +19,8 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(30))
     department: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(server_default=true())
+    # Usual building, set by a Facility Admin; the report form starts on it
+    home_building_id: Mapped[int | None] = mapped_column(ForeignKey("buildings.id", ondelete="SET NULL"))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -32,3 +34,7 @@ class User(Base):
     @property
     def is_engineer(self) -> bool:
         return self.role == UserRole.ENGINEER
+
+    @property
+    def is_employee(self) -> bool:
+        return self.role == UserRole.EMPLOYEE

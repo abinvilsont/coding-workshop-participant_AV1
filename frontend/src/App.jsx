@@ -8,6 +8,7 @@ import Login from './pages/Login.jsx'
 import NewIncident from './pages/NewIncident.jsx'
 import Engineers from './pages/admin/Engineers.jsx'
 import Facilities from './pages/admin/Facilities.jsx'
+import People from './pages/admin/People.jsx'
 import { matchPath, navigate, useHashPath } from './router'
 import { setUnauthorizedHandler } from './services/apiClient'
 import { getCurrentUser, logout } from './services/authService'
@@ -26,6 +27,7 @@ function routeFor(path, user) {
     }
     if (path === '/admin/facilities') return <Facilities />
     if (path === '/admin/engineers') return <Engineers />
+    if (path === '/admin/people') return <People user={user} />
   }
   const m = matchPath('/incidents/:id', path)
   if (m) return <IncidentDetail key={m.id} id={m.id} user={user} />

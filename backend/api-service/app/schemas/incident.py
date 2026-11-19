@@ -48,6 +48,9 @@ class IncidentUpdate(BaseModel):
     # admin only
     priority: IncidentPriority | None = None
     is_escalated: bool | None = None
+    # The incident's updated_at when the editor loaded it. If it changed since (someone
+    # else saved first), the edit is refused with 409 instead of overwriting their change.
+    expected_updated_at: datetime | None = None
 
 
 class StatusChange(BaseModel):
@@ -66,6 +69,18 @@ class MergeIn(BaseModel):
 class EscalateIn(BaseModel):
     reason: _text(2000)
     requested_priority: IncidentPriority | None = None
+
+
+def _strip_optional(v: str | None) -> str | None:
+    v = (v or "").strip()
+    return v or None
+
+
+class ReviewIn(BaseModel):
+    """Create or replace your review of the engineer (PUT/PATCH send the whole review)."""
+
+    rating: int = Field(ge=1, le=5, description="1 (poor) to 5 (excellent)")
+    comment: Annotated[str | None, Field(max_length=2000), AfterValidator(_strip_optional)] = None
 
 
 class NoteCreate(BaseModel):
@@ -129,6 +144,7 @@ class Permissions(BaseModel):
     can_add_internal_note: bool
     can_delete: bool
     can_merge: bool = False
+    can_review: bool = False
     status_transitions: list[IncidentStatus]
 
 
@@ -139,9 +155,51 @@ class LinkedIncident(BaseModel):
     reported_by: str | None = None
 
 
+class ReviewOut(BaseModel):
+    id: int
+    engineer_id: int
+    engineer_name: str
+    reviewer_id: int
+    reviewer_name: str
+    rating: int
+    comment: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EngineerReviewOut(ReviewOut):
+    """A review as listed on the admin's Engineers page."""
+
+    incident_id: int
+    incident_reference: str
+    incident_title: str
+
+
 class Follower(BaseModel):
     id: int
     name: str
+    escalation_requested_at: datetime | None = None  # when they asked to escalate it
+
+
+class SimilarIncident(BaseModel):
+    """An open incident that may be the problem someone is about to report.
+    Deliberately brief: no reporter name, description or notes."""
+
+    id: int
+    reference: str
+    title: str
+    category: IncidentCategory
+    status: IncidentStatus
+    building: str
+    floor: str | None
+    seat: str | None
+    is_escalated: bool
+    created_at: datetime
+    relation: str | None  # 'reporter' / 'follower' when it's already the caller's
+
+
+class EscalationRequestIn(BaseModel):
+    reason: Annotated[str | None, Field(max_length=2000), AfterValidator(_strip_optional)] = None
 
 
 class IncidentDetail(IncidentSummary):
@@ -162,3 +220,4 @@ class IncidentDetail(IncidentSummary):
     merged_into: LinkedIncident | None = None      # set on a duplicate
     merged_from: list[LinkedIncident] = []         # duplicates merged into this one
     followers: list[Follower] = []                 # their reporters, kept informed
+    reviews: list[ReviewOut] = []                  # admins: all; employees: their own; engineers: none

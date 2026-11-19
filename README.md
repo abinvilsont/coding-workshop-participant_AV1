@@ -6,28 +6,50 @@ them, and Engineers fix them. Everyone involved is kept informed in the app.
 
 Built for the coding workshop. The workshop brief and evaluation guides are in
 [`docs/`](docs/README.md); the original brief is in
-[`docs/WORKSHOP-BRIEF.md`](docs/WORKSHOP-BRIEF.md).
+[`docs/WORKSHOP-BRIEF.md`](docs/WORKSHOP-BRIEF.md). How the app works, step by step and with
+diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
+
+**View in your browser:** [How ACME Facility Desk Works](https://claude.ai/artifact/4zg4HwDhZH7Agf9TZVPy6h)
+· [Architecture page](https://claude.ai/artifact/5K5Hw9Gkc1Lg2SGG9JziYM)
 
 ## What it does
 
 | Role | Can do |
 |---|---|
-| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen |
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (the form starts on their usual building, if an admin has set one, with a gentle note if they pick another; they're told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
-| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, manage buildings / floors / seats and engineer accounts, delete incidents |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, manage **People** (set each person's usual building, make an employee an admin or back, deactivate or reactivate accounts), delete incidents |
 
 An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
 reporter, not the engineer, confirms the fix. Every change is written to the
 incident's history, and the people involved are notified through the bell
 (it polls every 30 s).
 
-**Duplicates.** When two employees report the same problem, an admin merges one
+**Already reported?** Before a new report is saved, the app looks for open incidents
+in the same building and category (and floor, when both have one). If it finds any,
+the employee sees **"This may already be reported"** and can:
+- **Request escalation** on the existing incident (with an optional reason). They
+  become a follower, the incident is escalated if it wasn't already, a note names
+  them for the engineer, and the admins, engineer and original reporter are told.
+  Each employee can request this once per incident.
+- **Report it anyway** if it's a different problem, or go back to the form.
+
+**Duplicates.** If two employees still report the same problem, an admin merges one
 report into the other:
 - The duplicate is closed and labelled "Merged", with a link to the main incident.
 - The duplicate's details are added to the main incident as a note.
 - Its reporter becomes a **follower** of the main incident: they see it, can comment,
   and get every update.
 - Only the original reporter confirms the fix.
+
+**Engineer reviews.** Once an incident is closed, the employees who reported it
+(the reporter and any followers) can each rate the engineer from 1 to 5 stars, with
+an optional comment, and edit or delete that review later.
+- The reviewer sees their own review on the incident.
+- Admins see every review on the incident, plus each engineer's average rating on
+  the Engineers page.
+- **Engineers never see reviews.** The API leaves reviews out of every response an
+  engineer receives, and doesn't notify them.
 
 ## Architecture
 
@@ -38,7 +60,9 @@ report into the other:
 ```
 
 - **Frontend:** React 19, Material UI 7, React Responsive, Vite. Hash routing, so it
-  works on S3 without rewrite rules.
+  works on S3 without rewrite rules. Light and dark mode: the sun/moon button in
+  the top bar (and on the sign-in page) switches, and the choice is remembered on
+  that device. Until someone picks, the app follows the device's own setting.
 - **Backend:** one FastAPI service (`backend/api-service`) running on Lambda through
   Mangum. It uses SQLAlchemy 2, Pydantic 2, JWT auth and bcrypt hashing.
 - **Database:** PostgreSQL. The schema is in [`backend/db/schema.sql`](backend/db/schema.sql),
@@ -114,8 +138,14 @@ REST + JSON under `/api/api-service`. The full endpoint table is in
 - **Methods and status codes:** `POST` creates (201), `GET` reads (200),
   `PUT`/`PATCH` update (200; `PUT` is an alias of `PATCH`), `DELETE` removes (204).
   Workflow actions are `POST /incidents/{id}/status|assign|escalate|notes`.
-- **Errors** always come back as `{"message": "..."}`. Validation errors also carry
-  `errors: [{loc, msg}]`, which the forms show under the matching field.
+- **Errors** always come back as `{"message": "..."}`. When the problem is about one
+  field, the response also carries `errors: [{loc, msg}]` naming it: invalid input, and
+  rule errors such as a duplicate email, a floor from another building or a full
+  engineer.
+  - The page shows each message directly **above** that field and moves the cursor to
+    the first one.
+  - An error that names no field (for example the server can't be reached) appears just
+    above the button that was clicked. Nothing is shown in a banner at the top of the page.
 
   | Code | Meaning |
   |---|---|
@@ -137,9 +167,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 228 | 99 % |
-| Frontend: Vitest + React Testing Library | 104 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 13 | every critical journey |
+| Backend: pytest, unit + integration on a throwaway database | 329 | 99 % |
+| Frontend: Vitest + React Testing Library | 157 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 27 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -150,27 +180,59 @@ are in [`TESTING.md`](TESTING.md).
 The infrastructure is defined in `infra/` and deployed by the workshop scripts:
 
 ```sh
-./bin/deploy-backend.sh aws     # Terraform: Lambda, Aurora, CloudFront, S3
-./bin/deploy-frontend.sh aws    # build React and upload to S3
+./bin/sync-db-sql.sh            # only if backend/db changed (a test fails if the copies drift)
+./bin/deploy-backend.sh aws     # Terraform: Lambda, Aurora, CloudFront, S3 (renews AWS credentials)
+./bin/deploy-frontend.sh aws    # build React with the CloudFront URL, upload to S3
 ```
 
-Before the first cloud deploy:
-1. Connect to Aurora over TLS (`sslmode=require` when `IS_LOCAL` is `false`).
-2. Create the tables in Aurora: run `schema.sql`, and for sample data, `seed.sql`.
-   Change the sample passwords first. `schema.sql` already includes every
-   migration in `backend/db/migrations/`.
-3. Set a strong `JWT_SECRET`.
+**First deploy: create the database.** Aurora has no public address, so its tables
+are created by the Lambda itself. Invoke it directly; this needs AWS credentials, and
+web requests can't trigger it:
 
-**Status:** the app has not yet been deployed to AWS. All three steps are still open.
+```sh
+FN=$(cd infra && terraform output -json lambda_urls | jq -r 'keys[0]')
+aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
+  --payload '{"action":"init_db","admin":{"name":"Your Name","email":"you@acme.inc","password":"a-strong-password"}}' out.json
+cat out.json
+```
+
+| Payload | What it does |
+|---|---|
+| `{"action":"status"}` | Tables present? Counts of users, incidents and admins; is the signing key set? |
+| `{"action":"init_db", "admin": {...}}` | **Empty database only.** Creates the tables, your admin account and a random JWT signing key. Add `"seed": true` for the sample data; every sample password is `Password123!`. |
+| `{"action":"migrate"}` | Runs every migration in `backend/db/migrations/` (each is additive and safe to repeat). Run it after deploying a version that adds tables or columns. |
+
+On AWS (`IS_LOCAL=false`) the API:
+- connects to Aurora over TLS (`sslmode=require`);
+- waits up to 45 s for a paused Aurora to wake;
+- signs tokens with the random key that `init_db` stored in the `app_secrets` table.
+
+Set `JWT_SECRET` in the Lambda environment to override that key.
+
+Aurora Serverless v2 pauses after 5 idle minutes. While it wakes, the API retries
+the connection for up to 25 seconds (`DB_WAKE_SECONDS`), so the first request after
+a quiet spell is slow rather than failing. That limit stays under CloudFront's
+30-second origin timeout.
+
+**Status:** deployed on 19 Nov 2026 at **https://d3lb2j5ijpzy26.cloudfront.net**, with the sample data, so every
+sample password is `Password123!`.
 
 ## Design decisions and trade-offs
 
 - **One API service, not several.** It's one codebase and one deploy, and the domain
   is small enough. Routes are split by feature inside it.
 - **JWT instead of server sessions.** Lambda instances share no memory. Tokens last
-  8 hours (a working day) and live in `sessionStorage`, so closing the tab signs you
-  out, which suits shared office PCs. There is no refresh token yet; an expired
-  session sends you back to sign-in.
+  8 hours and live in `sessionStorage`, so closing the tab signs you out, which suits
+  shared office PCs.
+  - When less than an hour is left, the app quietly swaps the token for a fresh one
+    (`POST /auth/refresh`). An open tab therefore stays signed in, because the bell
+    calls the API every 30 s.
+  - A session still ends 24 hours after signing in, which limits how long a stolen
+    token is useful.
+  - Every renewal re-reads the user's role and whether the account is active.
+- **An installable app (PWA), without a plugin.** A hand-written service worker
+  (`public/sw.js`) caches the app's files, so the app opens instantly and loads offline.
+  It never caches `/api/` responses, so incident data is always live and private.
 - **Notifications are polled every 30 s, not pushed.** Lambda can't hold WebSockets
   open, and the polling query only counts rows.
 - **History is written by a database trigger.** No code path can forget to log a
@@ -180,8 +242,31 @@ Before the first cloud deploy:
 - **The connection pool depends on where the API runs:** 1+1 connections on Lambda,
   10+30 under uvicorn. This was found by the load test.
 - **Native `<select>` styled by Material UI** so phones show their own pickers.
+- **Responsive at every width, from 320 px phones to wide monitors** (breakpoints in
+  `src/hooks/useResponsive.js`).
+  - **Below 960 px:** the top bar becomes a menu drawer, and incident lists become cards.
+  - **Below 1200 px for admins:** their six menu links don't fit in one row, so they
+    get the drawer too.
+  - **Below 1100 px:** the Engineers table becomes cards.
+  - **Below 700 px:** pages use a single column.
+  - A browser test checks every page for every role at four sizes, and fails if a page
+    or a table scrolls sideways.
+- **Dark mode uses Material UI's colour schemes as CSS variables.** Both palettes
+  live in `src/theme.js`, and switching only changes a class on `<html>`, so nothing
+  re-renders. A small script in `index.html` applies the saved choice before React
+  loads, so the page doesn't flash white.
 - **Engineer capacity is enforced on the server** with a row lock, so two admins
   can't both fill an engineer's last slot.
+- **People acting on the same incident at once never overwrite each other.**
+  - Every request that changes an incident locks its row first. A second request
+    waits, then re-checks its rules against what the first one saved. For example, a
+    cancel that arrives just after "Start work" is refused (403) instead of silently
+    winning.
+  - The edit form sends the version it started from (`expected_updated_at`). If
+    someone saved in between, the API answers 409, and the page shows their version
+    with a warning instead of overwriting it.
+  - Any refused action reloads the incident, so the buttons match its current
+    state.
 - **Merging a duplicate cancels it rather than adding a new status.**
   - The database already requires an engineer for any status other than
     Open or Cancelled, and a duplicate often has none.
@@ -189,6 +274,12 @@ Before the first cloud deploy:
     labels it "Merged".
   - Followers live in their own table, so the original reporter keeps sole control
     of confirming the fix.
+- **Reviews are filtered on the server, not hidden in the UI.**
+  - `visible_reviews()` in `permissions.py` returns every review to admins, the
+    caller's own review to an employee, and nothing to engineers.
+  - The engineer's own profile response has the rating fields removed.
+  - Each review stores the engineer at the time it's written, so a later
+    reassignment doesn't move the rating to someone else.
 
 ## Assumptions
 
@@ -202,10 +293,14 @@ Before the first cloud deploy:
 - A merge isn't undone automatically. If an admin merges by mistake, the follower
   can still comment on the main incident, and the admin can ask them to report
   it again.
+- Employees see only their own review, not other reporters'. Reviews are feedback
+  for admins, not a public score.
+- Only closed incidents can be reviewed. A cancelled or merged report has no fix
+  to rate; its reporter rates the main incident instead.
 
 ## Known gaps
 
-- Not yet deployed to AWS (see above).
-- No token refresh, password change or password reset.
-- No push notifications, PWA or offline mode.
-- No admin-account management screen.
+- No password change or password reset.
+- No push notifications: the bell polls every 30 s. Offline, the app opens but can't
+  load data.
+- Engineers can't change role from the People page; they're managed on the Engineers page.

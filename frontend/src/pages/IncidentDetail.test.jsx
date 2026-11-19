@@ -1,8 +1,9 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { USERS, incident, mockApi } from '../test/mockApi';
 import IncidentDetail from './IncidentDetail';
+import { expectErrorAbove } from '../test/fieldErrors';
 
 const NOTES = [
   { id: 1, body: 'Refrigerant is low.', is_internal: false, created_at: '2026-11-16T10:00:00Z', author_id: 2, author_name: 'Ethan Electrics', author_role: 'engineer' },
@@ -186,7 +187,8 @@ describe('IncidentDetail', () => {
     await within(assignBlock).findByRole('option', { name: /Tom Tech/ });
     await user.selectOptions(within(assignBlock).getByRole('combobox'), '4');
     await user.click(screen.getByRole('button', { name: 'Assign' }));
-    expect(await screen.findByText(message)).toBeInTheDocument();
+    // shown inside the Assign box, right above the engineer picker - not at the top of the page
+    await waitFor(() => expectErrorAbove(within(assignBlock).getByRole('combobox'), message));
   });
 
   it('edits details in place', async () => {
@@ -205,6 +207,60 @@ describe('IncidentDetail', () => {
 
     expect(await screen.findByRole('heading', { name: 'AC broken' })).toBeInTheDocument();
     expect(api.calls.at(-1).body).not.toHaveProperty('priority');
+    // tells the API which version the edit started from
+    expect(api.calls.at(-1).body.expected_updated_at).toBe('2026-11-17T09:00:00Z');
+  });
+
+  it('does not overwrite a change someone else saved while you were editing', async () => {
+    const user = userEvent.setup();
+    let current = incident({ status: 'open', permissions: { can_edit: true } });
+    const api = setup(current, {
+      'GET /incidents/4': () => current,
+      'GET /facilities': [],
+      'PATCH /incidents/4': () => {
+        // Tom renamed it a moment earlier
+        current = incident({ title: 'AC fixed by Tom', status: 'open', updated_at: '2026-11-17T10:00:00Z',
+          permissions: { can_edit: true } });
+        return { status: 409, body: { message: 'Someone updated this incident while you were editing.' } };
+      },
+    });
+    render(<IncidentDetail id={4} user={USERS.employee} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }));
+    await user.clear(screen.getByLabelText(/^Title/));
+    await user.type(screen.getByLabelText(/^Title/), 'My stale title');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    // the form closes on the latest version, with a warning where it was
+    expect(await screen.findByRole('heading', { name: 'AC fixed by Tom' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("Your changes weren't saved: someone updated this incident");
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+
+    // editing again starts from the new version
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Title/)).toHaveValue('AC fixed by Tom');
+    expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
+  });
+
+  it('reloads the incident when an action is refused because it changed meanwhile', async () => {
+    const user = userEvent.setup();
+    let current = incident({ status: 'assigned', permissions: { status_transitions: ['cancelled'] } });
+    const api = setup(current, {
+      'GET /incidents/4': () => current,
+      'POST /incidents/4/status': () => {
+        current = incident({ status: 'in_progress', permissions: { status_transitions: [] } }); // Tom started work
+        return { status: 403, body: { message: "You can't change this incident from in_progress to cancelled." } };
+      },
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<IncidentDetail id={4} user={USERS.employee} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel incident' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('from in_progress to cancelled');
+    await waitFor(() => expect(screen.getByTestId('incident-badges')).toHaveTextContent('In progress'));
+    expect(screen.queryByRole('button', { name: 'Cancel incident' })).not.toBeInTheDocument();
+    expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
   });
 
   it('deletes after confirmation and returns to the list', async () => {
@@ -310,11 +366,101 @@ describe('IncidentDetail', () => {
       expect(screen.getByText(/You're following this incident/)).toHaveTextContent('Emma Employee confirms the fix.');
     });
 
+    it('shows who asked for escalation, and tells them why they follow it', async () => {
+      const liam = { id: 7, name: 'Liam Lee', email: 'liam.lee@acme.inc', role: 'employee' };
+      setup(incident({
+        is_escalated: true,
+        followers: [{ id: 7, name: 'Liam Lee', escalation_requested_at: '2026-11-19T09:00:00Z' }],
+      }));
+      render(<IncidentDetail id={4} user={liam} />);
+      const details = await screen.findByTestId('incident-details');
+      expect(details).toHaveTextContent('Asked to escalateLiam Lee');
+      expect(screen.getByText(/You're following this incident/)).toHaveTextContent(
+        'because you have the same problem and asked for it to be escalated',
+      );
+    });
+
     it('does not show the follower notice to the original reporter', async () => {
       setup(incident({ followers: [{ id: 7, name: 'Liam Lee' }] }));
       render(<IncidentDetail id={4} user={USERS.employee} />);
       await screen.findByRole('heading', { name: 'Air conditioning not cooling' });
       expect(screen.queryByText(/You're following this incident/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('engineer reviews', () => {
+    const closed = (overrides = {}) =>
+      incident({ status: 'closed', assigned_engineer: 'Tom Tech', assigned_engineer_id: 4, ...overrides });
+    const REVIEW = {
+      id: 1, engineer_id: 4, engineer_name: 'Tom Tech', reviewer_id: 6, reviewer_name: 'Emma Employee',
+      rating: 4, comment: 'Quick fix.', created_at: '2026-11-18T09:00:00Z', updated_at: '2026-11-18T09:00:00Z',
+    };
+
+    it('employee rates the engineer of a closed incident', async () => {
+      const user = userEvent.setup();
+      const api = setup(closed({ permissions: { can_review: true } }), {
+        'POST /incidents/4/review': () => ({ status: 201, body: closed({ reviews: [REVIEW] }) }),
+      });
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+
+      const section = await screen.findByRole('region', { name: 'Rate Tom Tech' });
+      expect(section).toHaveTextContent("Only you and Facility Admins see your review. Tom Tech won't.");
+      const submit = within(section).getByRole('button', { name: 'Submit review' });
+      expect(submit).toBeDisabled();
+      // MUI Rating reads hover from element sizes, which jsdom lacks, so click the radio itself
+      fireEvent.click(within(section).getByRole('radio', { name: '4 stars' }));
+      expect(section).toHaveTextContent('Very good');
+      await user.type(within(section).getByLabelText('Comment (optional)'), '  Quick fix.  ');
+      await user.click(submit);
+
+      expect(api.calls.at(-1)).toMatchObject({ method: 'POST', path: '/incidents/4/review', body: { rating: 4, comment: 'Quick fix.' } });
+      expect(await within(section).findByText('Your review')).toBeInTheDocument();
+      expect(within(section).getByRole('img', { name: '4 stars' })).toBeInTheDocument();
+    });
+
+    it('employee edits and deletes their review', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      let current = closed({ reviews: [REVIEW] });
+      const api = setup(current, {
+        'GET /incidents/4': () => current,
+        'PUT /incidents/4/review': (body) => (current = closed({ reviews: [{ ...REVIEW, ...body }] })),
+        'DELETE /incidents/4/review': () => {
+          current = closed({ permissions: { can_review: true } });
+          return { status: 204, body: null };
+        },
+      });
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+
+      const section = await screen.findByRole('region', { name: 'Rate Tom Tech' });
+      expect(section).toHaveTextContent('Quick fix.');
+      await user.click(within(section).getByRole('button', { name: 'Edit review' }));
+      fireEvent.click(within(section).getByRole('radio', { name: '2 stars' }));
+      await user.clear(within(section).getByLabelText('Comment (optional)'));
+      await user.click(within(section).getByRole('button', { name: 'Save review' }));
+      expect(api.calls.at(-1)).toMatchObject({ method: 'PUT', body: { rating: 2, comment: null } });
+      expect(await within(section).findByRole('img', { name: '2 stars' })).toBeInTheDocument();
+
+      await user.click(within(section).getByRole('button', { name: 'Delete' }));
+      expect(await within(section).findByRole('button', { name: 'Submit review' })).toBeInTheDocument();
+      expect(api.calls.some((c) => c.method === 'DELETE')).toBe(true);
+    });
+
+    it('admin reads every review', async () => {
+      setup(closed({ reviews: [REVIEW, { ...REVIEW, id: 2, reviewer_id: 7, reviewer_name: 'Liam Lee', rating: 2, comment: null }] }));
+      render(<IncidentDetail id={4} user={USERS.admin} />);
+      const section = await screen.findByRole('region', { name: 'Engineer reviews (2)' });
+      expect(section).toHaveTextContent('Emma Employee rated Tom Tech');
+      expect(section).toHaveTextContent('Liam Lee rated Tom Tech');
+      expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('shows nothing to engineers, or before the incident is closed', async () => {
+      setup(closed());
+      render(<IncidentDetail id={4} user={USERS.engineer} />);
+      await screen.findByRole('heading', { name: 'Air conditioning not cooling' });
+      expect(screen.queryByText(/review/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /Rate/ })).not.toBeInTheDocument();
     });
   });
 });

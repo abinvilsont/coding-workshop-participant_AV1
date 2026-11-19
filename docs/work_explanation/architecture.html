@@ -1,0 +1,1154 @@
+<title>ACME Facility Desk Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one reading column of numbered-by-topic sections; diagrams scroll sideways on phones. */
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --fg: #172030;
+  --muted: #5b6577;
+  --line: #c7cfdb;
+  --accent: #1f4fd8;
+  --emp: #0f766e;
+  --eng: #b45309;
+  --adm: #7c3aed;
+  --ok: #15803d;
+  --todo: #b45309;
+  --tint: #eef2fb;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131b; --surface: #161d28; --fg: #e5e9f0; --muted: #9aa4b5; --line: #354157;
+    --accent: #85a6ff; --emp: #2dd4bf; --eng: #fbbf24; --adm: #b69cfb; --ok: #4ade80; --todo: #fbbf24;
+    --tint: #1b2537; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131b; --surface: #161d28; --fg: #e5e9f0; --muted: #9aa4b5; --line: #354157;
+  --accent: #85a6ff; --emp: #2dd4bf; --eng: #fbbf24; --adm: #b69cfb; --ok: #4ade80; --todo: #fbbf24;
+  --tint: #1b2537; color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+header.top { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+h1 { margin: 0; font-size: clamp(28px, 4vw, 40px); line-height: 1.1; text-wrap: balance; font-weight: 700; }
+h2 { margin: 0; font-size: 22px; line-height: 1.25; text-wrap: balance; }
+h3 { margin: 0; font-size: 15px; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--muted); font-size: 16px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+
+.stack { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); font-size: 13px; white-space: nowrap;
+}
+.chip b { font-weight: 600; }
+.updated { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+
+section { display: flex; flex-direction: column; gap: 16px; }
+.sec-head { display: flex; flex-direction: column; gap: 6px; }
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.diagram {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+.diagram svg { display: block; width: 100%; height: auto; min-width: 820px; color: var(--fg); }
+figcaption { color: var(--muted); font-size: 13.5px; max-width: 80ch; }
+
+/* SVG vocabulary (page CSS styles the inline SVG) */
+svg text { font-family: var(--font-sans); fill: var(--fg); font-size: 13px; }
+svg .t-b { font-weight: 600; }
+svg .t-s { font-size: 11px; fill: var(--muted); }
+svg .t-m { font-family: var(--font-mono); font-size: 11.5px; }
+svg .t-ms { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); }
+svg .t-acc { fill: var(--accent); font-weight: 600; }
+svg .node { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+svg .group { fill: var(--tint); stroke: var(--line); stroke-width: 1.2; }
+svg .band { fill: var(--tint); }
+svg .dash { fill: none; stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 4 3; }
+svg .edge { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+svg .edge-acc { fill: none; stroke: var(--accent); stroke-width: 2; }
+svg .e-emp { fill: none; stroke: var(--emp); stroke-width: 2; }
+svg .e-eng { fill: none; stroke: var(--eng); stroke-width: 2; }
+svg .e-adm { fill: none; stroke: var(--adm); stroke-width: 2; }
+svg .l-emp { fill: var(--emp); font-weight: 600; font-size: 11.5px; }
+svg .l-eng { fill: var(--eng); font-weight: 600; font-size: 11.5px; }
+svg .l-adm { fill: var(--adm); font-weight: 600; font-size: 11.5px; }
+svg .mk-muted { fill: var(--muted); }
+svg .mk-acc { fill: var(--accent); }
+svg .mk-emp { fill: var(--emp); }
+svg .mk-eng { fill: var(--eng); }
+svg .mk-adm { fill: var(--adm); }
+svg .state { fill: var(--surface); stroke: var(--fg); stroke-width: 1.3; }
+svg .state-end { fill: var(--tint); stroke: var(--fg); stroke-width: 1.3; }
+svg .dot { fill: var(--fg); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.sw.emp { background: var(--emp); } .sw.eng { background: var(--eng); } .sw.adm { background: var(--adm); }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+th {
+  font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); background: var(--tint);
+}
+td.ep { font-family: var(--font-mono); font-size: 12.5px; white-space: nowrap; }
+.m { display: inline-block; min-width: 46px; font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--muted); }
+.yes { color: var(--ok); font-weight: 600; }
+.no { color: var(--muted); }
+.part { color: var(--todo); font-weight: 600; }
+.role-emp { color: var(--emp); font-weight: 600; }
+.role-eng { color: var(--eng); font-weight: 600; }
+.role-adm { color: var(--adm); font-weight: 600; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.card .path { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+ol.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; border-left: 2px solid var(--line); }
+ol.log li { position: relative; padding: 0 0 18px 20px; display: flex; flex-direction: column; gap: 4px; }
+ol.log li::before {
+  content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--surface); border: 2px solid var(--accent);
+}
+ol.log li.retired::before { border-color: var(--line); }
+.log-when { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.log-what { font-weight: 600; }
+.log-detail { font-size: 13.5px; color: var(--muted); max-width: 80ch; }
+
+.note {
+  border: 1px solid var(--line); border-left: 3px solid var(--todo); border-radius: 8px;
+  background: var(--surface); padding: 12px 14px; font-size: 13.5px;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <span class="eyebrow">Living architecture · coding-workshop-participant</span>
+  <h1>ACME Facility Desk Architecture</h1>
+  <p class="lede">How the incident platform fits together today: what runs where, how a request travels, what the database holds, and which role may do what. Updated as the build progresses.</p>
+  <div class="stack">
+    <span class="chip"><b>Frontend</b> React 19 · Material UI 7 · React Responsive · Vite</span>
+    <span class="chip"><b>API</b> FastAPI · SQLAlchemy 2 · Pydantic 2</span>
+    <span class="chip"><b>Runtime</b> AWS Lambda (Python 3.13) via Mangum</span>
+    <span class="chip"><b>Database</b> PostgreSQL 18</span>
+    <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
+  </div>
+  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>fbac27a</code> (deployed to AWS)</span>
+</header>
+
+<!-- ============================================================ 1. Request path -->
+<section id="request-path">
+  <div class="sec-head">
+    <span class="eyebrow">Runtime</span>
+    <h2>How a request travels</h2>
+  </div>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 1070 510" role="img" aria-label="The React app, installable with a service worker that caches its files, calls one FastAPI Lambda through the dev proxy locally or CloudFront in AWS; the Lambda reads and writes PostgreSQL, where a trigger records incident history.">
+        <defs>
+          <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ar-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- Browser -->
+        <rect class="group" x="20" y="40" width="190" height="448" rx="10"/>
+        <text class="t-b" x="115" y="66" text-anchor="middle">Browser</text>
+        <text class="t-s" x="115" y="83" text-anchor="middle">React + MUI · Vite :3000</text>
+        <rect class="node" x="36" y="100" width="158" height="28" rx="6"/><text x="115" y="119" text-anchor="middle">Login / Register</text>
+        <rect class="node" x="36" y="136" width="158" height="28" rx="6"/><text x="115" y="155" text-anchor="middle">Dashboard</text>
+        <rect class="node" x="36" y="172" width="158" height="28" rx="6"/><text x="115" y="191" text-anchor="middle">Incidents list</text>
+        <rect class="node" x="36" y="208" width="158" height="28" rx="6"/><text x="115" y="227" text-anchor="middle">Report incident</text>
+        <rect class="node" x="36" y="244" width="158" height="28" rx="6"/><text x="115" y="263" text-anchor="middle">Incident detail</text>
+        <rect class="node" x="36" y="280" width="158" height="28" rx="6"/><text x="115" y="299" text-anchor="middle">Facilities · admin</text>
+        <rect class="node" x="36" y="316" width="158" height="28" rx="6"/><text x="115" y="335" text-anchor="middle">Engineers · admin</text>
+        <rect class="node" x="36" y="352" width="158" height="28" rx="6"/><text x="115" y="371" text-anchor="middle">People · admin</text>
+        <rect class="dash" x="36" y="392" width="158" height="38" rx="6"/>
+        <text class="t-ms" x="115" y="408" text-anchor="middle">sessionStorage: JWT</text>
+        <text class="t-ms" x="115" y="422" text-anchor="middle">renewed under 1 h left</text>
+        <rect class="dash" x="36" y="438" width="158" height="38" rx="6"/>
+        <text class="t-ms" x="115" y="454" text-anchor="middle">service worker</text>
+        <text class="t-ms" x="115" y="468" text-anchor="middle">app files, never /api</text>
+
+        <!-- Edge: proxy / CloudFront -->
+        <rect class="node" x="280" y="80" width="170" height="70" rx="8"/>
+        <text class="t-b" x="365" y="107" text-anchor="middle">Dev proxy :3001</text>
+        <text class="t-s" x="365" y="124" text-anchor="middle">local · bin/proxy-server.js</text>
+        <text class="t-s" x="365" y="139" text-anchor="middle">forwards Authorization</text>
+
+        <rect class="node" x="280" y="230" width="170" height="70" rx="8"/>
+        <text class="t-b" x="365" y="257" text-anchor="middle">CloudFront</text>
+        <text class="t-s" x="365" y="274" text-anchor="middle">AWS · /api/api-service*</text>
+        <text class="t-s" x="365" y="289" text-anchor="middle">same origin as the SPA</text>
+
+        <line class="edge-acc" x1="210" y1="115" x2="278" y2="115" marker-end="url(#ar-acc)"/>
+        <text class="t-s" x="244" y="107" text-anchor="middle">fetch + JWT</text>
+        <line class="edge-acc" x1="210" y1="265" x2="278" y2="265" marker-end="url(#ar-acc)"/>
+        <text class="t-s" x="244" y="257" text-anchor="middle">fetch + JWT</text>
+
+        <!-- Lambda -->
+        <rect class="group" x="520" y="20" width="310" height="430" rx="10"/>
+        <text class="t-b" x="675" y="45" text-anchor="middle">api-service · AWS Lambda</text>
+        <text class="t-s" x="675" y="62" text-anchor="middle">FastAPI app wrapped by Mangum</text>
+
+        <rect class="node" x="536" y="76" width="278" height="50" rx="6"/>
+        <text class="t-b" x="675" y="97" text-anchor="middle">Middleware</text>
+        <text class="t-s" x="675" y="114" text-anchor="middle">strip /api/api-service · errors as {message}</text>
+
+        <rect class="node" x="536" y="140" width="278" height="50" rx="6"/>
+        <text class="t-b" x="675" y="158" text-anchor="middle">Routers</text>
+        <text class="t-ms" x="675" y="172" text-anchor="middle">auth · incidents · dashboard · facilities</text>
+        <text class="t-ms" x="675" y="185" text-anchor="middle">engineers · users · notifications</text>
+
+        <rect class="node" x="536" y="204" width="278" height="50" rx="6"/>
+        <text class="t-b" x="675" y="225" text-anchor="middle">Auth dependencies</text>
+        <text class="t-s" x="675" y="242" text-anchor="middle">verify JWT · load user · require_roles()</text>
+
+        <rect class="node" x="536" y="268" width="278" height="50" rx="6"/>
+        <text class="t-b" x="675" y="289" text-anchor="middle">Services</text>
+        <text class="t-s" x="675" y="306" text-anchor="middle">permissions · incidents · notifications</text>
+
+        <rect class="node" x="536" y="332" width="278" height="50" rx="6"/>
+        <text class="t-b" x="675" y="353" text-anchor="middle">SQLAlchemy ORM</text>
+        <text class="t-s" x="675" y="370" text-anchor="middle">models · session · psycopg 3 driver</text>
+
+        <text class="t-ms" x="675" y="412" text-anchor="middle">handler = function.handler</text>
+        <text class="t-ms" x="675" y="428" text-anchor="middle">also runs under uvicorn for /docs</text>
+
+        <line class="edge-acc" x1="450" y1="115" x2="518" y2="115" marker-end="url(#ar-acc)"/>
+        <text class="t-s" x="484" y="107" text-anchor="middle">invoke</text>
+        <line class="edge-acc" x1="450" y1="265" x2="518" y2="265" marker-end="url(#ar-acc)"/>
+        <text class="t-s" x="484" y="257" text-anchor="middle">invoke</text>
+
+        <!-- PostgreSQL -->
+        <rect class="group" x="900" y="40" width="150" height="430" rx="10"/>
+        <text class="t-b" x="975" y="66" text-anchor="middle">PostgreSQL</text>
+        <text class="t-s" x="975" y="83" text-anchor="middle">db postgres · :5432</text>
+        <text class="t-m" x="916" y="110">users</text>
+        <text class="t-m" x="916" y="128">engineer_profiles</text>
+        <text class="t-m" x="916" y="146">buildings</text>
+        <text class="t-m" x="916" y="164">floors</text>
+        <text class="t-m" x="916" y="182">seats</text>
+        <text class="t-m" x="916" y="200">incidents</text>
+        <text class="t-m" x="916" y="218">incident_notes</text>
+        <text class="t-m" x="916" y="236">incident_history</text>
+        <text class="t-m" x="916" y="254">notifications</text>
+        <text class="t-m" x="916" y="272">incident_followers</text>
+        <text class="t-m" x="916" y="290">engineer_reviews</text>
+        <text class="t-m" x="916" y="308">app_secrets</text>
+        <text class="t-ms" x="916" y="328">view engineer_workload</text>
+
+        <rect class="dash" x="912" y="346" width="126" height="64" rx="6"/>
+        <text class="t-acc" x="975" y="365" text-anchor="middle" font-size="12">trigger</text>
+        <text class="t-ms" x="975" y="382" text-anchor="middle">on incidents change</text>
+        <text class="t-ms" x="975" y="398" text-anchor="middle">writes history row</text>
+
+        <text class="t-ms" x="975" y="434" text-anchor="middle">schema.sql + seed.sql</text>
+        <text class="t-ms" x="975" y="450" text-anchor="middle">+ migrations/</text>
+
+        <line class="edge-acc" x1="814" y1="357" x2="898" y2="357" marker-end="url(#ar-acc)"/>
+        <text class="t-s" x="856" y="349" text-anchor="middle">SQL</text>
+        <text class="t-ms" x="856" y="373" text-anchor="middle">app.user_id</text>
+      </svg>
+    </div>
+    <figcaption>One Lambda serves the whole API. Locally the dev proxy strips <code>/api/api-service</code> before invoking it; in AWS CloudFront passes the full path and the app's middleware strips it. Each request sets <code>app.user_id</code> in its transaction so the database trigger can record who changed an incident.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 2. Data model -->
+<section id="data-model">
+  <div class="sec-head">
+    <span class="eyebrow">Database</span>
+    <h2>What the database holds</h2>
+  </div>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 1000 730" role="img" aria-label="Incidents reference the reporting user, the assigned engineer profile and a building, floor and seat; notes, history rows, followers and notifications hang off each incident; a merged duplicate points at its main incident; engineer profiles extend users one to one; engineer reviews rate an engineer profile for one incident.">
+        <defs>
+          <marker id="er-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- users -->
+        <rect class="node" x="30" y="30" width="210" height="148" rx="8"/>
+        <rect class="band" x="31" y="31" width="208" height="28" rx="7"/>
+        <text class="t-b t-m" x="44" y="50">users</text>
+        <text class="t-m" x="44" y="77">id</text><text class="t-ms" x="228" y="77" text-anchor="end">PK</text>
+        <text class="t-m" x="44" y="95">email</text><text class="t-ms" x="228" y="95" text-anchor="end">@acme.inc only</text>
+        <text class="t-m" x="44" y="113">role</text><text class="t-ms" x="228" y="113" text-anchor="end">employee/engineer/admin</text>
+        <text class="t-m" x="44" y="131">password_hash</text><text class="t-ms" x="228" y="131" text-anchor="end">bcrypt</text>
+        <text class="t-m" x="44" y="149">is_active</text>
+        <text class="t-m" x="44" y="167">home_building_id</text><text class="t-ms" x="228" y="167" text-anchor="end">usual building</text>
+
+        <!-- engineer_profiles -->
+        <rect class="node" x="30" y="330" width="210" height="130" rx="8"/>
+        <rect class="band" x="31" y="331" width="208" height="28" rx="7"/>
+        <text class="t-b t-m" x="44" y="350">engineer_profiles</text>
+        <text class="t-m" x="44" y="377">user_id</text><text class="t-ms" x="228" y="377" text-anchor="end">PK, FK users</text>
+        <text class="t-m" x="44" y="395">specializations</text><text class="t-ms" x="228" y="395" text-anchor="end">category[]</text>
+        <text class="t-m" x="44" y="413">availability</text>
+        <text class="t-m" x="44" y="431">max_active_tickets</text>
+        <text class="t-m" x="44" y="449">home_building_id</text>
+
+        <rect class="dash" x="30" y="482" width="210" height="44" rx="6"/>
+        <text class="t-ms" x="135" y="500" text-anchor="middle">view engineer_workload</text>
+        <text class="t-ms" x="135" y="515" text-anchor="middle">profile + count of active tickets</text>
+
+        <!-- incidents -->
+        <rect class="node" x="380" y="150" width="240" height="184" rx="8"/>
+        <rect class="band" x="381" y="151" width="238" height="28" rx="7"/>
+        <text class="t-b t-m" x="394" y="170">incidents</text>
+        <text class="t-m" x="394" y="197">id · reference</text><text class="t-ms" x="608" y="197" text-anchor="end">INC-000123</text>
+        <text class="t-m" x="394" y="215">status</text><text class="t-ms" x="608" y="215" text-anchor="end">7 states</text>
+        <text class="t-m" x="394" y="233">priority</text><text class="t-ms" x="608" y="233" text-anchor="end">+ requested_priority</text>
+        <text class="t-m" x="394" y="251">is_escalated</text><text class="t-ms" x="608" y="251" text-anchor="end">+ reason, time</text>
+        <text class="t-m" x="394" y="269">reported_by</text>
+        <text class="t-m" x="394" y="287">assigned_engineer_id</text>
+        <text class="t-m" x="394" y="305">building · floor · seat</text>
+        <text class="t-m" x="394" y="323">merged_into_id</text><text class="t-ms" x="608" y="323" text-anchor="end">→ main incident</text>
+
+        <!-- notes -->
+        <rect class="node" x="300" y="400" width="190" height="112" rx="8"/>
+        <rect class="band" x="301" y="401" width="188" height="28" rx="7"/>
+        <text class="t-b t-m" x="314" y="420">incident_notes</text>
+        <text class="t-m" x="314" y="447">incident_id</text>
+        <text class="t-m" x="314" y="465">author_id</text><text class="t-ms" x="478" y="465" text-anchor="end">FK users</text>
+        <text class="t-m" x="314" y="483">body</text>
+        <text class="t-m" x="314" y="501">is_internal</text><text class="t-ms" x="478" y="501" text-anchor="end">staff only</text>
+
+        <!-- history -->
+        <rect class="node" x="520" y="400" width="200" height="112" rx="8"/>
+        <rect class="band" x="521" y="401" width="198" height="28" rx="7"/>
+        <text class="t-b t-m" x="534" y="420">incident_history</text>
+        <text class="t-m" x="534" y="447">incident_id</text>
+        <text class="t-m" x="534" y="465">event_type</text><text class="t-ms" x="708" y="465" text-anchor="end">6 kinds</text>
+        <text class="t-m" x="534" y="483">from → to</text>
+        <text class="t-m" x="534" y="501">changed_by</text><text class="t-ms" x="708" y="501" text-anchor="end">FK users</text>
+
+        <!-- facilities -->
+        <rect class="node" x="780" y="30" width="190" height="94" rx="8"/>
+        <rect class="band" x="781" y="31" width="188" height="28" rx="7"/>
+        <text class="t-b t-m" x="794" y="50">buildings</text>
+        <text class="t-m" x="794" y="77">code</text><text class="t-ms" x="958" y="77" text-anchor="end">unique</text>
+        <text class="t-m" x="794" y="95">name</text>
+        <text class="t-m" x="794" y="113">is_active</text>
+
+        <rect class="node" x="780" y="190" width="190" height="94" rx="8"/>
+        <rect class="band" x="781" y="191" width="188" height="28" rx="7"/>
+        <text class="t-b t-m" x="794" y="210">floors</text>
+        <text class="t-m" x="794" y="237">building_id</text>
+        <text class="t-m" x="794" y="255">floor_number</text><text class="t-ms" x="958" y="255" text-anchor="end">unique per bldg</text>
+        <text class="t-m" x="794" y="273">is_active</text>
+
+        <rect class="node" x="780" y="350" width="190" height="94" rx="8"/>
+        <rect class="band" x="781" y="351" width="188" height="28" rx="7"/>
+        <text class="t-b t-m" x="794" y="370">seats</text>
+        <text class="t-m" x="794" y="397">floor_id</text>
+        <text class="t-m" x="794" y="415">seat_code</text><text class="t-ms" x="958" y="415" text-anchor="end">unique per floor</text>
+        <text class="t-m" x="794" y="433">is_active</text>
+
+        <!-- relationships -->
+        <line class="edge" x1="135" y1="330" x2="135" y2="180" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="143" y="250">extends 1 : 1</text>
+
+        <polyline class="edge" points="380,264 310,264 310,110 242,110" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="316" y="190">reported by</text>
+
+        <polyline class="edge" points="380,282 330,282 330,392 242,392" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="336" y="340">assigned to</text>
+
+        <polyline class="edge" points="620,300 700,300 700,77 778,77" marker-end="url(#er-mut)"/>
+        <polyline class="edge" points="700,237 778,237" marker-end="url(#er-mut)"/>
+        <polyline class="edge" points="700,300 700,397 778,397" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="708" y="160">located at</text>
+
+        <line class="edge" x1="875" y1="190" x2="875" y2="126" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="883" y="163">in</text>
+        <line class="edge" x1="875" y1="350" x2="875" y2="286" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="883" y="323">on</text>
+
+        <line class="edge" x1="430" y1="400" x2="430" y2="336" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="438" y="364">on</text>
+        <line class="edge" x1="580" y1="400" x2="580" y2="336" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="588" y="364">logs</text>
+
+        <!-- followers -->
+        <rect class="node" x="300" y="590" width="190" height="112" rx="8"/>
+        <rect class="band" x="301" y="591" width="188" height="28" rx="7"/>
+        <text class="t-b t-m" x="314" y="610">incident_followers</text>
+        <text class="t-m" x="314" y="637">incident_id</text><text class="t-ms" x="478" y="637" text-anchor="end">main incident</text>
+        <text class="t-m" x="314" y="655">user_id</text><text class="t-ms" x="478" y="655" text-anchor="end">reporter</text>
+        <text class="t-m" x="314" y="673">added_by · added_at</text>
+        <text class="t-m" x="314" y="691">escalation_requested_at</text>
+        <polyline class="edge" points="490,620 505,620 505,336" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="511" y="560">follows</text>
+        <polyline class="edge" points="300,655 260,655 260,140 242,140" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="266" y="580">follower</text>
+
+        <!-- engineer reviews -->
+        <rect class="node" x="30" y="580" width="210" height="112" rx="8"/>
+        <rect class="band" x="31" y="581" width="208" height="28" rx="7"/>
+        <text class="t-b t-m" x="44" y="600">engineer_reviews</text>
+        <text class="t-m" x="44" y="627">incident_id</text><text class="t-ms" x="228" y="627" text-anchor="end">FK incidents, closed</text>
+        <text class="t-m" x="44" y="645">engineer_id</text><text class="t-ms" x="228" y="645" text-anchor="end">FK profiles</text>
+        <text class="t-m" x="44" y="663">reviewer_id</text><text class="t-ms" x="228" y="663" text-anchor="end">one per incident</text>
+        <text class="t-m" x="44" y="681">rating · comment</text><text class="t-ms" x="228" y="681" text-anchor="end">1–5</text>
+        <polyline class="edge" points="30,636 14,636 14,395 28,395" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="20" y="560">rates</text>
+
+        <!-- notifications -->
+        <rect class="node" x="760" y="476" width="210" height="112" rx="8"/>
+        <rect class="band" x="761" y="477" width="208" height="28" rx="7"/>
+        <text class="t-b t-m" x="774" y="496">notifications</text>
+        <text class="t-m" x="774" y="523">user_id</text><text class="t-ms" x="958" y="523" text-anchor="end">recipient, FK users</text>
+        <text class="t-m" x="774" y="541">incident_id · ref</text><text class="t-ms" x="958" y="541" text-anchor="end">kept if deleted</text>
+        <text class="t-m" x="774" y="559">actor_id · message</text>
+        <text class="t-m" x="774" y="577">is_read</text>
+        <polyline class="edge" points="760,532 740,532 740,250 622,250" marker-end="url(#er-mut)"/>
+        <text class="t-s" x="746" y="466">about</text>
+      </svg>
+    </div>
+    <figcaption>Eleven tables and one view (plus <code>app_secrets</code>, which holds the JWT key on AWS), created by <code>backend/db/schema.sql</code> (existing databases get <code>notifications</code> from <code>migrations/001_notifications.sql</code>, the merge column and <code>incident_followers</code> from <code>migrations/002_incident_merge.sql</code>, and <code>engineer_reviews</code> from <code>migrations/003_engineer_reviews.sql</code>; <code>escalation_requested_at</code> on followers from <code>migrations/004_escalation_requests.sql</code>; <code>app_secrets</code> from <code>migrations/005_app_secrets.sql</code>; and each person's usual building, <code>users.home_building_id</code>, from <code>migrations/006_user_home_building.sql</code>). A review stores the engineer at the time it is written, and the database allows one per reviewer per incident and a rating from 1 to 5. A merged duplicate is stored as <em>cancelled</em> with <code>merged_into_id</code> set (a check constraint ties the two together), and its reporter gets a row in <code>incident_followers</code>; the SQLAlchemy models map onto them and never create tables. The database itself enforces the @acme.inc email rule, that a floor belongs to the incident's building and a seat to its floor, that only engineers get profiles, and that an incident past <em>open</em> has an engineer.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 3. Lifecycle -->
+<section id="lifecycle">
+  <div class="sec-head">
+    <span class="eyebrow">Workflow</span>
+    <h2>Incident lifecycle and who moves it</h2>
+  </div>
+  <div class="legend" aria-hidden="true">
+    <span><i class="sw emp"></i>Employee (the reporter)</span>
+    <span><i class="sw eng"></i>Engineer (the assignee)</span>
+    <span><i class="sw adm"></i>Facility Admin</span>
+  </div>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 940 290" role="img" aria-label="Incidents start open; an admin assigns them; the engineer starts, holds, resumes and resolves; the reporter confirms to close or reopens; the reporter can cancel before work starts.">
+        <defs>
+          <marker id="lc-emp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-emp" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="lc-eng" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eng" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="lc-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="lc-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- start -->
+        <circle class="dot" cx="20" cy="120" r="6"/>
+        <line class="edge" x1="26" y1="120" x2="58" y2="120" marker-end="url(#lc-mut)"/>
+        <text class="t-s" x="38" y="150" text-anchor="middle">report</text>
+
+        <!-- states -->
+        <rect class="state" x="60" y="100" width="120" height="40" rx="20"/><text class="t-m" x="120" y="124" text-anchor="middle">open</text>
+        <rect class="state" x="220" y="100" width="120" height="40" rx="20"/><text class="t-m" x="280" y="124" text-anchor="middle">assigned</text>
+        <rect class="state" x="400" y="100" width="120" height="40" rx="20"/><text class="t-m" x="460" y="124" text-anchor="middle">in_progress</text>
+        <rect class="state" x="400" y="210" width="120" height="40" rx="20"/><text class="t-m" x="460" y="234" text-anchor="middle">on_hold</text>
+        <rect class="state" x="600" y="100" width="120" height="40" rx="20"/><text class="t-m" x="660" y="124" text-anchor="middle">resolved</text>
+        <rect class="state-end" x="800" y="100" width="120" height="40" rx="20"/><text class="t-m" x="860" y="124" text-anchor="middle">closed</text>
+        <rect class="state-end" x="150" y="210" width="120" height="40" rx="20"/><text class="t-m" x="210" y="234" text-anchor="middle">cancelled</text>
+
+        <!-- transitions -->
+        <line class="e-adm" x1="180" y1="120" x2="218" y2="120" marker-end="url(#lc-adm)"/>
+        <text class="l-adm" x="199" y="94" text-anchor="middle">assign</text>
+
+        <line class="e-eng" x1="340" y1="120" x2="398" y2="120" marker-end="url(#lc-eng)"/>
+        <text class="l-eng" x="369" y="112" text-anchor="middle">start</text>
+
+        <line class="e-eng" x1="448" y1="140" x2="448" y2="208" marker-end="url(#lc-eng)"/>
+        <text class="l-eng" x="440" y="180" text-anchor="end">hold</text>
+        <line class="e-eng" x1="472" y1="210" x2="472" y2="142" marker-end="url(#lc-eng)"/>
+        <text class="l-eng" x="480" y="180">resume</text>
+
+        <line class="e-eng" x1="520" y1="120" x2="598" y2="120" marker-end="url(#lc-eng)"/>
+        <text class="l-eng" x="559" y="112" text-anchor="middle">resolve</text>
+        <line class="e-eng" x1="520" y1="226" x2="616" y2="142" marker-end="url(#lc-eng)"/>
+        <text class="l-eng" x="580" y="206">resolve</text>
+
+        <line class="e-emp" x1="720" y1="120" x2="798" y2="120" marker-end="url(#lc-emp)"/>
+        <text class="l-emp" x="759" y="112" text-anchor="middle">confirm fix</text>
+
+        <path class="e-emp" d="M660,100 C660,36 460,36 460,98" marker-end="url(#lc-emp)"/>
+        <text class="l-emp" x="560" y="40" text-anchor="middle">reopen (reporter or engineer)</text>
+
+        <line class="e-emp" x1="120" y1="140" x2="176" y2="208" marker-end="url(#lc-emp)"/>
+        <text class="l-emp" x="138" y="186" text-anchor="end">cancel</text>
+        <line class="e-emp" x1="268" y1="140" x2="236" y2="208" marker-end="url(#lc-emp)"/>
+        <text class="l-emp" x="262" y="186">cancel</text>
+      </svg>
+    </div>
+    <figcaption>Each arrow is coloured by the role that normally makes the move; the rules live in <code>app/services/permissions.py</code>. A Facility Admin can also make any move once an engineer is assigned, and can close or cancel. Notes can be added in every state except <em>closed</em> and <em>cancelled</em>. Escalation and priority requests are available to the reporter from <em>open</em> through <em>on_hold</em>. Two people moving the same incident at once never overwrite each other: every change locks the incident row, so the second request waits and re-checks its rule against what the first saved (a cancel arriving just after "start work" gets 403), and an edit made from an outdated copy (<code>expected_updated_at</code>) gets 409.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 3b. Supporting workflows -->
+<section id="workflows">
+  <div class="sec-head">
+    <span class="eyebrow">Workflows</span>
+    <h2>Supporting workflows</h2>
+    <p class="lede">The flows around the lifecycle: getting signed in, escalating, assigning work, administering facilities and engineers, and telling people about changes.</p>
+  </div>
+
+  <figure>
+    <h3>Sign-in and session</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 1010 220" role="img" aria-label="Employees register themselves and admins create engineer accounts; login checks the bcrypt password and active flag and issues an 8 hour token; while it has under an hour left the app renews it, up to 24 hours after sign-in; every request re-checks the user; a 401 signs the user out and returns them to login.">
+        <defs>
+          <marker id="a-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="a-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="20" y="30" width="160" height="56" rx="8"/>
+        <text class="t-b" x="100" y="54" text-anchor="middle">Register</text>
+        <text class="t-s" x="100" y="72" text-anchor="middle">self sign-up · @acme.inc</text>
+        <rect class="node" x="20" y="130" width="160" height="56" rx="8"/>
+        <text class="t-b" x="100" y="154" text-anchor="middle">Admin adds engineer</text>
+        <text class="t-s" x="100" y="172" text-anchor="middle">account + profile</text>
+
+        <rect class="node" x="240" y="80" width="160" height="56" rx="8"/>
+        <text class="t-b" x="320" y="104" text-anchor="middle">Login</text>
+        <text class="t-s" x="320" y="122" text-anchor="middle">bcrypt check · active?</text>
+
+        <rect class="node" x="450" y="80" width="160" height="56" rx="8"/>
+        <text class="t-b" x="530" y="104" text-anchor="middle">Token</text>
+        <text class="t-s" x="530" y="122" text-anchor="middle">JWT, 8 h · sessionStorage</text>
+
+        <rect class="node" x="660" y="80" width="160" height="56" rx="8"/>
+        <text class="t-b" x="740" y="104" text-anchor="middle">API request</text>
+        <text class="t-s" x="740" y="122" text-anchor="middle">user re-checked each time</text>
+
+        <rect class="dash" x="870" y="80" width="120" height="56" rx="8"/>
+        <text class="t-b" x="930" y="104" text-anchor="middle">Signed out</text>
+        <text class="t-s" x="930" y="122" text-anchor="middle">expired, disabled, 24 h</text>
+
+        <line class="edge-acc" x1="180" y1="58" x2="238" y2="96" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="214" y="62">employee</text>
+        <line class="edge-acc" x1="180" y1="158" x2="238" y2="120" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="214" y="162">engineer</text>
+        <line class="edge-acc" x1="400" y1="108" x2="448" y2="108" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="424" y="100" text-anchor="middle">issues</text>
+        <line class="edge-acc" x1="610" y1="108" x2="658" y2="108" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="634" y="100" text-anchor="middle">Bearer</text>
+        <line class="edge" x1="820" y1="108" x2="868" y2="108" marker-end="url(#a-mut)"/>
+        <text class="t-s" x="844" y="100" text-anchor="middle">401</text>
+        <path class="edge" d="M930,136 V196 H320 V138" marker-end="url(#a-mut)"/>
+        <path class="edge-acc" d="M740,80 V46 H530 V78" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="635" y="38" text-anchor="middle">POST /auth/refresh: fresh 8 h token</text>
+        <text class="t-s" x="635" y="64" text-anchor="middle">when under 1 h is left</text>
+        <text class="t-s" x="625" y="190" text-anchor="middle">sign in again</text>
+      </svg>
+    </div>
+    <figcaption>Only employees can self-register; engineers get their account from a Facility Admin with a temporary password, and an admin can make an employee a Facility Admin on the People page (the first admin comes from the seed or the <code>init_db</code> task). While a token has under an hour left, the app quietly swaps it for a fresh one; each renewal keeps the original sign-in time and is refused 24 hours after it. Every request loads the user again, so a role change or a deactivated account takes effect at once rather than when the token expires.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Escalation and priority requests</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 920 200" role="img" aria-label="The reporter escalates with a reason and optionally a higher priority; the incident is flagged and appears in the admin's needs attention list; the admin either approves by setting the priority or dismisses by clearing the escalation.">
+        <defs>
+          <marker id="b-emp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-emp" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="b-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="b-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="20" y="70" width="170" height="64" rx="8"/>
+        <text class="t-b" x="105" y="94" text-anchor="middle">Reporter escalates</text>
+        <text class="t-s" x="105" y="111" text-anchor="middle">reason, and optionally</text>
+        <text class="t-s" x="105" y="125" text-anchor="middle">a higher priority</text>
+
+        <rect class="node" x="250" y="70" width="170" height="64" rx="8"/>
+        <text class="t-b" x="335" y="94" text-anchor="middle">Incident flagged</text>
+        <text class="t-ms" x="335" y="111" text-anchor="middle">is_escalated</text>
+        <text class="t-ms" x="335" y="125" text-anchor="middle">requested_priority</text>
+
+        <rect class="node" x="480" y="70" width="170" height="64" rx="8"/>
+        <text class="t-b" x="565" y="94" text-anchor="middle">Admin dashboard</text>
+        <text class="t-s" x="565" y="111" text-anchor="middle">Needs attention ·</text>
+        <text class="t-s" x="565" y="125" text-anchor="middle">Priority requests count</text>
+
+        <rect class="node" x="730" y="20" width="170" height="56" rx="8"/>
+        <text class="t-b" x="815" y="44" text-anchor="middle">Set priority</text>
+        <text class="t-s" x="815" y="62" text-anchor="middle">logged as priority change</text>
+        <rect class="node" x="730" y="128" width="170" height="56" rx="8"/>
+        <text class="t-b" x="815" y="152" text-anchor="middle">Clear escalation</text>
+        <text class="t-s" x="815" y="170" text-anchor="middle">flag removed</text>
+
+        <line class="e-emp" x1="190" y1="102" x2="248" y2="102" marker-end="url(#b-emp)"/>
+        <text class="l-emp" x="219" y="94" text-anchor="middle">once</text>
+        <line class="edge" x1="420" y1="102" x2="478" y2="102" marker-end="url(#b-mut)"/>
+        <text class="t-s" x="449" y="94" text-anchor="middle">appears in</text>
+        <line class="e-adm" x1="650" y1="94" x2="728" y2="52" marker-end="url(#b-adm)"/>
+        <text class="l-adm" x="680" y="62" text-anchor="middle">approve</text>
+        <line class="e-adm" x1="650" y1="110" x2="728" y2="152" marker-end="url(#b-adm)"/>
+        <text class="l-adm" x="680" y="150" text-anchor="middle">dismiss</text>
+      </svg>
+    </div>
+    <figcaption>The reporter can escalate once, while the incident is open, assigned, in progress or on hold, and may only request a priority above the current one. Employees can choose low, medium or high when reporting; only an admin can open an incident as critical. Both the request and the escalation are written to history.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Assigning work</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 1010 248" role="img" aria-label="The admin picks an engineer; the API refuses engineers who are on leave, offline, inactive or at their maximum active tickets; otherwise the incident becomes assigned, the engineer's workload rises by one and the ticket appears on their dashboard. Engineers set their own availability, which feeds the check.">
+        <defs>
+          <marker id="c-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="c-eng" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eng" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="c-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="200" y="6" width="180" height="40" rx="8"/>
+        <text class="t-s" x="290" y="31" text-anchor="middle">engineer sets availability</text>
+        <line class="e-eng" x1="290" y1="46" x2="290" y2="70" marker-end="url(#c-eng)"/>
+
+        <rect class="node" x="20" y="80" width="160" height="64" rx="8"/>
+        <text class="t-b" x="100" y="104" text-anchor="middle">Admin picks engineer</text>
+        <text class="t-s" x="100" y="121" text-anchor="middle">full engineers greyed out</text>
+        <text class="t-s" x="100" y="135" text-anchor="middle">★ = matching specialty</text>
+
+        <polygon class="node" points="290,72 350,112 290,152 230,112"/>
+        <text class="t-s" x="290" y="109" text-anchor="middle">can take</text>
+        <text class="t-s" x="290" y="123" text-anchor="middle">tickets?</text>
+
+        <rect class="dash" x="170" y="186" width="240" height="48" rx="8"/>
+        <text class="t-s" x="290" y="203" text-anchor="middle">400: on leave, offline, inactive</text>
+        <text class="t-s" x="290" y="219" text-anchor="middle">409: at max active tickets</text>
+
+        <rect class="node" x="410" y="80" width="170" height="64" rx="8"/>
+        <text class="t-b" x="495" y="104" text-anchor="middle">Assigned</text>
+        <text class="t-s" x="495" y="121" text-anchor="middle">open → assigned</text>
+        <text class="t-s" x="495" y="135" text-anchor="middle">history logged</text>
+
+        <rect class="node" x="630" y="80" width="160" height="64" rx="8"/>
+        <text class="t-b" x="710" y="104" text-anchor="middle">Workload +1</text>
+        <text class="t-ms" x="710" y="124" text-anchor="middle">engineer_workload</text>
+
+        <rect class="node" x="840" y="80" width="150" height="64" rx="8"/>
+        <text class="t-b" x="915" y="104" text-anchor="middle">Engineer's list</text>
+        <text class="t-s" x="915" y="121" text-anchor="middle">highest priority</text>
+        <text class="t-s" x="915" y="135" text-anchor="middle">first</text>
+
+        <line class="e-adm" x1="180" y1="112" x2="228" y2="112" marker-end="url(#c-adm)"/>
+        <line class="edge" x1="350" y1="112" x2="408" y2="112" marker-end="url(#c-mut)"/>
+        <text class="t-s" x="379" y="104" text-anchor="middle">yes</text>
+        <line class="edge" x1="290" y1="152" x2="290" y2="184" marker-end="url(#c-mut)"/>
+        <text class="t-s" x="298" y="173">no</text>
+        <line class="edge" x1="580" y1="112" x2="628" y2="112" marker-end="url(#c-mut)"/>
+        <text class="t-s" x="604" y="104" text-anchor="middle">counts</text>
+        <line class="edge" x1="790" y1="112" x2="838" y2="112" marker-end="url(#c-mut)"/>
+        <text class="t-s" x="814" y="104" text-anchor="middle">shows</text>
+      </svg>
+    </div>
+    <figcaption>"Busy" engineers can still be assigned; the admin decides. An engineer whose active tickets (assigned, in progress, on hold) have reached <code>max_active_tickets</code> is refused with 409; the check reads the <code>engineer_workload</code> view while holding a row lock on the engineer's profile, so two simultaneous assignments can't both take the last slot. Re-assigning the current engineer is never blocked. Reassignment works the same way at any point until the incident is closed or cancelled, and an incident that is already in progress keeps its status when it moves to another engineer.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Merging duplicates</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 1010 250" role="img" aria-label="On the duplicate, the admin picks Merge into; the API refuses merging into itself or a closed, cancelled or merged incident; otherwise, in one transaction, the duplicate is marked merged, its reporter becomes a follower of the main incident and a note copies its details; both reporters, the engineers and the main reporter are notified, and the follower gets every later update.">
+        <defs>
+          <marker id="m-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="m-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="20" y="72" width="160" height="80" rx="8"/>
+        <text class="t-b" x="100" y="98" text-anchor="middle">Admin on the</text>
+        <text class="t-b" x="100" y="114" text-anchor="middle">duplicate</text>
+        <text class="t-s" x="100" y="134" text-anchor="middle">Merge into… (same bldg</text>
+        <text class="t-s" x="100" y="146" text-anchor="middle">+ category listed first)</text>
+
+        <polygon class="node" points="290,72 350,112 290,152 230,112"/>
+        <text class="t-s" x="290" y="109" text-anchor="middle">both</text>
+        <text class="t-s" x="290" y="123" text-anchor="middle">open?</text>
+
+        <rect class="dash" x="190" y="186" width="200" height="48" rx="8"/>
+        <text class="t-s" x="290" y="205" text-anchor="middle">400: itself, closed, cancelled</text>
+        <text class="t-s" x="290" y="221" text-anchor="middle">or already merged</text>
+
+        <rect class="node" x="400" y="64" width="210" height="96" rx="8"/>
+        <text class="t-b" x="505" y="88" text-anchor="middle">One locked transaction</text>
+        <text class="t-s" x="505" y="108" text-anchor="middle">duplicate → cancelled, Merged</text>
+        <text class="t-s" x="505" y="124" text-anchor="middle">its reporter → follower</text>
+        <text class="t-s" x="505" y="140" text-anchor="middle">note with its details on main</text>
+
+        <rect class="node" x="650" y="64" width="160" height="96" rx="8"/>
+        <text class="t-b" x="730" y="88" text-anchor="middle">Notify</text>
+        <text class="t-s" x="730" y="108" text-anchor="middle">duplicate's reporter</text>
+        <text class="t-s" x="730" y="124" text-anchor="middle">main reporter</text>
+        <text class="t-s" x="730" y="140" text-anchor="middle">engineer(s)</text>
+
+        <rect class="node" x="850" y="64" width="140" height="96" rx="8"/>
+        <text class="t-b" x="920" y="88" text-anchor="middle">From now on</text>
+        <text class="t-s" x="920" y="108" text-anchor="middle">follower gets</text>
+        <text class="t-s" x="920" y="124" text-anchor="middle">every update,</text>
+        <text class="t-s" x="920" y="140" text-anchor="middle">can comment</text>
+
+        <line class="e-adm" x1="180" y1="112" x2="228" y2="112" marker-end="url(#m-adm)"/>
+        <line class="edge" x1="350" y1="112" x2="398" y2="112" marker-end="url(#m-mut)"/>
+        <text class="t-s" x="374" y="104" text-anchor="middle">yes</text>
+        <line class="edge" x1="290" y1="152" x2="290" y2="184" marker-end="url(#m-mut)"/>
+        <text class="t-s" x="298" y="173">no</text>
+        <line class="edge" x1="610" y1="112" x2="648" y2="112" marker-end="url(#m-mut)"/>
+        <line class="edge" x1="810" y1="112" x2="848" y2="112" marker-end="url(#m-mut)"/>
+      </svg>
+    </div>
+    <figcaption><code>POST /incidents/{id}/merge</code>, admin only. Both rows are locked in id order so two opposite merges can't deadlock. Duplicates already merged into the source are re-pointed at the main incident, so chains collapse. Employees can also become followers themselves: when a new report matches an open incident (<code>GET /incidents/similar</code>), they can request escalation on it instead (<code>POST /incidents/{id}/escalation-request</code>), which follows it, escalates it if needed, adds a note and notifies the reporter, engineer and admins. Followers see the incident in their list and dashboard, get assignment, status and public-note updates, and can add notes; they never see internal notes, and only the original reporter can escalate, cancel, confirm the fix or reopen.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Reviewing engineers</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 1010 230" role="img" aria-label="Once an incident is closed, its reporter and followers may each rate the engineer from 1 to 5 stars with an optional comment; the review is stored in engineer_reviews; admins see every review and each engineer's average, the reviewer sees their own, and the engineer receives nothing.">
+        <defs>
+          <marker id="r-emp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-emp" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="r-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="20" y="76" width="190" height="80" rx="8"/>
+        <text class="t-b" x="115" y="102" text-anchor="middle">Reporter or follower</text>
+        <text class="t-s" x="115" y="122" text-anchor="middle">incident is Closed and</text>
+        <text class="t-s" x="115" y="138" text-anchor="middle">had an engineer</text>
+
+        <rect class="node" x="290" y="76" width="220" height="80" rx="8"/>
+        <text class="t-b" x="400" y="102" text-anchor="middle">POST /incidents/{id}/review</text>
+        <text class="t-s" x="400" y="122" text-anchor="middle">1–5 stars + comment, one each</text>
+        <text class="t-s" x="400" y="138" text-anchor="middle">→ row in engineer_reviews</text>
+
+        <rect class="node" x="600" y="20" width="390" height="52" rx="8"/>
+        <text class="t-b" x="616" y="42">Facility Admin</text>
+        <text class="t-s" x="616" y="60">every review on the incident; average + list on the Engineers page</text>
+
+        <rect class="node" x="600" y="90" width="390" height="52" rx="8"/>
+        <text class="t-b" x="616" y="112">The reviewer</text>
+        <text class="t-s" x="616" y="130">their own review; can edit (PUT) or delete it</text>
+
+        <rect class="dash" x="600" y="160" width="390" height="52" rx="8"/>
+        <text class="t-b" x="616" y="182">Engineer</text>
+        <text class="t-s" x="616" y="200">nothing: reviews, ratings and notifications are left out</text>
+
+        <line class="e-emp" x1="210" y1="116" x2="288" y2="116" marker-end="url(#r-emp)"/>
+        <text class="l-emp" x="249" y="108" text-anchor="middle">rates</text>
+        <polyline class="e-adm" points="510,116 550,116 550,46 598,46" marker-end="url(#r-adm)"/>
+        <line class="e-emp" x1="550" y1="116" x2="598" y2="116" marker-end="url(#r-emp)"/>
+        <polyline class="edge" points="550,116 550,186 584,186" stroke-dasharray="4 3"/>
+        <line class="edge" x1="588" y1="176" x2="588" y2="196" stroke-width="2.5"/>
+      </svg>
+    </div>
+    <figcaption>Visibility is decided once, on the server, by <code>visible_reviews()</code> in <code>permissions.py</code>: admins get every review, an employee gets their own, an engineer gets an empty list. <code>GET /engineers</code> adds <code>avg_rating</code> and <code>review_count</code> for admins, and the engineer's own availability response has those fields removed. Admins and engineers trying to review get 403; a second review gets 409; an incident that isn't closed gets 400.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Administering facilities and engineers</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Buildings, floors, seats and engineers are created active, can be deactivated and reactivated, and facilities can be deleted only while nothing references them; an engineer can only be deactivated with no active tickets.">
+        <defs>
+          <marker id="d-adm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-adm" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <circle class="dot" cx="40" cy="82" r="6"/>
+        <line class="e-adm" x1="46" y1="82" x2="118" y2="82" marker-end="url(#d-adm)"/>
+        <text class="l-adm" x="82" y="74" text-anchor="middle">create</text>
+
+        <rect class="state" x="120" y="60" width="140" height="44" rx="22"/>
+        <text class="t-b" x="190" y="80" text-anchor="middle">Active</text>
+        <text class="t-s" x="190" y="96" text-anchor="middle">in pickers · can sign in</text>
+
+        <rect class="state" x="420" y="60" width="140" height="44" rx="22"/>
+        <text class="t-b" x="490" y="80" text-anchor="middle">Inactive</text>
+        <text class="t-s" x="490" y="96" text-anchor="middle">hidden · can't sign in</text>
+
+        <rect class="state-end" x="720" y="60" width="140" height="44" rx="22"/>
+        <text class="t-b" x="790" y="87" text-anchor="middle">Deleted</text>
+
+        <line class="e-adm" x1="260" y1="74" x2="418" y2="74" marker-end="url(#d-adm)"/>
+        <text class="l-adm" x="340" y="66" text-anchor="middle">deactivate</text>
+        <text class="t-ms" x="340" y="44" text-anchor="middle">engineer: 0 active tickets</text>
+        <line class="e-adm" x1="420" y1="92" x2="262" y2="92" marker-end="url(#d-adm)"/>
+        <text class="l-adm" x="340" y="110" text-anchor="middle">reactivate</text>
+
+        <line class="e-adm" x1="560" y1="82" x2="718" y2="82" marker-end="url(#d-adm)"/>
+        <text class="l-adm" x="640" y="74" text-anchor="middle">delete if unused</text>
+        <path class="e-adm" d="M190,104 C190,160 790,160 790,106" marker-end="url(#d-adm)"/>
+        <text class="l-adm" x="490" y="178" text-anchor="middle">delete if unused</text>
+      </svg>
+    </div>
+    <figcaption>Applies to buildings, floors and seats. Deleting is refused while any incident (or an engineer's home building) points at the item, so history is never broken; deactivate it instead. Engineers follow the same active/inactive states but are never deleted. Accounts and roles are managed on the People page (<code>/users</code>): set each person's usual building (their report form starts on it; picking another building shows a soft note, never a block), make an employee a Facility Admin or back, deactivate or reactivate; never your own role or account, never engineers (they stay on the Engineers page), and never down to zero active admins.</figcaption>
+  </figure>
+
+  <figure>
+    <h3>Notifications</h3>
+    <div class="diagram">
+      <svg viewBox="0 0 1010 170" role="img" aria-label="When someone changes an incident, the API saves the change and one notification per recipient in the same transaction, never notifying the person who made the change; the recipient's bell polls every 30 seconds, and opening the notification or the incident marks it read.">
+        <defs>
+          <marker id="n-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="n-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="node" x="20" y="50" width="160" height="64" rx="8"/>
+        <text class="t-b" x="100" y="74" text-anchor="middle">Someone acts</text>
+        <text class="t-s" x="100" y="91" text-anchor="middle">status, note, assign,</text>
+        <text class="t-s" x="100" y="105" text-anchor="middle">escalate, edit, delete</text>
+
+        <rect class="node" x="230" y="50" width="180" height="64" rx="8"/>
+        <text class="t-b" x="320" y="74" text-anchor="middle">Pick recipients</text>
+        <text class="t-s" x="320" y="91" text-anchor="middle">by event (table below)</text>
+        <text class="t-s" x="320" y="105" text-anchor="middle">minus the actor</text>
+
+        <rect class="node" x="460" y="50" width="170" height="64" rx="8"/>
+        <text class="t-b" x="545" y="74" text-anchor="middle">Save together</text>
+        <text class="t-s" x="545" y="91" text-anchor="middle">change + notifications</text>
+        <text class="t-s" x="545" y="105" text-anchor="middle">in one transaction</text>
+
+        <rect class="node" x="680" y="50" width="150" height="64" rx="8"/>
+        <text class="t-b" x="755" y="74" text-anchor="middle">Bell badge</text>
+        <text class="t-s" x="755" y="91" text-anchor="middle">unread count,</text>
+        <text class="t-s" x="755" y="105" text-anchor="middle">polled every 30 s</text>
+
+        <rect class="node" x="880" y="50" width="110" height="64" rx="8"/>
+        <text class="t-b" x="935" y="78" text-anchor="middle">Read</text>
+        <text class="t-s" x="935" y="96" text-anchor="middle">click or open</text>
+
+        <line class="edge-acc" x1="180" y1="82" x2="228" y2="82" marker-end="url(#n-acc)"/>
+        <line class="edge-acc" x1="410" y1="82" x2="458" y2="82" marker-end="url(#n-acc)"/>
+        <line class="edge-acc" x1="630" y1="82" x2="678" y2="82" marker-end="url(#n-acc)"/>
+        <text class="t-s" x="654" y="74" text-anchor="middle">GET</text>
+        <line class="edge-acc" x1="830" y1="82" x2="878" y2="82" marker-end="url(#n-acc)"/>
+        <text class="t-s" x="854" y="74" text-anchor="middle">opens</text>
+        <path class="edge" d="M935,114 V146 H755 V116" marker-end="url(#n-mut)"/>
+        <text class="t-s" x="845" y="140" text-anchor="middle">badge drops</text>
+      </svg>
+    </div>
+    <figcaption>In-app only, as the brief rules out external integrations. Opening an incident marks all of its notifications read. A deleted incident's notification keeps its INC reference text but no longer links anywhere.</figcaption>
+  </figure>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Event</th><th>Who is notified (never the person who did it)</th></tr></thead>
+      <tbody>
+        <tr><td>Incident reported</td><td><span class="role-adm">All admins</span></td></tr>
+        <tr><td>Engineer assigned or reassigned</td><td><span class="role-eng">New engineer</span>, <span class="role-emp">reporter and followers</span>, <span class="role-eng">previous engineer</span></td></tr>
+        <tr><td>Status change, priority change, details edited, public note</td><td><span class="role-emp">Reporter, followers</span> and <span class="role-eng">assigned engineer</span>; <span class="role-adm">all admins</span> while unassigned</td></tr>
+        <tr><td>Escalation or priority request</td><td><span class="role-adm">All admins</span> and <span class="role-eng">assigned engineer</span></td></tr>
+        <tr><td>Internal note</td><td><span class="role-eng">Assigned engineer</span> and <span class="role-adm">all admins</span>; never the employee</td></tr>
+        <tr><td>Escalation cleared</td><td><span class="role-emp">Reporter</span></td></tr>
+        <tr><td>Incident deleted</td><td><span class="role-emp">Reporter, followers</span> and <span class="role-eng">assigned engineer</span></td></tr>
+        <tr><td>Duplicate merged</td><td><span class="role-emp">Duplicate's reporter and followers</span> (link to the main incident), <span class="role-emp">main reporter</span>, <span class="role-eng">main engineer</span>, <span class="role-eng">duplicate's engineer</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>Who sees which notes</h3>
+      <ul>
+        <li><span class="role-emp">Employee</span>: public notes on their own incidents and those they follow; cannot write internal notes.</li>
+        <li><span class="role-eng">Engineer</span>: all notes on assigned incidents; can mark a note internal.</li>
+        <li><span class="role-adm">Admin</span>: all notes on every incident.</li>
+        <li>No new notes once an incident is closed or cancelled. A comment added with a status change is saved as a note.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>What each dashboard shows</h3>
+      <ul>
+        <li><span class="role-emp">Employee</span>: waiting / in work / resolved counts and their own and followed incidents.</li>
+        <li><span class="role-eng">Engineer</span>: new, in-progress and on-hold counts, capacity and availability, assigned tickets by priority.</li>
+        <li><span class="role-adm">Admin</span>: unassigned, escalated, priority requests, awaiting closure; needs-attention list, engineer workload, facility counts, recent activity.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 4. Permissions -->
+<section id="api">
+  <div class="sec-head">
+    <span class="eyebrow">API · /api/api-service</span>
+    <h2>Who can call what</h2>
+    <p class="lede">Every route except register, login and health needs a bearer token. Incident detail responses include a <code>permissions</code> object, so the UI shows only the actions the API will accept.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Endpoint</th><th>Purpose</th><th class="role-emp">Employee</th><th class="role-eng">Engineer</th><th class="role-adm">Admin</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="ep"><span class="m">POST</span>/auth/register</td><td>Self sign-up, creates an employee</td><td class="yes">public</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/auth/login</td><td>Returns token (8 h) and user</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/auth/refresh</td><td>Fresh 8 h token, same session; refused 24 h after sign-in; re-reads role and active flag</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/auth/me</td><td>Your account, fresh (the report form reads your usual building from it)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/dashboard</td><td>Summary for the caller's role</td><td class="yes">own</td><td class="yes">assigned</td><td class="yes">all</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/incidents</td><td>List with filters and search</td><td class="yes">own + followed</td><td class="yes">assigned</td><td class="yes">all</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents</td><td>Report an incident</td><td class="yes">✓ not critical</td><td class="yes">✓ not critical</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/incidents/{id}</td><td>Detail, notes, history, permissions, reviews</td><td class="yes">own + followed</td><td class="yes">assigned</td><td class="yes">all</td></tr>
+        <tr><td class="ep"><span class="m">PATCH·PUT</span>/incidents/{id}</td><td>Edit details; admin sets priority</td><td class="part">while open</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">DELETE</span>/incidents/{id}</td><td>Delete with notes and history</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/status</td><td>Move through the lifecycle</td><td class="part">cancel, close, reopen</td><td class="part">start → resolve</td><td class="yes">any</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/assign</td><td>Assign or reassign an engineer</td><td class="no">—</td><td class="no">—</td><td class="yes">✓ not on leave/offline, under capacity</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/escalate</td><td>Escalate, request higher priority</td><td class="yes">reporter</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/notes</td><td>Add a note</td><td class="yes">public only (also followers)</td><td class="yes">+ internal</td><td class="yes">+ internal</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/review</td><td>Rate the engineer of a closed incident</td><td class="yes">reporter + followers, once each</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">PUT·PATCH·DELETE</span>/incidents/{id}/review</td><td>Change or withdraw your review</td><td class="yes">own review</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/incidents/similar</td><td>Open incidents like a report about to be sent (same building, category, floor); brief, no reporter</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/escalation-request</td><td>Same problem: follow it, escalate it, note + notify (once each)</td><td class="yes">not the reporter</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/incidents/{id}/merge-candidates</td><td>Open incidents to merge into, likeliest first</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/merge</td><td>Merge a duplicate; its reporter follows the main incident</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/facilities</td><td>Buildings → floors → seats</td><td class="yes">active</td><td class="yes">active</td><td class="yes">+ inactive</td></tr>
+        <tr><td class="ep"><span class="m">POST·PATCH·PUT·DELETE</span>/buildings · /floors · /seats</td><td>Define facilities; delete only if unused</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET·POST·PATCH·PUT</span>/engineers</td><td>Create and manage engineer profiles</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/engineers/{id}/reviews</td><td>Every review of an engineer, newest first</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/users</td><td>Every account (search, role filter, inactive)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">PATCH·PUT</span>/users/{id}</td><td>Make admin / employee, deactivate / reactivate, set usual building (active buildings only); role and active flag never your own, not engineers, never zero admins</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">PATCH·PUT</span>/engineers/me/availability</td><td>Set own availability</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/notifications · /unread-count</td><td>Own notifications and bell count</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/notifications/{id}/read · /read-all</td><td>Mark read (all, or one incident's)</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ 5. Code map -->
+<section id="code-map">
+  <div class="sec-head">
+    <span class="eyebrow">Repository</span>
+    <h2>Where the code lives</h2>
+  </div>
+  <div class="cols">
+    <div class="card">
+      <h3>Frontend</h3>
+      <span class="path">frontend/src/</span>
+      <ul>
+        <li><code>App.jsx</code> · <code>router.js</code>: hash routes <code>#/</code>, <code>#/incidents</code>, <code>#/incidents/new</code>, <code>#/incidents/:id</code>, <code>#/admin/facilities</code>, <code>#/admin/engineers</code> (admin only)</li>
+        <li><code>pages/</code>: Login, Dashboard (engineer availability switch), IncidentList, NewIncident, IncidentDetail</li>
+        <li><code>pages/admin/</code>: Facilities, Engineers, People (accounts and roles)</li>
+        <li><code>public/manifest.webmanifest</code> · <code>public/sw.js</code> · <code>public/icons/</code>: installable app; the service worker caches app files, never <code>/api/</code></li>
+        <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark), Field (errors above the input) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints: phone 699, tablet 959, wide tables 1099, admin top bar 1199)</li>
+        <li><code>theme.js</code>: the Material UI theme with light and dark colour schemes as CSS variables (brand colours, chip colours for both schemes, type scale); <code>index.html</code> applies the saved scheme before React loads</li>
+        <li><code>services/</code>: apiClient (token, quiet renewal under an hour left, 401 sign-out), authService, incidentService, adminService, notificationService</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>API service</h3>
+      <span class="path">backend/api-service/</span>
+      <ul>
+        <li><code>function.py</code>: Lambda entry (Mangum); a direct invocation <code>{"action": ...}</code> runs a database task instead</li>
+        <li><code>app/admin_tasks.py</code>: <code>status</code> · <code>init_db</code> · <code>migrate</code>, using <code>sql/</code> (a copy of <code>backend/db</code>, kept in sync by <code>bin/sync-db-sql.sh</code>)</li>
+        <li><code>app/api/routes/</code>: auth, incidents, dashboard, facilities, engineers, users, notifications</li>
+        <li><code>app/api/deps.py</code>: current user, role checks</li>
+        <li><code>app/services/permissions.py</code>: all role rules</li>
+        <li><code>app/services/notifications.py</code>: who is told about which change</li>
+        <li><code>app/models/</code> · <code>app/schemas/</code>: ORM and request/response shapes</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Database and tooling</h3>
+      <span class="path">backend/db/ · bin/ · infra/</span>
+      <ul>
+        <li><code>schema.sql</code>: tables, enums, triggers, workload view</li>
+        <li><code>seed.sql</code>: demo data, all passwords <code>Password123!</code></li>
+        <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building)</li>
+        <li><code>bin/start-dev.sh</code>: Postgres, LocalStack, deploy, proxy</li>
+        <li><code>infra/</code>: Terraform finds each folder under <code>backend/</code> and deploys it as a Lambda</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ 6. Requirements -->
+<section id="requirements">
+  <div class="sec-head">
+    <span class="eyebrow">Brief</span>
+    <h2>Requirements coverage</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Persona</th><th>Requirement</th><th>Database</th><th>API</th><th>UI</th></tr></thead>
+      <tbody>
+        <tr><td class="role-emp">Employee</td><td>Register with an acme.inc email</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Create and track incidents</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Add notes to open incidents</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Request priority, escalate</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-adm">Admin</td><td>Define buildings, floors, seats</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-adm">Admin</td><td>Create engineer profiles</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-adm">Admin</td><td>Assign tickets, oversee lifecycle</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-eng">Engineer</td><td>Manage assigned tickets, update status</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-eng">Engineer</td><td>Talk to the reporter through notes</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-eng">Engineer</td><td>Keep availability up to date</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Told when a problem is already reported; request escalation instead</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Review the engineer (hidden from engineers)</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td>All</td><td>Transparent communication: told when someone else updates their incidents</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <strong>Open items.</strong> Every requirement now has database, API and UI support. Remaining: admins can't reset an engineer's password from the UI (the API has no endpoint for it yet). The local database has not been re-seeded with the newest seed rows (it would delete the registered account <code>test@acme.inc</code>). Deployed to AWS on 19 Nov 2026 at <a href="https://d3lb2j5ijpzy26.cloudfront.net">https://d3lb2j5ijpzy26.cloudfront.net</a> with the sample data (every sample password is <code>Password123!</code>). Not done: password change or reset, push notifications (the bell polls), AI features.
+  </div>
+</section>
+
+<!-- ============================================================ 7. Change log -->
+<section id="changes">
+  <div class="sec-head">
+    <span class="eyebrow">History</span>
+    <h2>Change log</h2>
+  </div>
+  <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 25</span>
+      <span class="log-what">Soft note when reporting outside your usual building</span>
+      <span class="log-detail">When someone picks a building other than their usual one, the note under the location changes to "This isn't your usual building (…). That's fine if the problem is here." It's a polite live region, so screen readers hear it too. A nudge only: no confirmation, and the API doesn't compare the two. +1 frontend test (157); the usual-building E2E journey checks it.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 24</span>
+      <span class="log-what">Usual building for employees</span>
+      <span class="log-detail">New <code>users.home_building_id</code> (migration 006, <code>ON DELETE SET NULL</code>). Admins pick it per person on the People page (<code>PATCH /users/{id}</code>, active buildings only, admins may set their own; engineers keep theirs on the Engineers page). The report page asks <code>GET /auth/me</code> when it opens and the form starts on that building with a note, so a change applies without signing in again; a deactivated building is ignored. The People page switches to cards below 960 px for the extra column. +8 backend tests (329), +7 frontend tests (156), new E2E journey (27).</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 23</span>
+      <span class="log-what">Responsive at every screen size</span>
+      <span class="log-detail">Audited every page for every role at 320, 375, 414, 600, 768, 1024, 1280 and 1920 px. Fixed: at 1024 px the admin top bar (six links) overflowed and every admin page scrolled sideways, so admins now get the menu drawer below 1200 px (employees and engineers keep the top bar down to 960 px); incident lists switch to cards below 960 px (were squeezed tables on tablets); the Engineers table switches to cards below 1100 px. Breakpoints live in <code>hooks/useResponsive.js</code>. The layout test now runs at 320 px, a Pixel 7 and an iPad Mini portrait and landscape, and fails if a page or a table scrolls sideways. +5 frontend tests (149), 26 E2E runs.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 22</span>
+      <span class="log-what">Parallel updates: row locks and stale-edit check</span>
+      <span class="log-detail">Every route that changes an incident (status, edit, assign, escalate, note, reviews, delete) now locks its row with <code>get_incident_or_404(..., for_update=True)</code>, so concurrent changes run one at a time and each re-checks its rules against the latest state; before, a reporter's cancel and an engineer's "start work" could both pass and the last one won. <code>PATCH /incidents/{id}</code> takes <code>expected_updated_at</code> and answers 409 if the incident changed meanwhile; the edit form sends it and, on 409, shows the latest version with a warning. A refused action reloads the incident and keeps its message visible. Race tests hold the first transaction open (they fail without the lock). +8 backend tests (321), +2 frontend (144), new E2E journey (17).</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 21</span>
+      <span class="log-what">Token refresh, installable app, People admin</span>
+      <span class="log-detail"><code>POST /auth/refresh</code> swaps a valid token for a fresh 8 h one (same session start, refused 24 h after sign-in, role and active flag re-read); the frontend renews quietly when under an hour is left. The app is a PWA: manifest, icons and a hand-written service worker that caches app files and never <code>/api/</code>. New admin People page (<code>GET/PATCH /users</code>): make an employee an admin or back, deactivate/reactivate; not yourself, not engineers, never zero active admins (row lock, 409). +18 backend tests (313), +16 frontend tests (142), new E2E journey (16), admin pages added to the phone layout check.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 20</span>
+      <span class="log-what">Deployed to AWS</span>
+      <span class="log-detail">Lambda database tasks by direct invocation (<code>status</code>, <code>init_db</code>, <code>migrate</code>; <code>app/admin_tasks.py</code>), a packaged copy of <code>backend/db</code> with a drift test, a random JWT key stored in <code>app_secrets</code> (migration 005), <code>sslmode=require</code> on AWS, and a 25 s connection retry while a paused Aurora wakes (verified live: 200 in 6.6 s after 7 idle minutes). Live at the CloudFront URL with the sample data.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 19</span>
+      <span class="log-what">Already reported? Request escalation</span>
+      <span class="log-detail">Before an employee's report is saved, <code>GET /incidents/similar</code> finds open incidents in the same building and category (and floor when both have one; at most 5, no reporter or description). The new "This may already be reported" prompt offers Request escalation (optional reason) or "It's a different problem, report it". <code>POST /incidents/{id}/escalation-request</code> makes the employee a follower (new <code>incident_followers.escalation_requested_at</code>, migration 004), escalates the incident if it wasn't, adds their note, and notifies the reporter, engineer and admins; once per employee (409). The incident shows "Asked to escalate". +16 backend tests (270), +9 frontend tests (126), new E2E journey (15).</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 18</span>
+      <span class="log-what">Errors shown above the field that caused them</span>
+      <span class="log-detail">Rule errors about one field now name it: <code>FieldError</code> (<code>app/core/errors.py</code>) adds <code>errors: [{loc, msg}]</code> to the response, as validation errors already did (duplicate email → <code>email</code>, full or on-leave engineer → <code>engineer_id</code>, floor from another building → <code>floor_id</code>, building/floor/seat clashes, merge target, requested priority, engineer deactivation). The frontend's new <code>Field</code> component shows each message directly above its input and focuses the first; the "Please fix the highlighted fields" banners are gone. Errors naming no field sit just above the button that was clicked, and every incident action box and Facilities row keeps its own error. +7 backend tests (254), +3 frontend tests (117), 14 E2E pass.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 17</span>
+      <span class="log-what">Light and dark mode</span>
+      <span class="log-detail">A sun/moon button in the top bar and on the sign-in page switches between light and dark. Until someone picks, the app follows the device setting; the choice is saved in the browser (<code>mui-mode</code>). Both palettes live in <code>theme.js</code> as Material UI colour schemes (CSS variables, switched by a class on <code>&lt;html&gt;</code>); status/priority chips, stat numbers and note tints have dark variants. +4 frontend tests (114); all 14 E2E journeys pass. No backend or database change.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 16</span>
+      <span class="log-what">Employees review engineers</span>
+      <span class="log-detail">Once an incident is closed, its reporter and followers can each rate the engineer 1–5 stars with an optional comment, then edit or delete it (<code>POST/PUT/PATCH/DELETE /incidents/{id}/review</code>; new <code>engineer_reviews</code> table, migration 003). Admins see every review on the incident and each engineer's average and reviews on the Engineers page (<code>GET /engineers/{id}/reviews</code>). Engineers never receive reviews or ratings: they are filtered on the server, and no notification is sent. +19 backend tests (247), +6 frontend tests (110), new E2E journey (14).</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 15</span>
+      <span class="log-what">Merge duplicate incidents</span>
+      <span class="log-detail">Admins merge a duplicate into another open incident (<code>POST /incidents/{id}/merge</code>, candidates ordered by same building + category). The duplicate is cancelled and labelled Merged with a link; its reporter becomes a follower of the main incident (new <code>incident_followers</code> table, <code>merged_into_id</code> column, migration 002) and gets every update; a note copies its details for the engineer. Followers can view and comment but not confirm, cancel or see internal notes. +18 backend tests (228), +7 frontend tests (104), new E2E journey (13).</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 14</span>
+      <span class="log-what">400 for validation, PUT aliases, errors under each field, project README</span>
+      <span class="log-detail">Invalid or malformed requests now return 400 (was FastAPI's 422) with <code>errors: [{loc, msg}]</code>; every PATCH route also accepts PUT. The frontend maps those errors onto fields: required fields are marked, each problem shows under its field and clears as you type, and fields lock while saving (Login, Report/Edit incident, Engineers, Buildings). New root README (architecture, setup, accounts, API, testing, AWS deploy, trade-offs, assumptions); the workshop brief moved to docs/WORKSHOP-BRIEF.md. 210 backend and 97 frontend tests, 12 E2E journeys pass.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 13</span>
+      <span class="log-what">Frontend moved to Material UI + React Responsive</span>
+      <span class="log-detail">Every screen now uses Material UI 7 components with one shared theme (<code>theme.js</code>); the hand-written CSS files are gone. React Responsive drives the phone layouts: a menu drawer replaces the top nav, incident and admin tables become cards, forms stack in one column. Selects stay native for phone pickers. ESLint was broken (missing plugins) and now passes with zero errors, including React's set-state-in-effect rule. 92 frontend tests (99% lines) and all 12 E2E journeys pass on desktop and phone; the build is split into app, MUI and React chunks (~180 kB gzipped).</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 12</span>
+      <span class="log-what">Assignment enforces engineer capacity</span>
+      <span class="log-detail"><code>POST /incidents/{id}/assign</code> now refuses an engineer whose active tickets have reached <code>max_active_tickets</code> (409, "… is at full capacity (n/n active tickets) …"), reading <code>engineer_workload</code> under a <code>SELECT … FOR UPDATE</code> lock on the engineer profile. The picker greys out full engineers and labels them "(full)". +4 backend tests (202), +3 frontend tests (83).</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 11</span>
+      <span class="log-what">Automated tests + connection-pool fix</span>
+      <span class="log-detail">Tests now live in the repo (<code>./bin/run-tests.sh</code>, documented in TESTING.md): 198 backend pytest tests against a throwaway database (99% coverage), 80 frontend Vitest tests (99% lines), 12 Playwright end-to-end journeys and an Artillery load test. The load test exposed DB pool exhaustion when the API runs as a server (434/510 users failed); the pool is now sized per runtime (Lambda 1+1, server 10+30) and exhaustion or a DB outage returns a 503 with Retry-After. After the fix: 0/510 failed, p95 228 ms. Tests are excluded from the Lambda package. Tab title shows the signed-in user.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 10</span>
+      <span class="log-what">Browser tab shows who is signed in</span>
+      <span class="log-detail">The tab title reads "&lt;name&gt; · ACME Facility Desk" while signed in and "Sign in · ACME Facility Desk" on the login page (set in App.jsx; index.html default title changed from "hello-world").</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 9</span>
+      <span class="log-what">In-app notifications</span>
+      <span class="log-detail">New notifications table (migration 001, applied to the live database without data loss). Every incident change notifies the people involved, never the person who made it; internal notes never reach employees. A bell in the top bar shows the unread count, lists recent updates and links to the incident; opening an incident marks its notifications read.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 8</span>
+      <span class="log-what">Admin and engineer screens</span>
+      <span class="log-detail">Admins get Facilities (buildings, floors and seats: add, edit, deactivate, delete) and Engineers (add with temporary password, edit specialisations, capacity, availability, home building, deactivate) pages in the nav. Engineers get an availability switch on their dashboard. Fixed an API bug where optional text fields rejected null. All requirements now have UI.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 7</span>
+      <span class="log-what">Supporting workflows added to this page</span>
+      <span class="log-detail">New diagrams for sign-in and session, escalation and priority requests, assignment with the availability check, and facility/engineer administration; plus note visibility and per-role dashboard contents. No code changes.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 6</span>
+      <span class="log-what">Architecture page created</span>
+      <span class="log-detail">This page, to be updated after each change to the app.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 5</span>
+      <span class="log-what">Requirements audit: facility and engineer management</span>
+      <span class="log-detail">Added building, floor and seat management and engineer profile endpoints; engineers set their own availability; assignment refuses engineers on leave or offline; an engineer with active tickets can't be deactivated. Seed gained a cancelled incident, an engineer on leave and an admin priority change.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 4</span>
+      <span class="log-what">FastAPI + SQLAlchemy backend; incident screens in React</span>
+      <span class="log-detail">Replaced the two psycopg Lambdas with one FastAPI app (api-service) with role-based authorization and incident CRUD. React gained the incidents list, report form and incident detail page with notes and history.</span>
+    </li>
+    <li class="retired">
+      <span class="log-when">18 Nov 2026 · rev 3</span>
+      <span class="log-what">Login, register and dashboard endpoints (since replaced)</span>
+      <span class="log-detail">First backend: auth-service and incident-service Lambdas using psycopg directly. Fixed the dev proxy to forward the Authorization header and the start script to install Python 3.13 packages.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 2</span>
+      <span class="log-what">PostgreSQL schema and seed data</span>
+      <span class="log-detail">Eight tables, enums, history trigger and the engineer workload view, with demo users, facilities and incidents.</span>
+    </li>
+    <li>
+      <span class="log-when">18 Nov 2026 · rev 1</span>
+      <span class="log-what">Login page</span>
+      <span class="log-detail">React sign-in and employee registration restricted to acme.inc emails.</span>
+    </li>
+  </ol>
+</section>
+
+</div>

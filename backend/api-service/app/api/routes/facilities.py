@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.errors import FieldError
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models import Building, Floor, Seat
 from app.schemas.admin import (
@@ -56,12 +57,16 @@ def _seat_out(s: Seat) -> dict:
     }
 
 
-def _save(db: Session, conflict_msg: str):
+def _save(db: Session, conflict_msg: str, field: str):
+    """Commit; a unique-constraint clash becomes 409 on `field` (the form shows it there)."""
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, conflict_msg) from exc
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None) or ""
+        if field == "code" and "name" in constraint:  # buildings: code and name are both unique
+            field = "name"
+        raise FieldError(status.HTTP_409_CONFLICT, field, conflict_msg) from exc
 
 
 def _delete(db: Session, stmt, in_use_msg: str):
@@ -104,7 +109,7 @@ def list_facilities(
 def create_building(body: BuildingCreate, db: DbSession, user: AdminUser):
     b = Building(**body.model_dump(), created_by_id=user.id)
     db.add(b)
-    _save(db, "A building with this code or name already exists.")
+    _save(db, "A building with this code or name already exists.", "code")
     db.refresh(b, ["floors"])
     return _building_out(b, True)
 
@@ -118,7 +123,7 @@ def update_building(building_id: int, body: BuildingUpdate, db: DbSession, _user
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Code, name and is_active cannot be cleared.")
     for k, v in changes.items():
         setattr(b, k, v)
-    _save(db, "A building with this code or name already exists.")
+    _save(db, "A building with this code or name already exists.", "code")
     db.refresh(b, ["floors"])
     return _building_out(b, True)
 
@@ -140,7 +145,7 @@ def create_floor(body: FloorCreate, db: DbSession, _user: AdminUser):
     _get_or_404(db, Building, body.building_id, "Building")
     f = Floor(**body.model_dump())
     db.add(f)
-    _save(db, "That floor number already exists in this building.")
+    _save(db, "That floor number already exists in this building.", "floor_number")
     db.refresh(f, ["seats"])
     return _floor_out(f)
 
@@ -154,7 +159,7 @@ def update_floor(floor_id: int, body: FloorUpdate, db: DbSession, _user: AdminUs
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Floor number and is_active cannot be cleared.")
     for k, v in changes.items():
         setattr(f, k, v)
-    _save(db, "That floor number already exists in this building.")
+    _save(db, "That floor number already exists in this building.", "floor_number")
     db.refresh(f, ["seats"])
     return _floor_out(f)
 
@@ -176,7 +181,7 @@ def create_seat(body: SeatCreate, db: DbSession, _user: AdminUser):
     _get_or_404(db, Floor, body.floor_id, "Floor")
     s = Seat(**body.model_dump())
     db.add(s)
-    _save(db, "That seat code already exists on this floor.")
+    _save(db, "That seat code already exists on this floor.", "seat_code")
     return _seat_out(s)
 
 
@@ -189,7 +194,7 @@ def update_seat(seat_id: int, body: SeatUpdate, db: DbSession, _user: AdminUser)
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Seat code and is_active cannot be cleared.")
     for k, v in changes.items():
         setattr(s, k, v)
-    _save(db, "That seat code already exists on this floor.")
+    _save(db, "That seat code already exists on this floor.", "seat_code")
     return _seat_out(s)
 
 

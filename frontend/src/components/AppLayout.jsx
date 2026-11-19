@@ -4,9 +4,10 @@ import {
   ListItemText, Stack, Toolbar, Typography,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useIsCompact } from '../hooks/useResponsive';
+import { TABLET_MAX, WIDE_NAV_MAX, useIsNarrowerThan } from '../hooks/useResponsive';
 import { ROLE_LABELS } from '../utils/format';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 
 const NAV = [
   { href: '#/', label: 'Dashboard', match: (p) => p === '/' },
@@ -14,23 +15,25 @@ const NAV = [
   { href: '#/incidents/new', label: 'Report incident', match: (p) => p === '/incidents/new' },
   { href: '#/admin/facilities', label: 'Facilities', match: (p) => p === '/admin/facilities', roles: ['facility_admin'] },
   { href: '#/admin/engineers', label: 'Engineers', match: (p) => p === '/admin/engineers', roles: ['facility_admin'] },
+  { href: '#/admin/people', label: 'People', match: (p) => p === '/admin/people', roles: ['facility_admin'] },
 ];
 
 function Brand({ short }) {
   return (
     <Box component="a" href="#/" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary', textDecoration: 'none' }}>
-      <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontWeight: 700, fontSize: 16 }}>A</Avatar>
+      <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'primary.main', color: 'primary.contrastText', fontWeight: 700, fontSize: 16 }}>A</Avatar>
       {!short && <Typography sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>ACME Facility Desk</Typography>}
     </Box>
   );
 }
 
 export default function AppLayout({ user, path, onLogout, children }) {
-  const compact = useIsCompact();
+  const items = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
+  // Admins have six links: the top bar needs ~1200px before they fit in one row
+  const compact = useIsNarrowerThan(items.length > 3 ? WIDE_NAV_MAX : TABLET_MAX);
   // The menu belongs to the page it was opened on, so navigating closes it.
   const [menuPath, setMenuPath] = useState(null);
   const menuOpen = menuPath === path;
-  const items = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
   const role = ROLE_LABELS[user.role] ?? user.role;
 
   return (
@@ -62,6 +65,7 @@ export default function AppLayout({ user, path, onLogout, children }) {
             </Box>
           )}
           <Box sx={{ flexGrow: 1 }} />
+          <ThemeToggle />
           <NotificationBell path={path} />
           {!compact && (
             <>

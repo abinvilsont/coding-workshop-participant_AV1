@@ -16,6 +16,8 @@ SET LOCAL client_min_messages = warning;
 -- Clean slate (reverse dependency order)
 -- ---------------------------------------------------------------------
 DROP VIEW  IF EXISTS engineer_workload;
+DROP TABLE IF EXISTS app_secrets       CASCADE;
+DROP TABLE IF EXISTS engineer_reviews  CASCADE;
 DROP TABLE IF EXISTS notifications     CASCADE;
 DROP TABLE IF EXISTS incident_history  CASCADE;
 DROP TABLE IF EXISTS incident_followers CASCADE;
@@ -119,6 +121,11 @@ CREATE TABLE buildings (
 
 CREATE TRIGGER buildings_updated_at BEFORE UPDATE ON buildings
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- An employee's usual building (set by a Facility Admin; the report form starts on it).
+-- Added here because users is created before buildings.
+ALTER TABLE users
+    ADD COLUMN home_building_id BIGINT REFERENCES buildings (id) ON DELETE SET NULL;
 
 -- ---------------------------------------------------------------------
 -- Floors - belong to a building
@@ -253,8 +260,9 @@ CREATE TRIGGER incidents_updated_at BEFORE UPDATE ON incidents
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------
--- Incident followers - other employees who reported the same problem
--- (added when an admin merges their duplicate into this incident).
+-- Incident followers - other employees who reported the same problem:
+-- added when an admin merges their duplicate into this incident, or when
+-- they find it while reporting and ask for it to be escalated.
 -- They can view the incident, add notes and get the reporter's updates.
 -- ---------------------------------------------------------------------
 CREATE TABLE incident_followers (
@@ -262,6 +270,7 @@ CREATE TABLE incident_followers (
     user_id      BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     added_by     BIGINT      REFERENCES users (id) ON DELETE SET NULL,
     added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    escalation_requested_at TIMESTAMPTZ,              -- set when they asked to escalate it
     PRIMARY KEY (incident_id, user_id)
 );
 CREATE INDEX incident_followers_user_idx ON incident_followers (user_id);
@@ -361,6 +370,37 @@ CREATE TABLE notifications (
 );
 CREATE INDEX notifications_user_idx     ON notifications (user_id, is_read, created_at DESC);
 CREATE INDEX notifications_incident_idx ON notifications (incident_id);
+
+-- ---------------------------------------------------------------------
+-- Engineer reviews - an employee rates the engineer who fixed their
+-- closed incident. Seen by the reviewer and admins, never by engineers.
+-- ---------------------------------------------------------------------
+CREATE TABLE engineer_reviews (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    incident_id  BIGINT      NOT NULL REFERENCES incidents (id) ON DELETE CASCADE,
+    engineer_id  BIGINT      NOT NULL REFERENCES engineer_profiles (user_id) ON DELETE CASCADE,
+    reviewer_id  BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    rating       SMALLINT    NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment      TEXT        CHECK (comment IS NULL OR length(comment) <= 2000),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT engineer_reviews_one_per_reviewer_uq UNIQUE (incident_id, reviewer_id)
+);
+CREATE INDEX engineer_reviews_engineer_idx ON engineer_reviews (engineer_id, created_at DESC);
+
+CREATE TRIGGER engineer_reviews_updated_at BEFORE UPDATE ON engineer_reviews
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- App secrets - values the API needs but that must not live in code or
+-- Terraform state, e.g. the random JWT signing key the init_db task creates
+-- on AWS. Only the API's database user can read it.
+-- ---------------------------------------------------------------------
+CREATE TABLE app_secrets (
+    name        VARCHAR(50) PRIMARY KEY,
+    value       TEXT        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- ---------------------------------------------------------------------
 -- View: live engineer workload (for assignment decisions)

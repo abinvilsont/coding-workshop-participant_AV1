@@ -125,6 +125,15 @@ def escalated(db, inc: Incident, actor: User, requested: str | None):
     notify(db, staff(db, inc), actor=actor, kind="escalated", incident=inc, message=message)
 
 
+def escalation_requested(db, inc: Incident, actor: User, reason: str | None):
+    """Another employee found this incident while reporting the same problem and asked to escalate it."""
+    why = f': "{_short(reason, 120)}"' if reason else ""
+    notify(db, staff(db, inc), actor=actor, kind="escalation_requested", incident=inc,
+           message=f"{actor.full_name} has the same problem and asked to escalate {inc.reference}{why}")
+    notify(db, {inc.reported_by_id}, actor=actor, kind="escalation_requested", incident=inc,
+           message=f"{actor.full_name} reported the same problem and asked to escalate your incident {inc.reference}")
+
+
 def note_added(db, inc: Incident, actor: User, body: str, internal: bool):
     recipients = staff(db, inc) if internal else stakeholders(db, inc)
     label = "an internal note" if internal else "a note"

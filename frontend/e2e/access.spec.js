@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS, PASSWORD, asUser, signIn, stamp } from './helpers.js';
 
+/** The error text is drawn just above the field (its bottom edge sits above the field's top edge). */
+async function expectAbove(page, message, field) {
+  const text = await page.getByText(message, { exact: true }).boundingBox();
+  const box = await field.boundingBox();
+  expect(text.y + text.height).toBeLessThanOrEqual(box.y);
+  expect(box.y - (text.y + text.height)).toBeLessThan(40);
+}
+
 test('a new employee registers with an acme.inc email and signs in', async ({ page }) => {
   const email = `e2e.${stamp()}@acme.inc`;
   await page.goto('/');
@@ -12,8 +20,11 @@ test('a new employee registers with an acme.inc email and signs in', async ({ pa
   await page.locator('input[autocomplete="new-password"]').first().fill(PASSWORD);
   await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toHaveText('Please fix the highlighted fields.');
+  // the problem is shown above the email field, with no banner at the top
   await expect(page.getByLabel('Work email')).toHaveAccessibleDescription('Please use your @acme.inc email address.');
+  await expectAbove(page, 'Please use your @acme.inc email address.', page.getByLabel('Work email'));
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByLabel('Work email')).toBeFocused();
 
   await page.getByLabel('Work email').fill(email);
   await page.getByRole('button', { name: 'Create account' }).click();
@@ -33,7 +44,8 @@ test('a new employee registers with an acme.inc email and signs in', async ({ pa
   await page.locator('input[autocomplete="new-password"]').first().fill(PASSWORD);
   await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toHaveText('An account with this email already exists.');
+  await expect(page.getByLabel('Work email')).toHaveAccessibleDescription('An account with this email already exists.');
+  await expectAbove(page, 'An account with this email already exists.', page.getByLabel('Work email'));
 });
 
 test('wrong password shows a clear error', async ({ page }) => {
@@ -41,7 +53,10 @@ test('wrong password shows a clear error', async ({ page }) => {
   await page.getByLabel('Work email').fill(ACCOUNTS.employee);
   await page.locator('input[autocomplete="current-password"]').fill('not-my-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('alert')).toHaveText('Invalid email or password.');
+  const password = page.locator('input[autocomplete="current-password"]');
+  await expect(password).toHaveAccessibleDescription('Invalid email or password.');
+  await expectAbove(page, 'Invalid email or password.', password);
+  await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
 test('employees cannot reach admin pages', async ({ browser }) => {

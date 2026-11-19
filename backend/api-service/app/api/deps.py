@@ -14,12 +14,12 @@ from app.models import User, UserRole
 
 DbSession = Annotated[Session, Depends(get_db)]
 
-_bearer = HTTPBearer(auto_error=False)
+bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
     db: DbSession,
-    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> User:
     if creds is None or creds.scheme.lower() != "bearer":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Please sign in.")

@@ -4,7 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Building, Floor, Incident, IncidentHistory, IncidentNote, Seat, User
+from app.core.errors import FieldError
+from app.models import (
+    Building, EngineerReview, Floor, Incident, IncidentHistory, IncidentNote, Seat, User, incident_followers,
+)
 from app.services import permissions as perms
 
 # Eager-load everything a summary row needs in one round trip
@@ -39,7 +42,17 @@ def summary(inc: Incident) -> dict:
     }
 
 
-def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
+def get_incident_or_404(db: Session, incident_id: int, user: User, for_update: bool = False) -> Incident:
+    """Load an incident the user may see (else 404).
+
+    for_update=True locks its row until the transaction ends. Every route that
+    changes an incident uses it, so two people acting at once are handled one
+    after the other: the second request waits, then re-checks its rules against
+    what the first one saved (e.g. a cancel arriving just after "start work" is
+    refused instead of silently overwriting it).
+    """
+    if for_update:
+        db.execute(select(Incident.id).where(Incident.id == incident_id).with_for_update())
     inc = db.scalar(
         select(Incident)
         .options(
@@ -49,8 +62,12 @@ def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
             selectinload(Incident.followers),
             selectinload(Incident.merged_into),
             selectinload(Incident.merged_from).joinedload(Incident.reporter),
+            selectinload(Incident.reviews).options(
+                joinedload(EngineerReview.reviewer), joinedload(EngineerReview.engineer)
+            ),
         )
         .where(Incident.id == incident_id)
+        .execution_options(populate_existing=True)  # never trust a copy loaded before the lock
     )
     # Same 404 whether it doesn't exist or the user may not see it
     if inc is None or not perms.can_view(user, inc):
@@ -106,6 +123,12 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
         for h in inc.history
     ]
 
+    # When each follower asked to escalate (None for followers added by a merge)
+    asked = dict(db.execute(
+        select(incident_followers.c.user_id, incident_followers.c.escalation_requested_at)
+        .where(incident_followers.c.incident_id == inc.id)
+    ).all()) if inc.followers else {}
+
     return {
         **summary(inc),
         "description": inc.description,
@@ -131,26 +154,43 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
             {"id": m.id, "reference": m.reference, "title": m.title, "reported_by": m.reporter.full_name}
             for m in inc.merged_from
         ],
-        "followers": [{"id": f.id, "name": f.full_name} for f in inc.followers],
+        "followers": [
+            {"id": f.id, "name": f.full_name, "escalation_requested_at": asked.get(f.id)} for f in inc.followers
+        ],
+        "reviews": [review_out(r) for r in perms.visible_reviews(user, inc)],
+    }
+
+
+def review_out(r: EngineerReview) -> dict:
+    return {
+        "id": r.id,
+        "engineer_id": r.engineer_id,
+        "engineer_name": r.engineer.full_name,
+        "reviewer_id": r.reviewer_id,
+        "reviewer_name": r.reviewer.full_name,
+        "rating": r.rating,
+        "comment": r.comment,
+        "created_at": r.created_at,
+        "updated_at": r.updated_at,
     }
 
 
 def validate_location(db: Session, building_id: int, floor_id: int | None, seat_id: int | None) -> None:
     """Friendly 400s for location mismatches (the DB also enforces these)."""
     if seat_id is not None and floor_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a floor when choosing a seat.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "Choose a floor when choosing a seat.")
     building = db.get(Building, building_id)
     if building is None or not building.is_active:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That building doesn't exist or is no longer in use.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "building_id", "That building doesn't exist or is no longer in use.")
     if floor_id is not None:
         floor = db.get(Floor, floor_id)
         if floor is None or floor.building_id != building_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That floor is not in the selected building.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "That floor is not in the selected building.")
         if not floor.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That floor is no longer in use.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "That floor is no longer in use.")
     if seat_id is not None:
         seat = db.get(Seat, seat_id)
         if seat is None or seat.floor_id != floor_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That seat is not on the selected floor.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "seat_id", "That seat is not on the selected floor.")
         if not seat.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That seat is no longer in use.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "seat_id", "That seat is no longer in use.")
