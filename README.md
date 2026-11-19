@@ -14,12 +14,20 @@ Built for the coding workshop. The workshop brief and evaluation guides are in
 |---|---|
 | **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
-| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), manage buildings / floors / seats and engineer accounts, delete incidents |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, manage buildings / floors / seats and engineer accounts, delete incidents |
 
 An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
 reporter, not the engineer, confirms the fix. Every change is written to the
 incident's history, and the people involved are notified through the bell
 (it polls every 30 s).
+
+**Duplicates.** When two employees report the same problem, an admin merges one
+report into the other:
+- The duplicate is closed and labelled "Merged", with a link to the main incident.
+- The duplicate's details are added to the main incident as a note.
+- Its reporter becomes a **follower** of the main incident: they see it, can comment,
+  and get every update.
+- Only the original reporter confirms the fix.
 
 ## Architecture
 
@@ -52,9 +60,11 @@ Prerequisites: run the workshop's `./bin/setup-environment.sh` once. It installs
 Node, Python 3.13, PostgreSQL, Terraform and LocalStack.
 
 ```sh
-# 1. Create the tables and load sample data (WARNING: seed.sql wipes existing rows)
+# 1. Create the tables and load sample data (WARNING: both wipe existing rows)
 psql -h localhost -U postgres -d postgres -f backend/db/schema.sql
 psql -h localhost -U postgres -d postgres -f backend/db/seed.sql
+#    Already have data? Apply only the additive migrations instead:
+#    psql -h localhost -U postgres -d postgres -f backend/db/migrations/<file>.sql
 
 # 2. Start everything: LocalStack + Lambda, proxy, React dev server
 ./bin/start-dev.sh
@@ -127,9 +137,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 210 | 99 % |
-| Frontend: Vitest + React Testing Library | 97 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 12 | every critical journey |
+| Backend: pytest, unit + integration on a throwaway database | 228 | 99 % |
+| Frontend: Vitest + React Testing Library | 104 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 13 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -147,7 +157,8 @@ The infrastructure is defined in `infra/` and deployed by the workshop scripts:
 Before the first cloud deploy:
 1. Connect to Aurora over TLS (`sslmode=require` when `IS_LOCAL` is `false`).
 2. Create the tables in Aurora: run `schema.sql`, and for sample data, `seed.sql`.
-   Change the sample passwords first.
+   Change the sample passwords first. `schema.sql` already includes every
+   migration in `backend/db/migrations/`.
 3. Set a strong `JWT_SECRET`.
 
 **Status:** the app has not yet been deployed to AWS. All three steps are still open.
@@ -171,6 +182,13 @@ Before the first cloud deploy:
 - **Native `<select>` styled by Material UI** so phones show their own pickers.
 - **Engineer capacity is enforced on the server** with a row lock, so two admins
   can't both fill an engineer's last slot.
+- **Merging a duplicate cancels it rather than adding a new status.**
+  - The database already requires an engineer for any status other than
+    Open or Cancelled, and a duplicate often has none.
+  - The duplicate is stored as cancelled with a link (`merged_into_id`), and the UI
+    labels it "Merged".
+  - Followers live in their own table, so the original reporter keeps sole control
+    of confirming the fix.
 
 ## Assumptions
 
@@ -181,6 +199,9 @@ Before the first cloud deploy:
 - Critical priority is only set by admins. Employees ask for it by escalating.
 - "Active tickets" means assigned, in progress or on hold. Resolved tickets don't
   count against capacity.
+- A merge isn't undone automatically. If an admin merges by mistake, the follower
+  can still comment on the main incident, and the admin can ask them to report
+  it again.
 
 ## Known gaps
 

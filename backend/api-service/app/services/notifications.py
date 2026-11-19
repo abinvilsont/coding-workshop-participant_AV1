@@ -39,8 +39,13 @@ def admin_ids(db: Session) -> set[int]:
     )
 
 
+def reporters(inc: Incident) -> set[int]:
+    """The reporter plus followers (reporters of duplicates merged into it)."""
+    return {inc.reported_by_id} | {f.id for f in inc.followers}
+
+
 def stakeholders(db: Session, inc: Incident) -> set[int]:
-    ids = {inc.reported_by_id}
+    ids = reporters(inc)
     if inc.assigned_engineer_id:
         ids.add(inc.assigned_engineer_id)
     else:
@@ -106,7 +111,7 @@ def assigned(db, inc: Incident, actor: User, engineer: User, previous_id: int | 
     title = _short(inc.title)
     notify(db, {engineer.id}, actor=actor, kind="assigned", incident=inc,
            message=f"{actor.full_name} assigned {inc.reference} to you: {title}")
-    notify(db, {inc.reported_by_id} - {engineer.id}, actor=actor, kind="assigned", incident=inc,
+    notify(db, reporters(inc) - {engineer.id}, actor=actor, kind="assigned", incident=inc,
            message=f"{engineer.full_name} is now working on your incident {inc.reference}")
     if previous_id and previous_id != engineer.id:
         notify(db, {previous_id}, actor=actor, kind="unassigned", incident=inc,
@@ -128,6 +133,23 @@ def note_added(db, inc: Incident, actor: User, body: str, internal: bool):
 
 
 def incident_deleted(db, inc: Incident, actor: User):
-    recipients = {inc.reported_by_id, inc.assigned_engineer_id}
+    recipients = reporters(inc) | {inc.assigned_engineer_id}
     notify(db, recipients, actor=actor, kind="incident_deleted", incident=inc, link=False,
            message=f"{actor.full_name} deleted {inc.reference}: {_short(inc.title)}")
+
+
+def merged(db, source: Incident, target: Incident, actor: User, source_reporters: set[int]):
+    """A duplicate was merged into another incident: tell everyone who cares."""
+    notify(db, source_reporters, actor=actor, kind="merged", incident=target,
+           message=f"{actor.full_name} merged your incident {source.reference} into {target.reference}, "
+                   f"which reports the same problem. You'll get its updates from now on.")
+    if source.assigned_engineer_id and source.assigned_engineer_id != target.assigned_engineer_id:
+        notify(db, {source.assigned_engineer_id}, actor=actor, kind="merged", incident=target,
+               message=f"{actor.full_name} merged {source.reference} into {target.reference}; "
+                       f"it is no longer on your list.")
+    notify(db, {target.assigned_engineer_id}, actor=actor, kind="merged", incident=target,
+           message=f"{actor.full_name} merged {source.reference} ({source.reporter.full_name}) into your ticket "
+                   f"{target.reference}.")
+    notify(db, {target.reported_by_id} - source_reporters, actor=actor, kind="merged", incident=target,
+           message=f"{source.reporter.full_name} reported the same problem; {actor.full_name} merged "
+                   f"{source.reference} into your incident {target.reference}.")

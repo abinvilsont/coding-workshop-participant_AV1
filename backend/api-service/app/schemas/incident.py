@@ -59,6 +59,10 @@ class AssignIn(BaseModel):
     engineer_id: int
 
 
+class MergeIn(BaseModel):
+    target_id: int  # the incident this duplicate is merged into
+
+
 class EscalateIn(BaseModel):
     reason: _text(2000)
     requested_priority: IncidentPriority | None = None
@@ -88,6 +92,7 @@ class IncidentSummary(BaseModel):
     location_details: str | None
     reported_by: str
     assigned_engineer: str | None
+    merged_into_id: int | None = None
 
 
 class IncidentList(BaseModel):
@@ -123,7 +128,20 @@ class Permissions(BaseModel):
     can_add_note: bool
     can_add_internal_note: bool
     can_delete: bool
+    can_merge: bool = False
     status_transitions: list[IncidentStatus]
+
+
+class LinkedIncident(BaseModel):
+    id: int
+    reference: str
+    title: str
+    reported_by: str | None = None
+
+
+class Follower(BaseModel):
+    id: int
+    name: str
 
 
 class IncidentDetail(IncidentSummary):
@@ -141,3 +159,6 @@ class IncidentDetail(IncidentSummary):
     notes: list[NoteOut]
     history: list[HistoryOut]
     permissions: Permissions
+    merged_into: LinkedIncident | None = None      # set on a duplicate
+    merged_from: list[LinkedIncident] = []         # duplicates merged into this one
+    followers: list[Follower] = []                 # their reporters, kept informed

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import CurrentUser, DbSession
 from app.models import FINAL_STATUSES, Incident, IncidentStatus as S, User
 from app.services import incidents as svc
+from app.services import permissions as perms
 
 router = APIRouter(tags=["dashboard"])
 
@@ -28,7 +29,8 @@ def _incidents(db: Session, *where, order_by, limit=20) -> list[dict]:
 
 
 def _employee(db: Session, user: User) -> dict:
-    mine = Incident.reported_by_id == user.id
+    # Own reports plus incidents they follow (their duplicate was merged into it)
+    mine = perms.visibility_filter(user)
     return {
         "status_counts": _status_counts(db, mine),
         "incidents": _incidents(db, mine, order_by=[Incident.updated_at.desc()]),

@@ -3,16 +3,18 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import func, select, text
+from sqlalchemy import case, func, select, text, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models import (
-    EngineerAvailability, EngineerProfile, Incident, IncidentNote, IncidentPriority, IncidentStatus as S, User,
+    FINAL_STATUSES, EngineerAvailability, EngineerProfile, Incident, IncidentNote, IncidentPriority,
+    IncidentStatus as S, User, incident_followers,
 )
 from app.schemas.incident import (
-    AssignIn, EscalateIn, IncidentCreate, IncidentDetail, IncidentList, IncidentUpdate,
-    NoteCreate, StatusChange,
+    AssignIn, EscalateIn, IncidentCreate, IncidentDetail, IncidentList, IncidentSummary, IncidentUpdate,
+    MergeIn, NoteCreate, StatusChange,
 )
 from app.services import incidents as svc
 from app.services import notifications as notify
@@ -264,3 +266,86 @@ def add_note(incident_id: int, body: NoteCreate, db: DbSession, user: CurrentUse
     notify.note_added(db, inc, user, body.body, body.is_internal)
     _commit(db)
     return _reload(db, incident_id, user)
+
+
+# ------------------------------------------------------------------ duplicates
+
+@router.get("/{incident_id}/merge-candidates", response_model=list[IncidentSummary])
+def merge_candidates(incident_id: int, db: DbSession, user: AdminUser):
+    """Open incidents this one could be merged into, likeliest duplicates first
+    (same building and category, then same building, then newest)."""
+    source = svc.get_incident_or_404(db, incident_id, user)
+    same_building = Incident.building_id == source.building_id
+    rows = db.scalars(
+        select(Incident)
+        .options(*svc.SUMMARY_OPTIONS)
+        .where(
+            Incident.id != source.id,
+            Incident.status.not_in(FINAL_STATUSES),
+            Incident.merged_into_id.is_(None),
+        )
+        .order_by(
+            case((same_building & (Incident.category == source.category), 0), (same_building, 1), else_=2),
+            Incident.created_at.desc(),
+        )
+        .limit(50)
+    ).all()
+    return [svc.summary(i) for i in rows]
+
+
+@router.post("/{incident_id}/merge", response_model=IncidentDetail)
+def merge(incident_id: int, body: MergeIn, db: DbSession, user: AdminUser):
+    """Merge a duplicate into another incident (admin only).
+
+    The duplicate is cancelled and linked to the target; its reporter (and anyone
+    already following it) follows the target from now on, so they get every update.
+    """
+    if body.target_id == incident_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "An incident can't be merged into itself.")
+    # Lock both rows (in id order, so two opposite merges can't deadlock)
+    db.execute(
+        select(Incident.id).where(Incident.id.in_([incident_id, body.target_id])).order_by(Incident.id).with_for_update()
+    )
+    source = svc.get_incident_or_404(db, incident_id, user)
+    target = svc.get_incident_or_404(db, body.target_id, user)
+
+    if source.merged_into_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"{source.reference} has already been merged into another incident."
+        )
+    if source.status in FINAL_STATUSES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Closed or cancelled incidents can't be merged.")
+    if target.status in FINAL_STATUSES or target.merged_into_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"{target.reference} is closed or cancelled. Merge into an open incident."
+        )
+
+    source_reporters = notify.reporters(source)
+    new_followers = source_reporters - {target.reported_by_id}
+    if new_followers:
+        db.execute(
+            insert(incident_followers)
+            .values([{"incident_id": target.id, "user_id": uid, "added_by": user.id} for uid in new_followers])
+            .on_conflict_do_nothing()
+        )
+    # Duplicates previously merged into the source now point at the target
+    db.execute(update(Incident).where(Incident.merged_into_id == source.id).values(merged_into_id=target.id))
+
+    source.status = S.CANCELLED
+    source.merged_into_id = target.id
+    source.closed_at = _now()
+
+    summary = f"{source.title}: {source.description}"
+    if len(summary) > 1500:
+        summary = summary[:1499] + "…"
+    db.add(IncidentNote(
+        incident_id=target.id, author_id=user.id,
+        body=f"Merged {source.reference}, reported by {source.reporter.full_name}. {summary}",
+    ))
+    db.add(IncidentNote(
+        incident_id=source.id, author_id=user.id,
+        body=f"Merged into {target.reference}, which reports the same problem. Updates continue there.",
+    ))
+    notify.merged(db, source, target, user, source_reporters)
+    _commit(db)
+    return _reload(db, target.id, user)

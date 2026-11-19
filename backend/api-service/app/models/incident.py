@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger, Computed, DateTime, FetchedValue, ForeignKey, Identity, String, Text, false, func,
+    BigInteger, Column, Computed, DateTime, FetchedValue, ForeignKey, Identity, String, Table, Text, false,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,6 +13,17 @@ from app.models.enums import (
 )
 from app.models.facility import Building, Floor, Seat
 from app.models.user import User
+
+
+# Employees following an incident because their duplicate was merged into it
+incident_followers = Table(
+    "incident_followers",
+    Base.metadata,
+    Column("incident_id", ForeignKey("incidents.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("added_by", ForeignKey("users.id", ondelete="SET NULL")),
+    Column("added_at", DateTime(timezone=True), server_default=func.now()),
+)
 
 
 class Incident(Base):
@@ -49,6 +61,7 @@ class Incident(Base):
     )
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    merged_into_id: Mapped[int | None] = mapped_column(ForeignKey("incidents.id", ondelete="SET NULL"))
 
     building: Mapped[Building] = relationship()
     floor: Mapped[Floor | None] = relationship(
@@ -71,6 +84,24 @@ class Incident(Base):
     )
     history: Mapped[list["IncidentHistory"]] = relationship(
         order_by="[IncidentHistory.created_at, IncidentHistory.id]", viewonly=True
+    )
+    # Written with core inserts (to record added_by), so read-only here
+    followers: Mapped[list[User]] = relationship(
+        secondary=incident_followers,
+        primaryjoin=lambda: Incident.id == incident_followers.c.incident_id,
+        secondaryjoin=lambda: User.id == incident_followers.c.user_id,
+        order_by=lambda: incident_followers.c.added_at,
+        viewonly=True,
+    )
+    merged_into: Mapped["Incident | None"] = relationship(
+        remote_side=lambda: Incident.id, foreign_keys=lambda: Incident.merged_into_id, viewonly=True
+    )
+    merged_from: Mapped[list["Incident"]] = relationship(
+        primaryjoin=lambda: Incident.merged_into_id == Incident.id,
+        foreign_keys=lambda: Incident.merged_into_id,
+        remote_side=lambda: Incident.merged_into_id,
+        order_by=lambda: Incident.id,
+        viewonly=True,
     )
 
 

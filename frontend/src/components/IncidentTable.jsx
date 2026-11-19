@@ -29,7 +29,7 @@ function IncidentCards({ incidents, columns }) {
             <Title incident={i} />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{meta(i)}</Typography>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, flexWrap: 'wrap', rowGap: 1 }}>
-              <StatusBadge status={i.status} />
+              <StatusBadge status={i.status} merged={Boolean(i.merged_into_id)} />
               <PriorityBadge priority={i.priority} requested={i.requested_priority} />
             </Stack>
             <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
@@ -70,7 +70,7 @@ export default function IncidentTable({ incidents, columns = [], empty }) {
                 <Title incident={i} />
                 <Typography variant="body2" color="text.secondary">{meta(i)}</Typography>
               </TableCell>
-              <TableCell><StatusBadge status={i.status} /></TableCell>
+              <TableCell><StatusBadge status={i.status} merged={Boolean(i.merged_into_id)} /></TableCell>
               <TableCell><PriorityBadge priority={i.priority} requested={i.requested_priority} /></TableCell>
               {columns.includes('reporter') && <TableCell>{i.reported_by}</TableCell>}
               {columns.includes('engineer') && (

@@ -28,9 +28,9 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 210 | all pass, ~6 s | **99 %** of `app/` (1198 statements, 9 missed) |
-| Frontend (Vitest) | 97 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
-| End-to-end (Playwright) | 12 | all pass, ~30 s | every critical user path (below) |
+| Backend (pytest) | 228 | all pass, ~6 s | **99 %** of `app/` (1268 statements, 9 missed) |
+| Frontend (Vitest) | 104 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| End-to-end (Playwright) | 13 | all pass, ~30 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
 Both coverage runs enforce a minimum of 80 % and fail below it.
@@ -69,6 +69,7 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
+| `test_merge.py` | merging duplicates: links both ways, the duplicate's reporter (and its own followers) follow the main incident, who is notified, followers get every update but not internal notes and can't confirm/cancel, chained merges, freed engineer capacity, candidates ordered by building + category, refusals (self, closed, already merged, non-admin), delete keeps the duplicate |
 | `test_api_contract.py` | `{"message": ...}` error shape (400/404/405/500/503), malformed JSON and bad query values return 400, `PUT` works as an alias of every `PATCH` route, CloudFront path prefix, the Lambda handler with a real Function-URL event |
 
 ### Frontend: `frontend/src/**/*.test.{js,jsx}`
@@ -80,7 +81,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `services/` | auth header, query strings, 204, error messages, validation errors mapped onto fields, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
 | `Login` | sign in, client-side validation with messages under each field, server field errors, loading state, registration, show password |
 | `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
-| `IncidentDetail` | role-based actions shown/hidden, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
+| `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
 | `IncidentList` | filters and search sent to the API, role headings, paging, errors |
@@ -97,6 +98,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `incident-lifecycle.spec.js` | the full flow below, with each hand-off reached through the notification bell |
 | `access.spec.js` | registration (domain check, duplicate), wrong password, employee blocked from admin pages, engineer sees only own tickets, "cannot reach the server" message |
 | `admin.spec.js` | admin builds a building/floor/seat, the employee can pick it, then it is deleted; building in use cannot be deleted; admin creates an engineer who signs in and sets availability |
+| `merge.spec.js` | two employees report the same leak, the admin merges and assigns it, the engineer resolves it, both employees are notified and only the original reporter can close it |
 | `responsive.spec.js` | every role's main pages have no horizontal scroll on a phone (Pixel 7), using the phone menu layout |
 
 The full lifecycle in `incident-lifecycle.spec.js`:
