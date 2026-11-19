@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 19 · reflects local <code>main</code> @ <code>3a36642</code> + uncommitted escalation requests</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 21 · reflects local <code>main</code> @ <code>fedf83d</code> + uncommitted refresh, PWA and People</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -900,6 +900,7 @@ a { color: var(--accent); }
       <tbody>
         <tr><td class="ep"><span class="m">POST</span>/auth/register</td><td>Self sign-up, creates an employee</td><td class="yes">public</td><td class="no">—</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/auth/login</td><td>Returns token (8 h) and user</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/auth/refresh</td><td>Fresh 8 h token, same session; refused 24 h after sign-in; re-reads role and active flag</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/dashboard</td><td>Summary for the caller's role</td><td class="yes">own</td><td class="yes">assigned</td><td class="yes">all</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/incidents</td><td>List with filters and search</td><td class="yes">own + followed</td><td class="yes">assigned</td><td class="yes">all</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/incidents</td><td>Report an incident</td><td class="yes">✓ not critical</td><td class="yes">✓ not critical</td><td class="yes">✓</td></tr>
@@ -920,6 +921,8 @@ a { color: var(--accent); }
         <tr><td class="ep"><span class="m">POST·PATCH·PUT·DELETE</span>/buildings · /floors · /seats</td><td>Define facilities; delete only if unused</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET·POST·PATCH·PUT</span>/engineers</td><td>Create and manage engineer profiles</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/engineers/{id}/reviews</td><td>Every review of an engineer, newest first</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/users</td><td>Every account (search, role filter, inactive)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">PATCH·PUT</span>/users/{id}</td><td>Make admin / employee, deactivate / reactivate; not yourself, not engineers, never zero admins</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">PATCH·PUT</span>/engineers/me/availability</td><td>Set own availability</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/notifications · /unread-count</td><td>Own notifications and bell count</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/notifications/{id}/read · /read-all</td><td>Mark read (all, or one incident's)</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
@@ -941,18 +944,20 @@ a { color: var(--accent); }
       <ul>
         <li><code>App.jsx</code> · <code>router.js</code>: hash routes <code>#/</code>, <code>#/incidents</code>, <code>#/incidents/new</code>, <code>#/incidents/:id</code>, <code>#/admin/facilities</code>, <code>#/admin/engineers</code> (admin only)</li>
         <li><code>pages/</code>: Login, Dashboard (engineer availability switch), IncidentList, NewIncident, IncidentDetail</li>
-        <li><code>pages/admin/</code>: Facilities, Engineers</li>
+        <li><code>pages/admin/</code>: Facilities, Engineers, People (accounts and roles)</li>
+        <li><code>public/manifest.webmanifest</code> · <code>public/sw.js</code> · <code>public/icons/</code>: installable app; the service worker caches app files, never <code>/api/</code></li>
         <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark), Field (errors above the input) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints)</li>
         <li><code>theme.js</code>: the Material UI theme with light and dark colour schemes as CSS variables (brand colours, chip colours for both schemes, type scale); <code>index.html</code> applies the saved scheme before React loads</li>
-        <li><code>services/</code>: apiClient (token, 401 sign-out), authService, incidentService, adminService, notificationService</li>
+        <li><code>services/</code>: apiClient (token, quiet renewal under an hour left, 401 sign-out), authService, incidentService, adminService, notificationService</li>
       </ul>
     </div>
     <div class="card">
       <h3>API service</h3>
       <span class="path">backend/api-service/</span>
       <ul>
-        <li><code>function.py</code>: Lambda entry (Mangum)</li>
-        <li><code>app/api/routes/</code>: auth, incidents, dashboard, facilities, engineers, notifications</li>
+        <li><code>function.py</code>: Lambda entry (Mangum); a direct invocation <code>{"action": ...}</code> runs a database task instead</li>
+        <li><code>app/admin_tasks.py</code>: <code>status</code> · <code>init_db</code> · <code>migrate</code>, using <code>sql/</code> (a copy of <code>backend/db</code>, kept in sync by <code>bin/sync-db-sql.sh</code>)</li>
+        <li><code>app/api/routes/</code>: auth, incidents, dashboard, facilities, engineers, users, notifications</li>
         <li><code>app/api/deps.py</code>: current user, role checks</li>
         <li><code>app/services/permissions.py</code>: all role rules</li>
         <li><code>app/services/notifications.py</code>: who is told about which change</li>
@@ -1000,7 +1005,7 @@ a { color: var(--accent); }
     </table>
   </div>
   <div class="note">
-    <strong>Open items.</strong> Every requirement now has database, API and UI support. Remaining: admins can't reset an engineer's password from the UI (the API has no endpoint for it yet). The live database has not been re-seeded with the newest seed rows (it would delete the registered account <code>test@acme.inc</code>). Set a real <code>JWT_SECRET</code> before any AWS deployment; the AWS path itself is untested.
+    <strong>Open items.</strong> Every requirement now has database, API and UI support. Remaining: admins can't reset an engineer's password from the UI (the API has no endpoint for it yet). The local database has not been re-seeded with the newest seed rows (it would delete the registered account <code>test@acme.inc</code>). Deployed to AWS on 19 Nov 2026 at <a href="https://d3lb2j5ijpzy26.cloudfront.net">https://d3lb2j5ijpzy26.cloudfront.net</a> with the sample data (every sample password is <code>Password123!</code>). Not done: password change or reset, push notifications (the bell polls), AI features.
   </div>
 </section>
 
@@ -1011,6 +1016,16 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 21</span>
+      <span class="log-what">Token refresh, installable app, People admin</span>
+      <span class="log-detail"><code>POST /auth/refresh</code> swaps a valid token for a fresh 8 h one (same session start, refused 24 h after sign-in, role and active flag re-read); the frontend renews quietly when under an hour is left. The app is a PWA: manifest, icons and a hand-written service worker that caches app files and never <code>/api/</code>. New admin People page (<code>GET/PATCH /users</code>): make an employee an admin or back, deactivate/reactivate; not yourself, not engineers, never zero active admins (row lock, 409). +18 backend tests (313), +16 frontend tests (142), new E2E journey (16), admin pages added to the phone layout check.</span>
+    </li>
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 20</span>
+      <span class="log-what">Deployed to AWS</span>
+      <span class="log-detail">Lambda database tasks by direct invocation (<code>status</code>, <code>init_db</code>, <code>migrate</code>; <code>app/admin_tasks.py</code>), a packaged copy of <code>backend/db</code> with a drift test, a random JWT key stored in <code>app_secrets</code> (migration 005), <code>sslmode=require</code> on AWS, and a 25 s connection retry while a paused Aurora wakes (verified live: 200 in 6.6 s after 7 idle minutes). Live at the CloudFront URL with the sample data.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 19</span>
       <span class="log-what">Already reported? Request escalation</span>

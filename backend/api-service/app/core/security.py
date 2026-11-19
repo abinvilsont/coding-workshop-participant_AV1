@@ -41,13 +41,15 @@ def jwt_secret() -> str:
     return _stored_secret
 
 
-def create_access_token(user_id: int, role: str) -> str:
+def create_access_token(user_id: int, role: str, auth_time: int | None = None) -> str:
+    """`auth_time` = when the user originally signed in (kept across refreshes)."""
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "role": role,
         "iat": now,
         "exp": now + timedelta(hours=config.TOKEN_TTL_HOURS),
+        "auth_time": auth_time if auth_time is not None else int(now.timestamp()),
     }
     return jwt.encode(payload, jwt_secret(), algorithm=config.JWT_ALGORITHM)
 

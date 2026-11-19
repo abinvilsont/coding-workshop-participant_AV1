@@ -46,6 +46,9 @@ JWT_SECRET = os.getenv("JWT_SECRET") or (
 )
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL_HOURS = 8
+# A token can be renewed (POST /auth/refresh) while it's valid, but never beyond
+# this long after the original sign-in - then the user signs in again.
+MAX_SESSION_HOURS = 24
 
 ACME_EMAIL_DOMAIN = "acme.inc"
 MIN_PASSWORD_LENGTH = 8

@@ -1,3 +1,4 @@
+from datetime import datetime
 import re
 
 from pydantic import BaseModel, field_validator
@@ -70,3 +71,4 @@ class RegisterOut(BaseModel):
 class LoginOut(BaseModel):
     token: str
     user: UserOut
+    session_expires_at: datetime | None = None  # sign-in again after this, refresh or not

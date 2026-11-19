@@ -133,3 +133,10 @@ def new_incident(client, as_, facilities):
 
 def unread(client, headers) -> list[dict]:
     return client.get("/notifications", headers=headers, params={"unread_only": True}).json()["items"]
+
+
+def login_as(client, email: str, password: str = PASSWORD) -> str:
+    """Sign in through the API; returns the token."""
+    r = client.post("/auth/login", json={"email": email, "password": password})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]

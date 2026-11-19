@@ -18,7 +18,7 @@ diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
 |---|---|
 | **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (and are told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
-| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, delete incidents |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, manage **People** (make an employee an admin or back, deactivate or reactivate accounts), delete incidents |
 
 An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
 reporter, not the engineer, confirms the fix. Every change is written to the
@@ -222,9 +222,17 @@ sample password is `Password123!`.
 - **One API service, not several.** It's one codebase and one deploy, and the domain
   is small enough. Routes are split by feature inside it.
 - **JWT instead of server sessions.** Lambda instances share no memory. Tokens last
-  8 hours (a working day) and live in `sessionStorage`, so closing the tab signs you
-  out, which suits shared office PCs. There is no refresh token yet; an expired
-  session sends you back to sign-in.
+  8 hours and live in `sessionStorage`, so closing the tab signs you out, which suits
+  shared office PCs.
+  - When less than an hour is left, the app quietly swaps the token for a fresh one
+    (`POST /auth/refresh`). An open tab therefore stays signed in, because the bell
+    calls the API every 30 s.
+  - A session still ends 24 hours after signing in, which limits how long a stolen
+    token is useful.
+  - Every renewal re-reads the user's role and whether the account is active.
+- **An installable app (PWA), without a plugin.** A hand-written service worker
+  (`public/sw.js`) caches the app's files, so the app opens instantly and loads offline.
+  It never caches `/api/` responses, so incident data is always live and private.
 - **Notifications are polled every 30 s, not pushed.** Lambda can't hold WebSockets
   open, and the polling query only counts rows.
 - **History is written by a database trigger.** No code path can forget to log a
@@ -273,6 +281,7 @@ sample password is `Password123!`.
 
 ## Known gaps
 
-- No token refresh, password change or password reset.
-- No push notifications, PWA or offline mode.
-- No admin-account management screen.
+- No password change or password reset.
+- No push notifications: the bell polls every 30 s. Offline, the app opens but can't
+  load data.
+- Engineers can't change role from the People page; they're managed on the Engineers page.

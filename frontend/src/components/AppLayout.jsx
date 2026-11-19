@@ -15,6 +15,7 @@ const NAV = [
   { href: '#/incidents/new', label: 'Report incident', match: (p) => p === '/incidents/new' },
   { href: '#/admin/facilities', label: 'Facilities', match: (p) => p === '/admin/facilities', roles: ['facility_admin'] },
   { href: '#/admin/engineers', label: 'Engineers', match: (p) => p === '/admin/engineers', roles: ['facility_admin'] },
+  { href: '#/admin/people', label: 'People', match: (p) => p === '/admin/people', roles: ['facility_admin'] },
 ];
 
 function Brand({ short }) {

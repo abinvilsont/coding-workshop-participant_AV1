@@ -10,7 +10,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.exceptions import HTTPException
 
-from app.api.routes import auth, dashboard, engineers, facilities, incidents, notifications
+from app.api.routes import auth, dashboard, engineers, facilities, incidents, notifications, users
 from app.core import config
 
 logger = logging.getLogger()
@@ -47,6 +47,7 @@ app.include_router(dashboard.router)
 app.include_router(facilities.router)
 app.include_router(engineers.router)
 app.include_router(notifications.router)
+app.include_router(users.router)
 
 if config.CORS_ORIGINS:
     app.add_middleware(

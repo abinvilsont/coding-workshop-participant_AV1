@@ -53,7 +53,47 @@ function toQuery(params) {
   return s ? `?${s}` : '';
 }
 
+/** Seconds until the stored token expires (null if there is none or it can't be read). */
+export function tokenSecondsLeft(token = getToken()) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp - Date.now() / 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+// Renew the token quietly once less than this is left (tokens last 8 hours)
+export const REFRESH_WHEN_SECONDS_LEFT = 60 * 60;
+let refreshing = null; // one renewal at a time, shared by concurrent requests
+
+/** Swap a token that is about to expire for a fresh one (the server caps a session at 24 h). */
+async function refreshIfDue() {
+  const left = tokenSecondsLeft();
+  if (left === null || left <= 0 || left > REFRESH_WHEN_SECONDS_LEFT) return;
+  refreshing ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        saveSession(data.token, data.user);
+      }
+      // A refusal (e.g. the 24-hour limit) is fine: the request goes ahead with the
+      // old token, and once that expires the usual 401 sends the user to sign in.
+    } catch {
+      // offline: try again on the next request
+    } finally {
+      refreshing = null;
+    }
+  })();
+  await refreshing;
+}
+
 export async function apiRequest(path, { method = 'GET', body, params } = {}) {
+  if (!path.startsWith('/auth/')) await refreshIfDue();
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;

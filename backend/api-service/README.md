@@ -40,7 +40,8 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | Method | Path | Who | Purpose |
 |---|---|---|---|
 | POST | `/auth/register` | public | Employee sign-up (`@acme.inc` only) |
-| POST | `/auth/login` | public | Returns `{token, user}` (8h token) |
+| POST | `/auth/login` | public | Returns `{token, user, session_expires_at}` (8h token) |
+| POST | `/auth/refresh` | any | Swap a valid token for a fresh 8h one; refused 24h after the original sign-in; role and active status re-read |
 | GET | `/auth/me` | any | Current user |
 | GET | `/incidents` | any | List (scoped by role); filters `status`, `priority`, `escalated`, `unassigned`, `q`, `limit`, `offset` |
 | POST | `/incidents` | any | Report an incident |
@@ -62,6 +63,8 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST, PATCH / PUT, DELETE | `/buildings`, `/floors`, `/seats` (`/{id}`) | admin | Manage locations; delete refused (409) while in use |
 | GET, POST | `/engineers` | admin | List with workload / create engineer account |
 | GET, PATCH / PUT | `/engineers/{id}` | admin | View / update profile, capacity, availability, active flag |
+| GET | `/users?role&include_inactive&q` | admin | Every account, admins first |
+| PATCH / PUT | `/users/{id}` | admin | `{role: employee \| facility_admin, is_active}`; not yourself, not engineers, never zero active admins (409) |
 | GET | `/engineers/{id}/reviews` | admin | Every review of the engineer, newest first (`GET /engineers` also returns `avg_rating`, `review_count`) |
 | PATCH / PUT | `/engineers/me/availability` | engineer | Set own availability |
 | GET | `/notifications` | any | Own notifications, newest first, + unread count |

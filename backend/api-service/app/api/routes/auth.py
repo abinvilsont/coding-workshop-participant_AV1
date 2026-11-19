@@ -1,10 +1,14 @@
-from fastapi import APIRouter, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import FieldError
-from app.api.deps import CurrentUser, DbSession
-from app.core.security import create_access_token, hash_password, verify_password
+from app.api.deps import CurrentUser, DbSession, bearer
+from app.core import config
+from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.models import User, UserRole
 from app.schemas.auth import LoginIn, LoginOut, RegisterIn, RegisterOut, UserOut
 
@@ -40,7 +44,27 @@ def login(body: LoginIn, db: DbSession):
 
     db.execute(update(User).where(User.id == user.id).values(last_login_at=func.now()))
     db.commit()
-    return {"token": create_access_token(user.id, user.role), "user": UserOut.from_user(user)}
+    token = create_access_token(user.id, user.role)
+    return {"token": token, "user": UserOut.from_user(user), "session_expires_at": _session_end(token)}
+
+
+def _session_end(token: str) -> datetime:
+    auth_time = decode_access_token(token)["auth_time"]
+    return datetime.fromtimestamp(auth_time + config.MAX_SESSION_HOURS * 3600, timezone.utc)
+
+
+@router.post("/refresh", response_model=LoginOut)
+def refresh(user: CurrentUser, creds: HTTPAuthorizationCredentials = Depends(bearer)):
+    """Swap a still-valid token for a fresh one (another 8 hours), up to 24 hours after
+    the original sign-in. The role and active status come from the database, so a
+    changed role or a deactivated account takes effect here too."""
+    claims = decode_access_token(creds.credentials)  # already verified by CurrentUser
+    auth_time = int(claims.get("auth_time") or claims["iat"])
+    now = datetime.now(timezone.utc).timestamp()
+    if now - auth_time >= config.MAX_SESSION_HOURS * 3600:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Your session has reached its 24-hour limit. Please sign in again.")
+    token = create_access_token(user.id, user.role, auth_time=auth_time)
+    return {"token": token, "user": UserOut.from_user(user), "session_expires_at": _session_end(token)}
 
 
 @router.get("/me", response_model=UserOut)

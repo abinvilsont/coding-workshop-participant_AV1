@@ -50,6 +50,13 @@ Anyone with an `@acme.inc` email can register, and they always become an **Emplo
 5. The browser keeps the token in `sessionStorage`, so closing the tab signs you out. The tab title changes to "\<your name> · ACME Facility Desk".
 6. The page sends that token with every later request (see step 3 of the big picture).
 
+**Staying signed in** (`POST /auth/refresh`)
+
+1. Before each API call, the page checks how long the token has left. Under an hour, it first swaps the token for a fresh 8-hour one, without the user noticing. Concurrent calls share one renewal.
+2. The API checks the token, reloads the user (so a changed role or a deactivated account takes effect), and issues the new token with the **same** sign-in time.
+3. A session ends 24 hours after signing in, whatever happens: renewal is refused, and the next expired token sends the user to sign-in. That limits how long a stolen token is useful.
+4. Because the bell calls the API every 30 seconds, an open tab stays signed in up to that limit.
+
 ## Reporting an incident
 
 A new incident starts as **Open**, is unassigned, and gets a reference like `INC-000012`. Every Facility Admin is notified.
@@ -165,6 +172,22 @@ Once an incident is **Closed**, the employees who reported it can rate the engin
 | See the average rating | No | No | Yes | No |
 | Edit or delete it | Yes | No | No | No |
 
+### What an engineer's browser receives
+
+The hiding happens on the server, so an engineer who opens the browser's network tab finds no reviews or ratings in any response. Each endpoint that could carry them returns this to an engineer:
+
+| Endpoint | What an engineer gets |
+| --- | --- |
+| `GET /incidents/{id}` | `"reviews": []` |
+| `GET /incidents` (list) | Nothing to hide: the list summary has no reviews field |
+| `GET /engineers`, `GET /engineers/{id}`, `GET /engineers/{id}/reviews` | 403, admin only |
+| `PATCH /engineers/me/availability` | Their own profile with `avg_rating` and `review_count` removed (`RATING_FIELDS`) |
+| `GET /notifications` | No review notification is ever created |
+
+An employee's response carries only the review they wrote; an admin's carries all of them. The test `test_engineer_never_sees_reviews` checks every row above.
+
+**Keep it that way:** the filter is applied by hand. A new endpoint that returns incidents or engineer stats must go through `visible_reviews()` or drop `RATING_FIELDS`, and should get a line in that test.
+
 ## Notes, notifications and the dashboard
 
 Notifications are rows in the database, not pushed messages. The bell asks the API for new ones every 30 seconds.
@@ -209,6 +232,40 @@ Only a Facility Admin can manage buildings and engineers. Anyone else gets **403
 2. **Edit:** change details, capacity or availability.
 3. **Deactivate:** refused with **409** while the engineer still has active tickets ("Reassign them first"). You also can't deactivate yourself. A deactivated engineer can't sign in, and their existing token stops working on the next request.
 
+**People** (`/users`)
+
+1. **The list** shows every account with its role, department and last sign-in. You can search by name or email, filter by role, and show inactive accounts.
+2. **Make admin / Make employee** changes an employee into a Facility Admin or back. It takes effect on that person's next request, because every request reads the role from the database, and they get a notification.
+3. **Deactivate** signs the person out on their next request and blocks sign-in. **Reactivate** lets them back in.
+4. **Safeguards:** you can't change your own account; engineers are managed on the Engineers page (their tickets and capacity rules live there); and there is always at least one active Facility Admin. If two admins demote each other at the same moment, the API locks the admin rows and refuses the second change with **409**.
+
+## Install it as an app
+
+The app is a **progressive web app (PWA)**. Chrome, Edge and phones offer to install it, and it then opens in its own window with the ACME icon.
+
+- `manifest.webmanifest` gives the name, colours and icons.
+- `sw.js`, a service worker, caches the app's files, so it opens instantly and still loads offline (it then says it can't reach the server).
+- The service worker **never caches `/api/` responses**: incident data is always live, and nothing private is stored on the device.
+- Pages are fetched from the network first, so a new deploy shows up on the next visit.
+
+## Running on AWS
+
+The same code runs on AWS: the React app on S3 behind CloudFront, and the API on Lambda, connected to Aurora PostgreSQL. The workshop scripts deploy it: `deploy-backend.sh aws`, then `deploy-frontend.sh aws`.
+
+**Setting up the database.** Aurora has no public address, so the tables are created by the Lambda itself. Someone with AWS credentials invokes it directly with a task; web requests can never trigger these.
+
+| Task | What it does |
+| --- | --- |
+| `status` | Are there tables? How many users, incidents and admins? Is the signing key set? |
+| `init_db` | Empty database only: creates the tables, an admin (or the sample data) and a random 256-bit token-signing key |
+| `migrate` | Runs every migration (each safe to repeat). Use it after deploying a version that adds tables or columns |
+
+**What changes on AWS** (`IS_LOCAL=false`):
+
+- the database connection requires TLS (`sslmode=require`);
+- tokens are signed with the random key `init_db` stored in the database, not one derived from settings;
+- Aurora pauses after 5 idle minutes, so the API retries the connection for up to 25 seconds while it wakes: the first visit after a quiet spell takes a few seconds instead of failing. That limit stays under CloudFront's 30-second timeout.
+
 ## When things go wrong
 
 Every error comes back as `{"message": "..."}` in plain English, and the page shows that message as it is. A failed request changes nothing, because the whole transaction is rolled back.
@@ -248,6 +305,9 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Role rules checked on the server, and `role` ignored on register | The browser can be tampered with. Nobody can make themselves an admin or reach a hidden button by editing the page. |
 | Same message for a wrong email or password; 404 for incidents you can't see | Attackers can't learn which accounts or incident numbers exist. |
 | Only `@acme.inc` emails | Only company staff can register. The check runs in the form, the API and the database. |
+| Quiet token renewal, capped at 24 hours per sign-in | Nobody is thrown out mid-task after 8 hours, yet a stolen token stops working within a day. Each renewal re-reads the role and active flag, so admin changes apply quickly. |
+| People page safeguards: not yourself, not engineers, never zero admins | An admin can't lock everyone out by accident or in a race. Engineers stay on the Engineers page, where their open tickets block deactivation. |
+| Database set-up as a Lambda task, plus a random signing key stored in the database | Aurora isn't reachable from outside AWS, and the key the app would otherwise derive on AWS comes from a guessable database password. Direct invocation needs AWS credentials, so the public site can't trigger it. |
 
 **Workflow**
 
@@ -276,3 +336,5 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Pool of 1+1 connections on Lambda, 10+30 on a server | Each Lambda instance serves one request at a time, so a big pool would waste Aurora's connection limit. The load test showed that 4 connections starved the server, failing 434 of 510 users; with the new sizes none failed. |
 | 503 with `Retry-After` after 10 s | Users get a clear "busy" message instead of a page that hangs for 30 s. |
 | Every error is `{"message": "..."}` | The page shows any error as it is, with no special cases, and stack traces never reach the browser. |
+| Retry the database connection for up to 25 s on AWS | Aurora Serverless pauses when idle to save cost; without the retry, the first visit after a quiet spell failed. Tested on the live site: 200 in 6.6 s after 7 idle minutes. |
+| Hand-written service worker that never caches the API | About 60 lines with no plugin to learn or update. App files are cached for speed and offline start; data always comes live, so nobody sees stale incidents or leaves private data on a shared device. |
