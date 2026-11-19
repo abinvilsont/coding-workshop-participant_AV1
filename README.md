@@ -63,6 +63,8 @@ an optional comment, and edit or delete that review later.
   works on S3 without rewrite rules. Light and dark mode: the sun/moon button in
   the top bar (and on the sign-in page) switches, and the choice is remembered on
   that device. Until someone picks, the app follows the device's own setting.
+  Open tabs stay in step: each applies the choice saved now, so a late update from
+  a background tab can't make the page flicker between the two.
 - **Backend:** one FastAPI service (`backend/api-service`) running on Lambda through
   Mangum. It uses SQLAlchemy 2, Pydantic 2, JWT auth and bcrypt hashing.
 - **Database:** PostgreSQL. The schema is in [`backend/db/schema.sql`](backend/db/schema.sql),
@@ -170,7 +172,7 @@ cd frontend && npm run lint
 | Suite | Count | Coverage |
 |---|---|---|
 | Backend: pytest, unit + integration on a throwaway database | 332 | 99 % |
-| Frontend: Vitest + React Testing Library | 157 | 96 % lines |
+| Frontend: Vitest + React Testing Library | 159 | 96 % lines |
 | End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 27 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 

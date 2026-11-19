@@ -6,13 +6,13 @@
 
 ## What it is
 
-ACME Facility Desk is where ACME staff report problems in the office, like a broken chair, a leaking tap or a dead light. A Facility Admin hands each problem to an engineer, the engineer fixes it, and the person who reported it confirms the fix.
+ACME Facility Desk is where ACME staff report wee problems round the office: a broken chair, a leaking tap, a light that's packed in. A Facility Admin hands each one to an engineer, the engineer sorts it, and the person who reported it says whether it's fixed.
 
-Everyone can see where their problem stands at any time, and the app tells the right people whenever something changes. It works in a browser, on a phone, and as an app you can install.
+You can see where your problem's at any time, and the app lets the right people know whenever something changes. It works in a browser, on your phone, and as an app you can install.
 
 ## Who uses it
 
-There are three kinds of user. Each one sees only the screens and buttons for their job.
+There are three kinds of user, and each one only sees the screens and buttons for their own job. No clutter.
 
 | Role | Who they are | What they do |
 | --- | --- | --- |
@@ -24,61 +24,61 @@ There are three kinds of user. Each one sees only the screens and buttons for th
 
 | Feature | In plain words |
 | --- | --- |
-| **Report a problem** | Pick the building, floor and seat, describe the problem, and send it. If an admin has set your usual building, it's already filled in. You can still pick another; the app just reminds you it isn't your usual one. It gets a number like INC-000012. |
-| **"Already reported?" check** | Before saving, the app shows open problems at the same place. If yours is there, you can join it instead of reporting it twice. |
-| **Track progress** | Each problem shows its status, who is fixing it, and everything that happened to it. |
-| **Notes** | Anyone involved can add a note. Engineers and admins can also write internal notes that employees don't see. |
-| **Notifications** | A bell with a red badge tells you when something changes on your problems. You're never notified about your own actions. |
-| **Dashboard** | A home page that fits your role: your own problems, your jobs, or the whole picture for admins. |
-| **Escalate** | Mark a problem as urgent and say why, so admins look at it first. |
-| **Rate the engineer** | After a fix, give the engineer 1 to 5 stars. Only admins see the ratings; engineers never do. |
-| **Admin tools** | Manage buildings, floors and seats, engineer accounts, who is an admin, and each person's usual building. |
-| **Install as an app** | Chrome, Edge and phones can install it so it opens in its own window. |
+| **Report a problem** | Pick the building, floor and seat, say what's wrong, and send it. If an admin's set your usual building, it's already filled in for you. You can still pick another; the app just gives you a wee reminder it isn't your usual one. Your report gets a number like INC-000012. |
+| **"Already reported?" check** | Before it saves, the app shows any open problems at the same spot. If yours is there already, you can join it instead of reporting it twice. |
+| **Track progress** | Every problem shows where it's at, who's fixing it, and everything that's happened to it. |
+| **Notes** | Anybody involved can add a note. Engineers and admins can also write internal notes that employees don't see. |
+| **Notifications** | A bell with a red badge tells you when something changes on your problems. You're never told about things you did yourself. |
+| **Dashboard** | A home page that suits your role: your own problems, your jobs, or the whole picture if you're an admin. |
+| **Escalate** | Mark a problem as urgent and say why, so the admins look at it first. |
+| **Rate the engineer** | Once it's fixed, give the engineer 1 to 5 stars. Only admins see the ratings; engineers never do. |
+| **Admin tools** | Manage buildings, floors and seats, engineer accounts, who's an admin, and each person's usual building. |
+| **Install as an app** | Chrome, Edge and phones can install it, so it opens in its own window like any other app. |
 
 ## The main workflow: from report to fix
 
 ![A problem is closed only when the person who reported it agrees](images/simple-workflow.png)
 
-Every step sends a notification to the people involved. The reporter can cancel while the problem is still Open or Assigned, and an engineer can put the work on hold and resume it later.
+Every step sends a notification to the folk involved. The reporter can cancel while the problem's still Open or Assigned, and an engineer can put the work on hold and pick it back up later.
 
 ## Other workflows
 
-**Someone already reported it**
+**Somebody's already reported it**
 
 1. You fill in the form and press Submit.
-2. The app shows open problems in the same building and category.
-3. You press **Request escalation** on the matching one and say why it's urgent.
-4. You now follow that problem and get its updates. It's marked urgent, and the engineer sees your reason.
+2. The app shows any open problems in the same building and category.
+3. You press **Request escalation** on the one that matches and say why it's urgent.
+4. Now you follow that problem and get its updates. It's marked urgent, and the engineer sees your reason.
 
 **Two people reported the same thing**
 
 1. An admin spots the duplicate and merges it into the main problem.
-2. The duplicate closes with a link to the main one.
-3. Both people now get every update on the main problem. Only the first reporter can confirm the fix.
+2. The duplicate closes, with a link to the main one.
+3. Both people get every update on the main problem from then on. Only the first person who reported it can say it's fixed.
 
 **Rating the engineer**
 
-1. After you confirm the fix, a **Rate** box appears.
-2. You give 1 to 5 stars and an optional comment. You can change or delete it later.
+1. Once you've confirmed the fix, a **Rate** box appears.
+2. Give 1 to 5 stars and a comment if you like. You can change it or delete it later.
 3. Admins see each engineer's average on the Engineers page. The engineer never sees it.
 
 **Managing people (admins)**
 
-1. Create engineer accounts and set how many jobs each can hold at once.
+1. Create engineer accounts and set how many jobs each one can hold at once.
 2. Make an employee an admin, or back again.
-3. Turn off an account. That person is signed out on their next click and can't sign in.
-4. The app always keeps at least one admin, and an engineer with open jobs can't be turned off until they're reassigned.
+3. Turn an account off. That person's signed out on their next click and can't sign back in.
+4. The app always keeps at least one admin, and an engineer with open jobs can't be turned off until those jobs are handed to somebody else.
 
 **Two people act at the same moment**
 
-The second action waits a moment, then checks again. If the first one changed things, the second is refused with a clear message, so nobody's change is lost without them knowing.
+The second one waits a wee second, then checks again. If the first one changed things, the second is turned down with a clear message, so nobody's change goes missing without them knowing.
 
 ## Keeping accounts safe
 
-- **Passwords are never stored as typed.** They are scrambled one way (bcrypt), so even the database doesn't hold the real password.
-- **Signing in gives you a pass (a token).** Your browser shows it with every click, so you don't type your password again. The server checks that the pass is genuine each time.
-- **Passes run out.** A pass lasts 8 hours and is renewed quietly while you work. After 24 hours you sign in again. Closing the tab signs you out.
-- **The server decides what you may do.** Your role is checked on every click, so an account that is turned off or changed takes effect at once.
-- **Wrong email or wrong password give the same message**, so nobody can find out who has an account.
+- **Passwords are never stored the way you typed them.** They're scrambled one way (bcrypt), so even the database doesn't hold your real password.
+- **Signing in gives you a pass (a token).** Your browser shows it with every click, so you're not typing your password over and over. The server checks the pass is the real deal every time.
+- **Passes run out.** One lasts 8 hours and is renewed quietly while you work. After 24 hours you sign in again. Close the tab and you're signed out.
+- **The server decides what you're allowed to do.** Your role is checked on every click, so if an account's turned off or changed, that takes effect straight away.
+- **A wrong email and a wrong password get the same message**, so nobody can go fishing for who has an account.
 
-Still to add: a limit on repeated login attempts. The technical details are in [How ACME Facility Desk Works](how-it-works.md).
+Still on the list: a limit on repeated login attempts. The technical details are in [How ACME Facility Desk Works](how-it-works.md).

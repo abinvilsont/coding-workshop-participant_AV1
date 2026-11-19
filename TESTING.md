@@ -29,7 +29,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
 | Backend (pytest) | 332 | all pass, ~25 s | **99 %** of `app/` (1684 statements, 14 missed) |
-| Frontend (Vitest 4) | 157 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
+| Frontend (Vitest 4) | 159 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -114,7 +114,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
 | `apiClient` | JSON and token headers, query strings, error shapes and field errors, network failure, 401 sign-out; quiet token renewal under an hour left, one renewal shared by concurrent requests, carries on with the old token if renewal is refused or offline |
 | `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive); at 1024 px admins get the drawer (six links) while employees keep the top bar, admins get it back at 1200 px; incident table vs cards on phones and tablets (768 px) |
-| `ThemeToggle` | light ⇄ dark switch, choice saved and restored, `<html>` class, hidden outside the theme provider |
+| `ThemeToggle` | light ⇄ dark switch, choice saved and restored, `<html>` class, hidden outside the theme provider; with other tabs open, late storage events change nothing (fails with MUI's default storage) and a real change in another tab is followed |
 
 ### End-to-end: `frontend/e2e/`
 
