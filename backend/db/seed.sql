@@ -28,7 +28,15 @@ INSERT INTO users (full_name, email, password_hash, role, department, phone) VAL
     ('Emma Employee',    'emma@acme.inc',            '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Finance',     NULL),
     ('Liam Lee',         'liam.lee@acme.inc',        '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Marketing',   NULL),
     ('Sofia Santos',     'sofia.santos@acme.inc',    '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Engineering', NULL),
-    ('Noah Patel',       'noah.patel@acme.inc',      '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'HR',          NULL);
+    ('Noah Patel',       'noah.patel@acme.inc',      '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'HR',          NULL),
+    ('Ben Brooks',       'ben.admin@acme.inc',       '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'facility_admin', 'Facilities',  '+1-555-0101'),
+    ('Hana Kim',         'hana.eng@acme.inc',        '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'engineer',       'Facilities',  '+1-555-0114'),
+    ('Ava Johnson',      'ava.johnson@acme.inc',     '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Finance',     NULL),
+    ('Mason Clark',      'mason.clark@acme.inc',     '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Sales',       NULL),
+    ('Chloe Martin',     'chloe.martin@acme.inc',    '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Legal',       NULL),
+    ('Lucas Brown',      'lucas.brown@acme.inc',     '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Engineering', NULL),
+    ('Mia Wong',         'mia.wong@acme.inc',        '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Design',      NULL),
+    ('Zara Ahmed',       'zara.ahmed@acme.inc',      '$2b$10$QSJnNWOu7OnfDPDA8gYPCOFOIv5cs4RelbH2TwIzWNSY7i9ceL0B.', 'employee',       'Operations',  NULL);
 
 -- ---------------------------------------------------------------------
 -- Buildings, floors, seats
@@ -68,13 +76,19 @@ FROM (VALUES
 JOIN buildings b ON b.code = s.code
 JOIN floors fl ON fl.building_id = b.id AND fl.floor_number = s.num;
 
--- Usual buildings (Noah has none, so the report form starts empty for him)
+-- Usual buildings (Noah and Zara have none, so the report form starts empty for him)
 UPDATE users u SET home_building_id = b.id
 FROM (VALUES
     ('alice.admin@acme.inc',  'HQ1'),
     ('emma@acme.inc',         'HQ1'),
     ('liam.lee@acme.inc',     'HQ1'),
-    ('sofia.santos@acme.inc', 'INN')
+    ('sofia.santos@acme.inc', 'INN'),
+    ('ben.admin@acme.inc',    'INN'),
+    ('ava.johnson@acme.inc',  'HQ1'),
+    ('mason.clark@acme.inc',  'HQ1'),
+    ('chloe.martin@acme.inc', 'HQ1'),
+    ('lucas.brown@acme.inc',  'INN'),
+    ('mia.wong@acme.inc',     'INN')
 ) AS h(email, code)
 JOIN buildings b ON b.code = h.code
 WHERE u.email = h.email;
@@ -88,7 +102,8 @@ FROM (VALUES
     ('ethan.eng@acme.inc', '{electrical,hvac}',                  'available', 5, 'HQ1'),
     ('priya.eng@acme.inc', '{plumbing,cleaning,furniture}',      'busy',      4, 'HQ1'),
     ('tom.eng@acme.inc',   '{it_hardware,network,audio_visual}', 'available', 6, 'INN'),
-    ('omar.eng@acme.inc',  '{security,cleaning}',                'on_leave',  5, 'INN')
+    ('omar.eng@acme.inc',  '{security,cleaning}',                'on_leave',  5, 'INN'),
+    ('hana.eng@acme.inc',  '{hvac,furniture,other}',             'available', 5, 'INN')
 ) AS e(email, specs, avail, max_t, bcode)
 JOIN users u ON u.email = e.email
 JOIN buildings b ON b.code = e.bcode

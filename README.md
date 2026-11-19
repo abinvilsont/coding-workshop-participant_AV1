@@ -101,9 +101,9 @@ Sample accounts (password `Password123!` for all):
 
 | Role | Email |
 |---|---|
-| Facility Admin | `alice.admin@acme.inc` |
-| Engineer | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave) |
-| Employee | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc` |
+| Facility Admin (2) | `alice.admin@acme.inc`, `ben.admin@acme.inc` |
+| Engineer (5) | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave), `hana.eng@acme.inc` |
+| Employee (10) | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc`, `ava.johnson@acme.inc`, `mason.clark@acme.inc`, `chloe.martin@acme.inc`, `lucas.brown@acme.inc`, `mia.wong@acme.inc`, `zara.ahmed@acme.inc` |
 
 **To redeploy backend changes to LocalStack**, run `./bin/start-dev.sh` again. If you
 call `./bin/deploy-backend.sh` yourself:

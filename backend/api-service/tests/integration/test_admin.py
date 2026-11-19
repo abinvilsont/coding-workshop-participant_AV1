@@ -121,7 +121,8 @@ def test_missing_parents_are_404(client, as_):
 
 def test_list_engineers_with_workload(client, as_):
     engineers = {e["email"]: e for e in client.get("/engineers", headers=as_("alice")).json()}
-    assert set(engineers) == {"ethan.eng@acme.inc", "priya.eng@acme.inc", "tom.eng@acme.inc", "omar.eng@acme.inc"}
+    assert set(engineers) == {"ethan.eng@acme.inc", "priya.eng@acme.inc", "tom.eng@acme.inc", "omar.eng@acme.inc",
+                              "hana.eng@acme.inc"}
     ethan = engineers["ethan.eng@acme.inc"]
     assert ethan["active_tickets"] == 1 and ethan["remaining_capacity"] == 4  # AC in progress; lights resolved
     assert set(ethan["specializations"]) == {"electrical", "hvac"}
@@ -176,7 +177,7 @@ def test_deactivating_engineer_requires_no_active_tickets(client, as_):
     assert r.status_code == 200 and r.json()["is_active"] is False
     emails = [e["email"] for e in client.get("/engineers", headers=alice).json()]
     assert "omar.eng@acme.inc" not in emails
-    assert len(client.get("/engineers", headers=alice, params={"include_inactive": True}).json()) == 4
+    assert len(client.get("/engineers", headers=alice, params={"include_inactive": True}).json()) == 5
     login = client.post("/auth/login", json={"email": "omar.eng@acme.inc", "password": PASSWORD})
     assert login.status_code == 403
 

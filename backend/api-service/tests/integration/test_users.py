@@ -4,7 +4,7 @@ import pytest
 
 from tests.integration.conftest import USERS, login_as, unread
 
-EMMA, LIAM, TOM, ALICE = (USERS[n][0] for n in ("emma", "liam", "tom", "alice"))
+EMMA, LIAM, TOM, ALICE, BEN = (USERS[n][0] for n in ("emma", "liam", "tom", "alice", "ben"))
 
 
 def patch(client, headers, user_id, **body):
@@ -13,7 +13,7 @@ def patch(client, headers, user_id, **body):
 
 def test_admin_lists_everyone_admins_first(client, as_):
     body = client.get("/users", headers=as_("alice")).json()
-    assert body["total"] == 9
+    assert body["total"] == 17  # 2 admins, 5 engineers, 10 employees
     assert body["items"][0]["role"] == "facility_admin"
     emma = next(u for u in body["items"] if u["id"] == EMMA)
     assert (emma["name"], emma["email"], emma["role"], emma["is_active"]) == ("Emma Employee", "emma@acme.inc", "employee", True)
@@ -72,6 +72,7 @@ def test_two_admins_demoting_each_other_at_once_leave_one_admin(client, as_):
     from app.db.session import SessionLocal
     from app.models import User
 
+    patch(client, as_("alice"), BEN, role="employee")  # so Alice and Emma are the only admins
     patch(client, as_("alice"), EMMA, role="facility_admin")
     with SessionLocal() as db:
         emma_as_authenticated = db.get(User, EMMA)  # still an admin when her request started

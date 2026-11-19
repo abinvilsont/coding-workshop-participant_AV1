@@ -63,7 +63,7 @@ def test_init_db_refuses_a_database_that_has_tables(empty_db):
 def test_init_db_with_sample_data_warns_about_the_passwords(empty_db):
     result = admin_tasks.init_db(seed=True, engine=empty_db)
     assert result["ok"] and "Password123!" in result["message"]
-    assert result["users"] == 9 and result["incidents"] == 7 and result["jwt_secret"]
+    assert result["users"] == 17 and result["incidents"] == 7 and result["jwt_secret"]
 
 
 @pytest.mark.parametrize("kwargs, problem", [
