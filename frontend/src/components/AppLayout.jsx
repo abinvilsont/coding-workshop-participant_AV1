@@ -4,7 +4,7 @@ import {
   ListItemText, Stack, Toolbar, Typography,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import { useIsCompact } from '../hooks/useResponsive';
+import { TABLET_MAX, WIDE_NAV_MAX, useIsNarrowerThan } from '../hooks/useResponsive';
 import { ROLE_LABELS } from '../utils/format';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -28,11 +28,12 @@ function Brand({ short }) {
 }
 
 export default function AppLayout({ user, path, onLogout, children }) {
-  const compact = useIsCompact();
+  const items = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
+  // Admins have six links: the top bar needs ~1200px before they fit in one row
+  const compact = useIsNarrowerThan(items.length > 3 ? WIDE_NAV_MAX : TABLET_MAX);
   // The menu belongs to the page it was opened on, so navigating closes it.
   const [menuPath, setMenuPath] = useState(null);
   const menuOpen = menuPath === path;
-  const items = NAV.filter((n) => !n.roles || n.roles.includes(user.role));
   const role = ROLE_LABELS[user.role] ?? user.role;
 
   return (

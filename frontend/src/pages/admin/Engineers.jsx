@@ -8,7 +8,7 @@ import useFieldErrors, { focusFirstError } from '../../hooks/useFieldErrors';
 import Field, { ErrorText } from '../../components/Field';
 import { Section } from '../../components/Badges';
 import useAction from '../../hooks/useAction';
-import { useIsPhone } from '../../hooks/useResponsive';
+import { WIDE_TABLE_MAX, useIsNarrowerThan } from '../../hooks/useResponsive';
 import { ReviewItem, Stars } from '../../components/Reviews';
 import { createEngineer, getEngineerReviews, listEngineers, updateEngineer } from '../../services/adminService';
 import { getFacilities } from '../../services/incidentService';
@@ -375,7 +375,8 @@ export default function Engineers() {
   const [reviewing, setReviewing] = useState(null); // engineer id whose reviews are open
   const [notice, setNotice] = useState('');
   const { run, error } = useAction();
-  const isPhone = useIsPhone();
+  // The engineer table has six columns: cards until there's room for all of them
+  const isPhone = useIsNarrowerThan(WIDE_TABLE_MAX);
 
   const load = useCallback(
     () => run(async () => setEngineers(await listEngineers(includeInactive))),

@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 22 · reflects local <code>main</code> @ <code>0aa6221</code> + uncommitted parallel-update locking</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 23 · reflects local <code>main</code> @ <code>7fc4068</code> (deployed) + uncommitted responsive fixes</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -955,7 +955,7 @@ a { color: var(--accent); }
         <li><code>pages/</code>: Login, Dashboard (engineer availability switch), IncidentList, NewIncident, IncidentDetail</li>
         <li><code>pages/admin/</code>: Facilities, Engineers, People (accounts and roles)</li>
         <li><code>public/manifest.webmanifest</code> · <code>public/sw.js</code> · <code>public/icons/</code>: installable app; the service worker caches app files, never <code>/api/</code></li>
-        <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark), Field (errors above the input) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints)</li>
+        <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark), Field (errors above the input) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints: phone 699, tablet 959, wide tables 1099, admin top bar 1199)</li>
         <li><code>theme.js</code>: the Material UI theme with light and dark colour schemes as CSS variables (brand colours, chip colours for both schemes, type scale); <code>index.html</code> applies the saved scheme before React loads</li>
         <li><code>services/</code>: apiClient (token, quiet renewal under an hour left, 401 sign-out), authService, incidentService, adminService, notificationService</li>
       </ul>
@@ -1025,6 +1025,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 23</span>
+      <span class="log-what">Responsive at every screen size</span>
+      <span class="log-detail">Audited every page for every role at 320, 375, 414, 600, 768, 1024, 1280 and 1920 px. Fixed: at 1024 px the admin top bar (six links) overflowed and every admin page scrolled sideways, so admins now get the menu drawer below 1200 px (employees and engineers keep the top bar down to 960 px); incident lists switch to cards below 960 px (were squeezed tables on tablets); the Engineers table switches to cards below 1100 px. Breakpoints live in <code>hooks/useResponsive.js</code>. The layout test now runs at 320 px, a Pixel 7 and an iPad Mini portrait and landscape, and fails if a page or a table scrolls sideways. +5 frontend tests (149), 26 E2E runs.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 22</span>
       <span class="log-what">Parallel updates: row locks and stale-edit check</span>

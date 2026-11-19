@@ -338,6 +338,7 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | FastAPI with Pydantic | Request checks are declared once on the data models. Bad input is rejected before our code runs, and the API documents itself at `/docs`. |
 | PostgreSQL | The data is relational: incidents link to users, buildings, floors and seats. Constraints and triggers enforce the rules even if the API has a bug. |
 | Middleware strips `/api/api-service` | The same code runs behind CloudFront, which adds the prefix, and behind the local proxy, which doesn't. |
+| Layout switches by what fits, not by device: menu drawer below 960 px (1200 px for admins' six links), incident lists as cards below 960 px, the Engineers table as cards below 1100 px | An audit at 320, 375, 414, 600, 768, 1024, 1280 and 1920 px found the admin top bar spilling off a 1024 px screen and tables squeezed on tablets, so each breakpoint is where that part stops fitting. A browser test checks every page at four sizes and fails if a page or a table scrolls sideways. |
 
 **Security**
 

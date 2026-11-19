@@ -168,8 +168,8 @@ cd frontend && npm run lint
 | Suite | Count | Coverage |
 |---|---|---|
 | Backend: pytest, unit + integration on a throwaway database | 321 | 99 % |
-| Frontend: Vitest + React Testing Library | 144 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 17 | every critical journey |
+| Frontend: Vitest + React Testing Library | 149 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 26 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -242,6 +242,15 @@ sample password is `Password123!`.
 - **The connection pool depends on where the API runs:** 1+1 connections on Lambda,
   10+30 under uvicorn. This was found by the load test.
 - **Native `<select>` styled by Material UI** so phones show their own pickers.
+- **Responsive at every width, from 320 px phones to wide monitors** (breakpoints in
+  `src/hooks/useResponsive.js`).
+  - **Below 960 px:** the top bar becomes a menu drawer, and incident lists become cards.
+  - **Below 1200 px for admins:** their six menu links don't fit in one row, so they
+    get the drawer too.
+  - **Below 1100 px:** the Engineers table becomes cards.
+  - **Below 700 px:** pages use a single column.
+  - A browser test checks every page for every role at four sizes, and fails if a page
+    or a table scrolls sideways.
 - **Dark mode uses Material UI's colour schemes as CSS variables.** Both palettes
   live in `src/theme.js`, and switching only changes a class on `<html>`, so nothing
   re-renders. A small script in `index.html` applies the saved choice before React

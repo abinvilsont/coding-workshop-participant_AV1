@@ -1,7 +1,7 @@
 import {
   Card, CardContent, Link, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography,
 } from '@mui/material';
-import { useIsPhone } from '../hooks/useResponsive';
+import { useIsCompact } from '../hooks/useResponsive';
 import { categoryLabel, locationText, timeAgo } from '../utils/format';
 import { EscalatedBadge, PriorityBadge, StatusBadge } from './Badges';
 
@@ -45,7 +45,8 @@ function IncidentCards({ incidents, columns }) {
 }
 
 export default function IncidentTable({ incidents, columns = [], empty }) {
-  const isPhone = useIsPhone();
+  // Phones and tablets: one card per incident (the table needs ~960px to fit)
+  const isPhone = useIsCompact();
   if (!incidents?.length) {
     return <Typography color="text.secondary" sx={{ py: 2 }}>{empty}</Typography>;
   }

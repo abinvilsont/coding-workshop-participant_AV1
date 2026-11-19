@@ -148,6 +148,16 @@ describe('Engineers admin page', () => {
     expect(await screen.findByText('No engineers yet. Add the first one.')).toBeInTheDocument();
   });
 
+  it('shows engineers as cards up to 1099 px, where all six columns fit', async () => {
+    backend();
+    const { unmount } = render(<ResponsiveContext.Provider value={{ width: 1024 }}><Engineers /></ResponsiveContext.Provider>);
+    expect(await screen.findByRole('list', { name: 'Engineers' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    unmount();
+    render(<ResponsiveContext.Provider value={{ width: 1100 }}><Engineers /></ResponsiveContext.Provider>);
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+  });
+
   it('shows engineers as cards on a phone', async () => {
     backend();
     render(<ResponsiveContext.Provider value={{ width: 390 }}><Engineers /></ResponsiveContext.Provider>);

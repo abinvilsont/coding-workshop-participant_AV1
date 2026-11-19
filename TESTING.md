@@ -29,8 +29,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
 | Backend (pytest) | 321 | all pass, ~22 s | **99 %** of `app/` (1670 statements, 14 missed) |
-| Frontend (Vitest) | 144 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
-| End-to-end (Playwright) | 17 | all pass, ~90 s | every critical user path (below) |
+| Frontend (Vitest) | 149 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| End-to-end (Playwright) | 26 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
 Both coverage runs enforce a minimum of 80 % and fail below it.
@@ -100,7 +100,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation with per-field messages (incl. server field errors), conflict messages, inactive toggle, engineer ratings and reviews panel |
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
 | `apiClient` | JSON and token headers, query strings, error shapes and field errors, network failure, 401 sign-out; quiet token renewal under an hour left, one renewal shared by concurrent requests, carries on with the old token if renewal is refused or offline |
-| `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive), table vs phone cards |
+| `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive); at 1024 px admins get the drawer (six links) while employees keep the top bar, admins get it back at 1200 px; incident table vs cards on phones and tablets (768 px) |
 | `ThemeToggle` | light ⇄ dark switch, choice saved and restored, `<html>` class, hidden outside the theme provider |
 
 ### End-to-end: `frontend/e2e/`
@@ -117,7 +117,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `people.spec.js` | the admin makes a newly registered employee a Facility Admin (they get the admin pages), then deactivates them (their next page load signs them out) |
 | `already-reported.spec.js` | Emma reports a jammed printer; Liam starts reporting it too, is told it's already reported and requests escalation; he lands on Emma's incident as a follower, it's escalated, Emma and the admin are told, and a second attempt shows he's already following |
 | `merge.spec.js` | two employees report the same leak, the admin merges and assigns it, the engineer resolves it, both employees are notified and only the original reporter can close it |
-| `responsive.spec.js` | every role's main pages have no horizontal scroll on a phone (Pixel 7), using the phone menu layout |
+| `responsive.spec.js` | every role's pages (dashboard, incident list, report form, an incident, and the three admin pages) at 320 px, a Pixel 7, an iPad Mini portrait (768) and landscape (1024): no page or table scrolls sideways (lists switch to cards; admins get the menu drawer below 1200 px) |
 
 The full lifecycle in `incident-lifecycle.spec.js`:
 1. The employee reports an incident and escalates it.

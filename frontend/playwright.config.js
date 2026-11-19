@@ -27,5 +27,9 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], channel: 'chrome' }, testIgnore: /responsive\.spec\.js/ },
     { name: 'phone', use: { ...devices['Pixel 7'], channel: 'chrome' }, testMatch: /responsive\.spec\.js/ },
+    // Layout checks at the sizes in between: tablet portrait (768) and landscape / small laptop (1024)
+    { name: 'tablet', use: { ...devices['iPad Mini'], browserName: 'chromium', channel: 'chrome' }, testMatch: /responsive\.spec\.js/ },
+    { name: 'tablet-landscape', use: { ...devices['iPad Mini landscape'], browserName: 'chromium', channel: 'chrome' }, testMatch: /responsive\.spec\.js/ },
+    { name: 'small-phone', use: { viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true, channel: 'chrome' }, testMatch: /responsive\.spec\.js/ },
   ],
 });
