@@ -16,9 +16,9 @@ diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
 
 | Role | Can do |
 |---|---|
-| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (and are told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (the form starts on their usual building, if an admin has set one; they're told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
-| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, manage **People** (make an employee an admin or back, deactivate or reactivate accounts), delete incidents |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, manage **People** (set each person's usual building, make an employee an admin or back, deactivate or reactivate accounts), delete incidents |
 
 An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
 reporter, not the engineer, confirms the fix. Every change is written to the
@@ -167,9 +167,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 321 | 99 % |
-| Frontend: Vitest + React Testing Library | 149 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 26 | every critical journey, every page at every size |
+| Backend: pytest, unit + integration on a throwaway database | 329 | 99 % |
+| Frontend: Vitest + React Testing Library | 156 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 27 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)

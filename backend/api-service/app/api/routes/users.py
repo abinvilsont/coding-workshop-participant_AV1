@@ -1,6 +1,7 @@
 """
 People (Facility Admin only): see every account, promote an employee to Facility
-Admin or back, and deactivate or reactivate accounts.
+Admin or back, deactivate or reactivate accounts, and set each person's usual
+building (the report form starts on it).
 
 Engineers are managed on /engineers instead: their profile, capacity and the
 "no active tickets" rule for deactivation live there.
@@ -14,7 +15,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import AdminUser, DbSession
 from app.core.errors import FieldError
-from app.models import User, UserRole
+from app.models import Building, User, UserRole
 from app.services import notifications as notify
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -30,6 +31,8 @@ class UserRow(BaseModel):
     role: UserRole
     department: str | None
     is_active: bool
+    home_building_id: int | None
+    home_building: str | None
     created_at: datetime
     last_login_at: datetime | None
 
@@ -42,12 +45,22 @@ class UserList(BaseModel):
 class UserUpdate(BaseModel):
     role: UserRole | None = None
     is_active: bool | None = None
+    home_building_id: int | None = None  # null clears it
 
 
-def _row(u: User) -> dict:
+def _building_names(db, users) -> dict[int, str]:
+    ids = {u.home_building_id for u in users if u.home_building_id}
+    if not ids:
+        return {}
+    return dict(db.execute(select(Building.id, Building.name).where(Building.id.in_(ids))).all())
+
+
+def _row(u: User, names: dict[int, str]) -> dict:
     return {
         "id": u.id, "name": u.full_name, "email": u.email, "role": u.role, "department": u.department,
-        "is_active": u.is_active, "created_at": u.created_at, "last_login_at": u.last_login_at,
+        "is_active": u.is_active, "home_building_id": u.home_building_id,
+        "home_building": names.get(u.home_building_id), "created_at": u.created_at,
+        "last_login_at": u.last_login_at,
     }
 
 
@@ -76,26 +89,31 @@ def list_users(
         .order_by((User.role == UserRole.FACILITY_ADMIN).desc(), User.full_name)
         .limit(limit).offset(offset)
     ).all()
-    return {"items": [_row(u) for u in rows], "total": total}
+    names = _building_names(db, rows)
+    return {"items": [_row(u, names) for u in rows], "total": total}
 
 
 @router.put("/{user_id}", response_model=UserRow)  # PUT is accepted as an alias of PATCH
 @router.patch("/{user_id}", response_model=UserRow)
 def update_user(user_id: int, body: UserUpdate, db: DbSession, admin: AdminUser):
-    """Change an employee's or admin's role, or (de)activate their account.
-    A deactivated account is signed out on its next request."""
+    """Change an employee's or admin's role, (de)activate their account, or set
+    their usual building. A deactivated account is signed out on its next request."""
     changes = body.model_dump(exclude_unset=True)
-    if any(v is None for v in changes.values()):
+    if any(changes.get(k, True) is None for k in ("role", "is_active")):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "role and is_active cannot be cleared.")
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
-    if user.id == admin.id:
+    first = next(iter(changes), "role")
+    if user.is_engineer or changes.get("role") == UserRole.ENGINEER:
+        raise FieldError(status.HTTP_400_BAD_REQUEST, first, "Engineers are managed on the Engineers page.")
+    if user.id == admin.id and ("role" in changes or "is_active" in changes):
         field = "role" if "role" in changes else "is_active"
         raise FieldError(status.HTTP_400_BAD_REQUEST, field, "You can't change your own role or deactivate yourself.")
-    if user.is_engineer or changes.get("role") == UserRole.ENGINEER:
-        raise FieldError(status.HTTP_400_BAD_REQUEST, "role" if "role" in changes else "is_active",
-                         "Engineers are managed on the Engineers page.")
+    if changes.get("home_building_id") is not None:
+        building = db.get(Building, changes["home_building_id"])
+        if building is None or not building.is_active:
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "home_building_id", "Choose an active building.")
 
     new_role = changes.get("role", user.role)
     new_active = changes.get("is_active", user.is_active)
@@ -114,8 +132,10 @@ def update_user(user_id: int, body: UserUpdate, db: DbSession, admin: AdminUser)
     old_role = user.role
     user.role = new_role
     user.is_active = new_active
+    if "home_building_id" in changes:
+        user.home_building_id = changes["home_building_id"]
     if new_role != old_role and new_active:
         notify.notify(db, {user.id}, actor=admin, kind="role_changed", incident=None,
                       message=f"{admin.full_name} made you {ROLE_TEXT[new_role]}. Sign in again to see the change.")
     db.commit()
-    return _row(user)
+    return _row(user, _building_names(db, [user]))

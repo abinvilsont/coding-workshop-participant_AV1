@@ -122,6 +122,11 @@ CREATE TABLE buildings (
 CREATE TRIGGER buildings_updated_at BEFORE UPDATE ON buildings
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- An employee's usual building (set by a Facility Admin; the report form starts on it).
+-- Added here because users is created before buildings.
+ALTER TABLE users
+    ADD COLUMN home_building_id BIGINT REFERENCES buildings (id) ON DELETE SET NULL;
+
 -- ---------------------------------------------------------------------
 -- Floors - belong to a building
 -- ---------------------------------------------------------------------

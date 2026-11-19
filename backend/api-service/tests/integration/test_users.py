@@ -108,3 +108,48 @@ def test_bad_requests(client, as_):
     assert patch(client, as_("alice"), EMMA, role="king").status_code == 400
     assert patch(client, as_("alice"), EMMA, role=None).status_code == 400
     assert client.put(f"/users/{EMMA}", headers=as_("alice"), json={"is_active": True}).status_code == 200
+
+
+# ------------------------------------------------------------ usual building
+
+def test_the_list_shows_each_persons_usual_building(client, as_):
+    items = {u["id"]: u for u in client.get("/users", headers=as_("alice")).json()["items"]}
+    assert items[EMMA]["home_building"] == "ACME Headquarters"
+    assert items[USERS["noah"][0]]["home_building"] is None
+
+
+def test_an_admin_sets_and_clears_someones_usual_building(client, as_, facilities):
+    inn = facilities["inn"]["id"]
+    r = patch(client, as_("alice"), EMMA, home_building_id=inn)
+    assert r.status_code == 200
+    assert (r.json()["home_building_id"], r.json()["home_building"]) == (inn, "ACME Innovation Hub")
+    # Emma's own account says so, which is what the report form starts on
+    assert client.get("/auth/me", headers=as_("emma")).json()["home_building_id"] == inn
+    r = patch(client, as_("alice"), EMMA, home_building_id=None)
+    assert r.status_code == 200 and r.json()["home_building"] is None
+    assert client.get("/auth/me", headers=as_("emma")).json()["home_building_id"] is None
+
+
+def test_admins_can_set_their_own_usual_building(client, as_, facilities):
+    r = patch(client, as_("alice"), ALICE, home_building_id=facilities["inn"]["id"])
+    assert r.status_code == 200 and r.json()["home_building"] == "ACME Innovation Hub"
+
+
+@pytest.mark.parametrize("building", ["missing", "inactive"])
+def test_the_building_must_exist_and_be_active(client, as_, facilities, building):
+    bid = 999999
+    if building == "inactive":
+        bid = facilities["inn"]["id"]
+        assert client.patch(f"/buildings/{bid}", headers=as_("alice"), json={"is_active": False}).status_code == 200
+    r = patch(client, as_("alice"), EMMA, home_building_id=bid)
+    assert r.status_code == 400
+    assert r.json()["errors"] == [{"loc": ["body", "home_building_id"], "msg": "Choose an active building."}]
+
+
+def test_engineers_buildings_are_set_on_the_engineers_page(client, as_, facilities):
+    r = patch(client, as_("alice"), TOM, home_building_id=facilities["inn"]["id"])
+    assert r.status_code == 400 and r.json()["errors"][0]["loc"][-1] == "home_building_id"
+
+
+def test_only_admins_can_set_a_building(client, as_, facilities):
+    assert patch(client, as_("emma"), EMMA, home_building_id=facilities["inn"]["id"]).status_code == 403

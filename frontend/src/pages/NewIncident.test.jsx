@@ -20,6 +20,9 @@ async function fillAndSubmit(user) {
   await user.click(screen.getByRole('button', { name: 'Submit incident' }));
 }
 
+// No usual building: the form starts empty (tests below pick one)
+const ME = { ...USERS.employee, home_building_id: null };
+
 const created = (body) => ({ status: 201, body: incident({ id: 9, ...body }) });
 
 describe('Reporting a problem that may already be reported', () => {
@@ -29,7 +32,7 @@ describe('Reporting a problem that may already be reported', () => {
 
   it('reports straight away when nothing similar is open', async () => {
     const user = userEvent.setup();
-    const api = mockApi({ 'GET /facilities': FACILITIES, 'GET /incidents/similar': [], 'POST /incidents': created });
+    const api = mockApi({ 'GET /facilities': FACILITIES, 'GET /auth/me': ME, 'GET /incidents/similar': [], 'POST /incidents': created });
     render(<NewIncident user={USERS.employee} />);
     await fillAndSubmit(user);
 
@@ -41,7 +44,7 @@ describe('Reporting a problem that may already be reported', () => {
   it('shows the open incident and requests escalation instead of a duplicate', async () => {
     const user = userEvent.setup();
     const api = mockApi({
-      'GET /facilities': FACILITIES,
+      'GET /facilities': FACILITIES, 'GET /auth/me': ME,
       'GET /incidents/similar': [AC],
       'POST /incidents/4/escalation-request': () => incident({ id: 4 }),
     });
@@ -66,7 +69,7 @@ describe('Reporting a problem that may already be reported', () => {
   it('shows why a request was refused, above the reason box', async () => {
     const user = userEvent.setup();
     mockApi({
-      'GET /facilities': FACILITIES,
+      'GET /facilities': FACILITIES, 'GET /auth/me': ME,
       'GET /incidents/similar': [AC],
       'POST /incidents/4/escalation-request': {
         status: 409, body: { message: "You've already asked for this incident to be escalated." },
@@ -83,7 +86,7 @@ describe('Reporting a problem that may already be reported', () => {
 
   it('can still report it as a different problem', async () => {
     const user = userEvent.setup();
-    const api = mockApi({ 'GET /facilities': FACILITIES, 'GET /incidents/similar': [AC], 'POST /incidents': created });
+    const api = mockApi({ 'GET /facilities': FACILITIES, 'GET /auth/me': ME, 'GET /incidents/similar': [AC], 'POST /incidents': created });
     render(<NewIncident user={USERS.employee} />);
     await fillAndSubmit(user);
     const dialog = await screen.findByRole('dialog');
@@ -94,7 +97,7 @@ describe('Reporting a problem that may already be reported', () => {
 
   it('goes back to the form, which can be sent again', async () => {
     const user = userEvent.setup();
-    mockApi({ 'GET /facilities': FACILITIES, 'GET /incidents/similar': [AC] });
+    mockApi({ 'GET /facilities': FACILITIES, 'GET /auth/me': ME, 'GET /incidents/similar': [AC] });
     render(<NewIncident user={USERS.employee} />);
     await fillAndSubmit(user);
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Back to form' }));
@@ -105,7 +108,7 @@ describe('Reporting a problem that may already be reported', () => {
 
   it('links to an incident that is already yours instead of offering escalation', async () => {
     const user = userEvent.setup();
-    mockApi({ 'GET /facilities': FACILITIES, 'GET /incidents/similar': [{ ...AC, relation: 'reporter', is_escalated: true }] });
+    mockApi({ 'GET /facilities': FACILITIES, 'GET /auth/me': ME, 'GET /incidents/similar': [{ ...AC, relation: 'reporter', is_escalated: true }] });
     render(<NewIncident user={USERS.employee} />);
     await fillAndSubmit(user);
     const dialog = await screen.findByRole('dialog');
@@ -118,7 +121,7 @@ describe('Reporting a problem that may already be reported', () => {
   it('never blocks reporting when the check fails, and admins skip it', async () => {
     const user = userEvent.setup();
     const api = mockApi({
-      'GET /facilities': FACILITIES,
+      'GET /facilities': FACILITIES, 'GET /auth/me': ME,
       'GET /incidents/similar': { status: 500, body: { message: 'Something went wrong.' } },
       'POST /incidents': created,
     });
@@ -138,7 +141,7 @@ describe('Reporting a problem that may already be reported', () => {
   it('reports a save failure inside the prompt', async () => {
     const user = userEvent.setup();
     mockApi({
-      'GET /facilities': FACILITIES,
+      'GET /facilities': FACILITIES, 'GET /auth/me': ME,
       'GET /incidents/similar': [AC],
       'POST /incidents': { status: 500, body: { message: 'Something went wrong. Please try again.' } },
     });
@@ -147,5 +150,37 @@ describe('Reporting a problem that may already be reported', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: /different problem, report it/ }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Something went wrong');
+  });
+});
+
+describe('Usual building', () => {
+  beforeEach(() => {
+    window.location.hash = '#/incidents/new';
+  });
+
+  it("starts on the building an admin set for the reporter", async () => {
+    const user = userEvent.setup();
+    const api = mockApi({
+      'GET /facilities': FACILITIES,
+      'GET /auth/me': { ...USERS.employee, home_building_id: 1 },
+      'GET /incidents/similar': [],
+      'POST /incidents': created,
+    });
+    render(<NewIncident user={USERS.employee} />);
+    await waitFor(() => expect(screen.getByLabelText(/^Building/)).toHaveValue('1'));
+    await user.type(screen.getByLabelText(/^Title/), 'Too warm in finance');
+    await user.type(screen.getByLabelText(/^Description/), 'It is 28 degrees.');
+    await user.selectOptions(screen.getByLabelText(/^Category/), 'hvac');
+    await user.click(screen.getByRole('button', { name: 'Submit incident' }));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/incidents/9'));
+    expect(api.calls.find((c) => c.method === 'POST').body).toMatchObject({ building_id: 1 });
+  });
+
+  it('still lets them report if their account details cannot be loaded', async () => {
+    mockApi({ 'GET /facilities': FACILITIES, 'GET /auth/me': { status: 500, body: { message: 'Down' } } });
+    render(<NewIncident user={USERS.employee} />);
+    await waitFor(() => expect(screen.getByLabelText(/^Building/)).toBeEnabled());
+    expect(screen.getByLabelText(/^Building/)).toHaveValue('');
   });
 });

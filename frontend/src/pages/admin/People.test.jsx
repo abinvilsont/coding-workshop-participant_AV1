@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Context as ResponsiveContext } from 'react-responsive';
 import { describe, expect, it, vi } from 'vitest';
-import { USERS, mockApi } from '../../test/mockApi';
+import { FACILITIES, USERS, mockApi } from '../../test/mockApi';
 import People from './People';
 
 const person = (o) => ({
@@ -10,12 +10,16 @@ const person = (o) => ({
 });
 const ALICE = person({ id: 1, name: 'Alice Admin', email: 'alice.admin@acme.inc', role: 'facility_admin', department: 'Facilities' });
 const TOM = person({ id: 4, name: 'Tom Tech', email: 'tom.eng@acme.inc', role: 'engineer' });
-const EMMA = person({ id: 6, name: 'Emma Employee', email: 'emma@acme.inc', role: 'employee', department: 'Finance' });
+const EMMA = person({
+  id: 6, name: 'Emma Employee', email: 'emma@acme.inc', role: 'employee', department: 'Finance',
+  home_building_id: 1, home_building: 'ACME Headquarters',
+});
 const LIAM = person({ id: 7, name: 'Liam Lee', email: 'liam.lee@acme.inc', role: 'employee', last_login_at: null });
 
 function backend(extra = {}) {
   let people = [ALICE, TOM, EMMA, LIAM];
   return mockApi({
+    'GET /facilities': FACILITIES,
     'GET /users': () => ({ items: people, total: people.length }),
     'PATCH /users/6': (body) => (people = people.map((p) => (p.id === 6 ? { ...p, ...body } : p))).find((p) => p.id === 6),
     'PATCH /users/7': (body) => ({ ...LIAM, ...body }),
@@ -117,5 +121,48 @@ describe('People admin page', () => {
     const list = await screen.findByRole('list', { name: 'People' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(4);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it("sets someone's usual building, which saves straight away", async () => {
+    const user = userEvent.setup();
+    const api = backend({
+      'PATCH /users/7': (body) => ({ ...LIAM, ...body, home_building: body.home_building_id ? 'Innovation Hub' : null }),
+    });
+    render(<People user={USERS.admin} />);
+    const picker = await screen.findByRole('combobox', { name: "Liam Lee's usual building" });
+    await waitFor(() => expect(picker).toBeEnabled());
+    expect(picker).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: "Emma Employee's usual building" })).toHaveValue('1');
+    // engineers' buildings live on the Engineers page
+    expect(screen.queryByRole('combobox', { name: "Tom Tech's usual building" })).not.toBeInTheDocument();
+
+    await user.selectOptions(picker, '2');
+    expect(api.calls.at(-1)).toMatchObject({ method: 'PATCH', path: '/users/7', body: { home_building_id: 2 } });
+    expect(await screen.findByRole('status')).toHaveTextContent("Liam Lee's usual building is now Innovation Hub.");
+
+    await user.selectOptions(picker, '');
+    expect(api.calls.at(-1)).toMatchObject({ body: { home_building_id: null } });
+    expect(await screen.findByRole('status')).toHaveTextContent('Liam Lee no longer has a usual building.');
+  });
+
+  it('shows a refused building change right above the picker', async () => {
+    const user = userEvent.setup();
+    backend({ 'PATCH /users/7': { status: 400, body: { message: 'Choose an active building.' } } });
+    render(<People user={USERS.admin} />);
+    const picker = await screen.findByRole('combobox', { name: "Liam Lee's usual building" });
+    await waitFor(() => expect(picker).toBeEnabled());
+    await user.selectOptions(picker, '2');
+    expect(await within(await row('Liam Lee')).findByText('Choose an active building.')).toBeInTheDocument();
+  });
+
+  it('keeps showing a deactivated building someone still has', async () => {
+    backend({
+      'GET /users': { items: [{ ...LIAM, home_building_id: 9, home_building: 'Old Annex' }], total: 1 },
+    });
+    render(<People user={USERS.admin} />);
+    const picker = await screen.findByRole('combobox', { name: "Liam Lee's usual building" });
+    await waitFor(() => expect(picker).toBeEnabled());
+    expect(picker).toHaveValue('9');
+    expect(within(picker).getByRole('option', { name: 'Old Annex (inactive)' })).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import useFieldErrors, { focusFirstError } from '../hooks/useFieldErrors';
 import Field, { ErrorText } from './Field';
@@ -25,12 +25,15 @@ const toId = (v) => (v === '' || v === null || v === undefined ? null : Number(v
 /**
  * Create / edit form. `initial` pre-fills for edits; `showPriority` controls
  * whether the priority picker appears; `allowCritical` is for admins.
+ * `defaultBuildingId` (the reporter's usual building, read when the form opens) is
+ * chosen once the buildings load, if it's still an active building.
  */
 export default function IncidentForm({
   initial,
   submitLabel = 'Submit',
   showPriority = true,
   allowCritical = false,
+  defaultBuildingId = null,
   onSubmit,
   onCancel,
 }) {
@@ -42,11 +45,19 @@ export default function IncidentForm({
   const [facilities, setFacilities] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [usualBuilding, setUsualBuilding] = useState(null); // id we filled in for them
   const fe = useFieldErrors();
 
+  const usual = useRef(defaultBuildingId); // read once, when the form opens
   useEffect(() => {
     getFacilities()
-      .then(setFacilities)
+      .then((list) => {
+        setFacilities(list);
+        const id = usual.current;
+        if (!id || !list.some((b) => b.id === id)) return; // none, or deactivated since
+        setUsualBuilding(id);
+        setForm((f) => (f.building_id === '' ? { ...f, building_id: String(id) } : f));
+      })
       .catch((err) => setError(err.message));
   }, []);
 
@@ -218,6 +229,11 @@ export default function IncidentForm({
                 ))}
               </Field>
             </Box>
+            {usualBuilding && form.building_id === String(usualBuilding) && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
+                Your usual building is filled in. Change it if the problem is somewhere else.
+              </Typography>
+            )}
             <Field
               label="More details (optional)"
               value={form.location_details}

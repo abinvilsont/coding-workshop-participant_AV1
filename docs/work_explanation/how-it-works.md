@@ -278,10 +278,11 @@ Only a Facility Admin can manage buildings and engineers. Anyone else gets **403
 
 **People** (`/users`)
 
-1. **The list** shows every account with its role, department and last sign-in. You can search by name or email, filter by role, and show inactive accounts.
-2. **Make admin / Make employee** changes an employee into a Facility Admin or back. It takes effect on that person's next request, because every request reads the role from the database, and they get a notification.
-3. **Deactivate** signs the person out on their next request and blocks sign-in. **Reactivate** lets them back in.
-4. **Safeguards:** you can't change your own account; engineers are managed on the Engineers page (their tickets and capacity rules live there); and there is always at least one active Facility Admin. If two admins demote each other at the same moment, the API locks the admin rows and refuses the second change with **409**.
+1. **The list** shows every account with its role, department, usual building and last sign-in. You can search by name or email, filter by role, and show inactive accounts.
+2. **Usual building:** pick one from the row and it saves straight away (`PATCH /users/{id}` with `home_building_id`; `null` clears it). It must be an active building. Admins can set their own. When that person opens **Report incident**, the page asks the API for their account (`GET /auth/me`) and the form starts on that building, with a note saying so. Asking fresh means a change applies without signing in again. A building that's been deactivated is ignored; deleting a building clears it for everyone (`ON DELETE SET NULL`). The column comes from migration 006.
+3. **Make admin / Make employee** changes an employee into a Facility Admin or back. It takes effect on that person's next request, because every request reads the role from the database, and they get a notification.
+4. **Deactivate** signs the person out on their next request and blocks sign-in. **Reactivate** lets them back in.
+5. **Safeguards:** you can't change your own role or deactivate yourself; engineers are managed on the Engineers page (their tickets and capacity rules live there); and there is always at least one active Facility Admin. If two admins demote each other at the same moment, the API locks the admin rows and refuses the second change with **409**.
 
 ## Install it as an app
 

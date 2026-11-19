@@ -124,4 +124,20 @@ describe('IncidentForm', () => {
     render(<IncidentForm onSubmit={vi.fn()} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
   });
+
+  it("starts on the reporter's usual building, which they can change", async () => {
+    const user = userEvent.setup();
+    await renderForm({ defaultBuildingId: 1 });
+    expect(field('Building')).toHaveValue('1');
+    expect(field('Floor')).toBeEnabled();
+    expect(screen.getByText(/Your usual building is filled in/)).toBeInTheDocument();
+    await user.selectOptions(field('Building'), '2');
+    expect(screen.queryByText(/Your usual building is filled in/)).not.toBeInTheDocument();
+  });
+
+  it('ignores a usual building that is no longer active', async () => {
+    await renderForm({ defaultBuildingId: 99 });
+    expect(field('Building')).toHaveValue('');
+    expect(screen.queryByText(/Your usual building/)).not.toBeInTheDocument();
+  });
 });

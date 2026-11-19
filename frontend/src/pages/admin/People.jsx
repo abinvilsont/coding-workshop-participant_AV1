@@ -5,8 +5,9 @@ import {
 } from '@mui/material';
 import { Section } from '../../components/Badges';
 import Field, { ErrorText } from '../../components/Field';
-import { useIsPhone } from '../../hooks/useResponsive';
+import { useIsCompact } from '../../hooks/useResponsive';
 import { listUsers, updateUser } from '../../services/adminService';
+import { getFacilities } from '../../services/incidentService';
 import { ROLE_LABELS, formatDateTime, timeAgo } from '../../utils/format';
 
 const ROLE_COLORS = { facility_admin: 'primary', engineer: 'secondary', employee: 'default' };
@@ -69,6 +70,55 @@ function PersonActions({ person, me, onChanged }) {
   );
 }
 
+/**
+ * The person's usual building: the report form starts on it. Saves as soon as it's
+ * picked; a problem shows right above the picker. Engineers have theirs on the Engineers page.
+ */
+function BuildingPicker({ person, buildings, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (person.role === 'engineer') {
+    return <Typography variant="body2" color="text.secondary">—</Typography>;
+  }
+  // A deactivated building stays visible while someone still has it
+  const options = buildings?.some((b) => b.id === person.home_building_id) || !person.home_building_id
+    ? buildings ?? []
+    : [...(buildings ?? []), { id: person.home_building_id, name: `${person.home_building} (inactive)` }];
+
+  const change = async (e) => {
+    const value = e.target.value === '' ? null : Number(e.target.value);
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await updateUser(person.id, { home_building_id: value });
+      onChanged(updated, updated.home_building
+        ? `${updated.name}'s usual building is now ${updated.home_building}.`
+        : `${updated.name} no longer has a usual building.`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Field
+      select
+      size="small"
+      value={person.home_building_id ?? ''}
+      onChange={change}
+      disabled={!buildings || busy}
+      errorText={error}
+      sx={{ minWidth: 170 }}
+      slotProps={{ select: { native: true }, htmlInput: { 'aria-label': `${person.name}'s usual building` } }}
+    >
+      <option value="">Not set</option>
+      {options.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+    </Field>
+  );
+}
+
 const lastSeen = (p) => (p.last_login_at
   ? <span title={formatDateTime(p.last_login_at)}>{timeAgo(p.last_login_at)}</span>
   : <Typography component="span" variant="body2" color="text.secondary">Never</Typography>);
@@ -85,7 +135,7 @@ function NameCell({ person }) {
   );
 }
 
-function PeopleTable({ people, me, onChanged }) {
+function PeopleTable({ people, me, buildings, onChanged }) {
   return (
     <TableContainer>
       <Table size="small">
@@ -94,6 +144,7 @@ function PeopleTable({ people, me, onChanged }) {
             <TableCell>Person</TableCell>
             <TableCell>Role</TableCell>
             <TableCell>Department</TableCell>
+            <TableCell>Usual building</TableCell>
             <TableCell>Last sign-in</TableCell>
             <TableCell aria-label="Actions" />
           </TableRow>
@@ -104,6 +155,7 @@ function PeopleTable({ people, me, onChanged }) {
               <TableCell><NameCell person={p} /></TableCell>
               <TableCell><RoleChip role={p.role} /></TableCell>
               <TableCell sx={{ fontSize: 13 }}>{p.department ?? '—'}</TableCell>
+              <TableCell><BuildingPicker person={p} buildings={buildings} onChanged={onChanged} /></TableCell>
               <TableCell sx={{ fontSize: 13 }}>{lastSeen(p)}</TableCell>
               <TableCell align="right"><PersonActions person={p} me={me} onChanged={onChanged} /></TableCell>
             </TableRow>
@@ -114,7 +166,7 @@ function PeopleTable({ people, me, onChanged }) {
   );
 }
 
-function PeopleCards({ people, me, onChanged }) {
+function PeopleCards({ people, me, buildings, onChanged }) {
   return (
     <Stack component="ul" spacing={1.5} aria-label="People" sx={{ listStyle: 'none', p: 0, m: 0 }}>
       {people.map((p) => (
@@ -125,6 +177,14 @@ function PeopleCards({ people, me, onChanged }) {
               <RoleChip role={p.role} />
               <Typography variant="caption" color="text.secondary">Last sign-in {lastSeen(p)}</Typography>
             </Stack>
+            {p.role !== 'engineer' && (
+              <Box sx={{ mb: 1 }}>
+                <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 0.5 }}>
+                  Usual building
+                </Typography>
+                <BuildingPicker person={p} buildings={buildings} onChanged={onChanged} />
+              </Box>
+            )}
             <PersonActions person={p} me={me} onChanged={onChanged} />
           </CardContent>
         </Card>
@@ -133,15 +193,23 @@ function PeopleCards({ people, me, onChanged }) {
   );
 }
 
-/** Facility Admin: everyone with an account; promote employees to admin, (de)activate accounts. */
+/**
+ * Facility Admin: everyone with an account; promote employees to admin, (de)activate
+ * accounts, and set each person's usual building.
+ */
 export default function People({ user }) {
-  const isPhone = useIsPhone();
+  const isPhone = useIsCompact();
   const [people, setPeople] = useState(null);
+  const [buildings, setBuildings] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [q, setQ] = useState('');
   const [role, setRole] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
+
+  useEffect(() => {
+    getFacilities().then(setBuildings).catch((err) => setError(err.message));
+  }, []);
 
   useEffect(() => {
     // Wait for a pause in typing before searching
@@ -156,14 +224,14 @@ export default function People({ user }) {
     return () => clearTimeout(timer);
   }, [q, role, includeInactive]);
 
-  const changed = (updated) => {
+  const changed = (updated, message) => {
     setPeople((list) => list
       .map((p) => (p.id === updated.id ? updated : p))
       .filter((p) => includeInactive || p.is_active));
     setNotice(
-      updated.is_active
+      message ?? (updated.is_active
         ? `${updated.name} is now ${updated.role === 'facility_admin' ? 'a Facility Admin' : 'an Employee'}.`
-        : `${updated.name} is deactivated.`,
+        : `${updated.name} is deactivated.`),
     );
   };
 
@@ -172,7 +240,8 @@ export default function People({ user }) {
       <Box sx={{ mb: 3 }}>
         <Typography variant="h1">People</Typography>
         <Typography color="text.secondary">
-          Everyone with an account. Make an employee a Facility Admin, or deactivate an account. Engineers are managed on
+          Everyone with an account. Set someone's usual building (their reports start on it), make an employee a
+          Facility Admin, or deactivate an account. Engineers are managed on
           the <Link href="#/admin/engineers">Engineers</Link> page.
         </Typography>
       </Box>
@@ -204,9 +273,9 @@ export default function People({ user }) {
         ) : people.length === 0 ? (
           <Typography color="text.secondary">Nobody matches.</Typography>
         ) : isPhone ? (
-          <PeopleCards people={people} me={user} onChanged={changed} />
+          <PeopleCards people={people} me={user} buildings={buildings} onChanged={changed} />
         ) : (
-          <PeopleTable people={people} me={user} onChanged={changed} />
+          <PeopleTable people={people} me={user} buildings={buildings} onChanged={changed} />
         )}
       </Section>
     </>

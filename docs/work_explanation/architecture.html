@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 23 · reflects local <code>main</code> @ <code>0e8e6fd</code> (deployed to AWS)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>7c53b93</code> + uncommitted usual-building change (not yet on AWS)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -312,7 +312,7 @@ a { color: var(--accent); }
         </defs>
 
         <!-- users -->
-        <rect class="node" x="30" y="30" width="210" height="130" rx="8"/>
+        <rect class="node" x="30" y="30" width="210" height="148" rx="8"/>
         <rect class="band" x="31" y="31" width="208" height="28" rx="7"/>
         <text class="t-b t-m" x="44" y="50">users</text>
         <text class="t-m" x="44" y="77">id</text><text class="t-ms" x="228" y="77" text-anchor="end">PK</text>
@@ -320,6 +320,7 @@ a { color: var(--accent); }
         <text class="t-m" x="44" y="113">role</text><text class="t-ms" x="228" y="113" text-anchor="end">employee/engineer/admin</text>
         <text class="t-m" x="44" y="131">password_hash</text><text class="t-ms" x="228" y="131" text-anchor="end">bcrypt</text>
         <text class="t-m" x="44" y="149">is_active</text>
+        <text class="t-m" x="44" y="167">home_building_id</text><text class="t-ms" x="228" y="167" text-anchor="end">usual building</text>
 
         <!-- engineer_profiles -->
         <rect class="node" x="30" y="330" width="210" height="130" rx="8"/>
@@ -389,7 +390,7 @@ a { color: var(--accent); }
         <text class="t-m" x="794" y="433">is_active</text>
 
         <!-- relationships -->
-        <line class="edge" x1="135" y1="330" x2="135" y2="162" marker-end="url(#er-mut)"/>
+        <line class="edge" x1="135" y1="330" x2="135" y2="180" marker-end="url(#er-mut)"/>
         <text class="t-s" x="143" y="250">extends 1 : 1</text>
 
         <polyline class="edge" points="380,264 310,264 310,110 242,110" marker-end="url(#er-mut)"/>
@@ -805,7 +806,7 @@ a { color: var(--accent); }
         <text class="l-adm" x="490" y="178" text-anchor="middle">delete if unused</text>
       </svg>
     </div>
-    <figcaption>Applies to buildings, floors and seats. Deleting is refused while any incident (or an engineer's home building) points at the item, so history is never broken; deactivate it instead. Engineers follow the same active/inactive states but are never deleted. Accounts and roles are managed on the People page (<code>/users</code>): make an employee a Facility Admin or back, deactivate or reactivate; never yourself, never engineers (they stay on the Engineers page), and never down to zero active admins.</figcaption>
+    <figcaption>Applies to buildings, floors and seats. Deleting is refused while any incident (or an engineer's home building) points at the item, so history is never broken; deactivate it instead. Engineers follow the same active/inactive states but are never deleted. Accounts and roles are managed on the People page (<code>/users</code>): set each person's usual building (their report form starts on it), make an employee a Facility Admin or back, deactivate or reactivate; never your own role or account, never engineers (they stay on the Engineers page), and never down to zero active admins.</figcaption>
   </figure>
 
   <figure>
@@ -906,6 +907,7 @@ a { color: var(--accent); }
         <tr><td class="ep"><span class="m">POST</span>/auth/register</td><td>Self sign-up, creates an employee</td><td class="yes">public</td><td class="no">—</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/auth/login</td><td>Returns token (8 h) and user</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/auth/refresh</td><td>Fresh 8 h token, same session; refused 24 h after sign-in; re-reads role and active flag</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/auth/me</td><td>Your account, fresh (the report form reads your usual building from it)</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/dashboard</td><td>Summary for the caller's role</td><td class="yes">own</td><td class="yes">assigned</td><td class="yes">all</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/incidents</td><td>List with filters and search</td><td class="yes">own + followed</td><td class="yes">assigned</td><td class="yes">all</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/incidents</td><td>Report an incident</td><td class="yes">✓ not critical</td><td class="yes">✓ not critical</td><td class="yes">✓</td></tr>
@@ -927,7 +929,7 @@ a { color: var(--accent); }
         <tr><td class="ep"><span class="m">GET·POST·PATCH·PUT</span>/engineers</td><td>Create and manage engineer profiles</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/engineers/{id}/reviews</td><td>Every review of an engineer, newest first</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/users</td><td>Every account (search, role filter, inactive)</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-        <tr><td class="ep"><span class="m">PATCH·PUT</span>/users/{id}</td><td>Make admin / employee, deactivate / reactivate; not yourself, not engineers, never zero admins</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">PATCH·PUT</span>/users/{id}</td><td>Make admin / employee, deactivate / reactivate, set usual building (active buildings only); role and active flag never your own, not engineers, never zero admins</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">PATCH·PUT</span>/engineers/me/availability</td><td>Set own availability</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/notifications · /unread-count</td><td>Own notifications and bell count</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/notifications/{id}/read · /read-all</td><td>Mark read (all, or one incident's)</td><td class="yes">own</td><td class="yes">own</td><td class="yes">own</td></tr>
@@ -1021,6 +1023,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 24</span>
+      <span class="log-what">Usual building for employees</span>
+      <span class="log-detail">New <code>users.home_building_id</code> (migration 006, <code>ON DELETE SET NULL</code>). Admins pick it per person on the People page (<code>PATCH /users/{id}</code>, active buildings only, admins may set their own; engineers keep theirs on the Engineers page). The report page asks <code>GET /auth/me</code> when it opens and the form starts on that building with a note, so a change applies without signing in again; a deactivated building is ignored. The People page switches to cards below 960 px for the extra column. +8 backend tests (329), +7 frontend tests (156), new E2E journey (27).</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 23</span>
       <span class="log-what">Responsive at every screen size</span>

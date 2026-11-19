@@ -58,10 +58,12 @@ class UserOut(BaseModel):
     email: str
     role: UserRole
     department: str | None = None
+    home_building_id: int | None = None
 
     @classmethod
     def from_user(cls, u: User) -> "UserOut":
-        return cls(id=u.id, name=u.full_name, email=u.email, role=u.role, department=u.department)
+        return cls(id=u.id, name=u.full_name, email=u.email, role=u.role, department=u.department,
+                   home_building_id=u.home_building_id)
 
 
 class RegisterOut(BaseModel):

@@ -34,3 +34,29 @@ test('admin promotes an employee, then deactivates them', async ({ browser, requ
   await pat.reload();
   await expect(pat.getByRole('button', { name: 'Sign in' })).toBeVisible();
 });
+
+/** The admin sets a new employee's usual building; their report form then starts on it. */
+test("admin sets someone's usual building and their reports start there", async ({ browser, request }) => {
+  const email = `e2e.building.${stamp()}@acme.inc`;
+  const r = await request.post(`${API}/auth/register`, { data: { name: 'Bea Building', email, password: PASSWORD } });
+  expect(r.status()).toBe(201);
+
+  // before: the form starts with no building
+  const bea = await asUser(browser, email);
+  await bea.goto('/#/incidents/new');
+  await expect(bea.getByLabel('Building')).toBeEnabled();
+  await expect(bea.getByLabel('Building')).toHaveValue('');
+
+  const admin = await asUser(browser, ACCOUNTS.admin);
+  await admin.goto('/#/admin/people');
+  await admin.getByLabel('Search name or email').fill(email);
+  const picker = admin.getByLabel("Bea Building's usual building");
+  await expect(picker).toBeEnabled();
+  await picker.selectOption({ label: 'ACME Innovation Hub' });
+  await expect(admin.getByRole('status')).toHaveText("Bea Building's usual building is now ACME Innovation Hub.");
+
+  // after: no need to sign in again
+  await bea.reload();
+  await expect(bea.getByLabel('Building').locator('option:checked')).toHaveText('ACME Innovation Hub');
+  await expect(bea.getByText('Your usual building is filled in.', { exact: false })).toBeVisible();
+});

@@ -68,6 +68,17 @@ FROM (VALUES
 JOIN buildings b ON b.code = s.code
 JOIN floors fl ON fl.building_id = b.id AND fl.floor_number = s.num;
 
+-- Usual buildings (Noah has none, so the report form starts empty for him)
+UPDATE users u SET home_building_id = b.id
+FROM (VALUES
+    ('alice.admin@acme.inc',  'HQ1'),
+    ('emma@acme.inc',         'HQ1'),
+    ('liam.lee@acme.inc',     'HQ1'),
+    ('sofia.santos@acme.inc', 'INN')
+) AS h(email, code)
+JOIN buildings b ON b.code = h.code
+WHERE u.email = h.email;
+
 -- ---------------------------------------------------------------------
 -- Engineer profiles
 -- ---------------------------------------------------------------------
