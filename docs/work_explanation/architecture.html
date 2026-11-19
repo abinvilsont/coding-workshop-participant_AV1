@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 21 · reflects local <code>main</code> @ <code>fedf83d</code> + uncommitted refresh, PWA and People</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 21 · reflects local <code>main</code> @ <code>0a9b21b</code>, deployed to AWS</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -192,14 +192,14 @@ a { color: var(--accent); }
   </div>
   <figure>
     <div class="diagram">
-      <svg viewBox="0 0 1070 470" role="img" aria-label="The React app calls one FastAPI Lambda through the dev proxy locally or CloudFront in AWS; the Lambda reads and writes PostgreSQL, where a trigger records incident history.">
+      <svg viewBox="0 0 1070 510" role="img" aria-label="The React app, installable with a service worker that caches its files, calls one FastAPI Lambda through the dev proxy locally or CloudFront in AWS; the Lambda reads and writes PostgreSQL, where a trigger records incident history.">
         <defs>
           <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="ar-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
         </defs>
 
         <!-- Browser -->
-        <rect class="group" x="20" y="40" width="190" height="372" rx="10"/>
+        <rect class="group" x="20" y="40" width="190" height="448" rx="10"/>
         <text class="t-b" x="115" y="66" text-anchor="middle">Browser</text>
         <text class="t-s" x="115" y="83" text-anchor="middle">React + MUI · Vite :3000</text>
         <rect class="node" x="36" y="100" width="158" height="28" rx="6"/><text x="115" y="119" text-anchor="middle">Login / Register</text>
@@ -209,9 +209,13 @@ a { color: var(--accent); }
         <rect class="node" x="36" y="244" width="158" height="28" rx="6"/><text x="115" y="263" text-anchor="middle">Incident detail</text>
         <rect class="node" x="36" y="280" width="158" height="28" rx="6"/><text x="115" y="299" text-anchor="middle">Facilities · admin</text>
         <rect class="node" x="36" y="316" width="158" height="28" rx="6"/><text x="115" y="335" text-anchor="middle">Engineers · admin</text>
-        <rect class="dash" x="36" y="358" width="158" height="38" rx="6"/>
-        <text class="t-ms" x="115" y="374" text-anchor="middle">sessionStorage</text>
-        <text class="t-ms" x="115" y="388" text-anchor="middle">JWT + user</text>
+        <rect class="node" x="36" y="352" width="158" height="28" rx="6"/><text x="115" y="371" text-anchor="middle">People · admin</text>
+        <rect class="dash" x="36" y="392" width="158" height="38" rx="6"/>
+        <text class="t-ms" x="115" y="408" text-anchor="middle">sessionStorage: JWT</text>
+        <text class="t-ms" x="115" y="422" text-anchor="middle">renewed under 1 h left</text>
+        <rect class="dash" x="36" y="438" width="158" height="38" rx="6"/>
+        <text class="t-ms" x="115" y="454" text-anchor="middle">service worker</text>
+        <text class="t-ms" x="115" y="468" text-anchor="middle">app files, never /api</text>
 
         <!-- Edge: proxy / CloudFront -->
         <rect class="node" x="280" y="80" width="170" height="70" rx="8"/>
@@ -239,8 +243,9 @@ a { color: var(--accent); }
         <text class="t-s" x="675" y="114" text-anchor="middle">strip /api/api-service · errors as {message}</text>
 
         <rect class="node" x="536" y="140" width="278" height="50" rx="6"/>
-        <text class="t-b" x="675" y="161" text-anchor="middle">Routers</text>
-        <text class="t-ms" x="675" y="178" text-anchor="middle">auth incidents dashboard facilities engineers notifications</text>
+        <text class="t-b" x="675" y="158" text-anchor="middle">Routers</text>
+        <text class="t-ms" x="675" y="172" text-anchor="middle">auth · incidents · dashboard · facilities</text>
+        <text class="t-ms" x="675" y="185" text-anchor="middle">engineers · users · notifications</text>
 
         <rect class="node" x="536" y="204" width="278" height="50" rx="6"/>
         <text class="t-b" x="675" y="225" text-anchor="middle">Auth dependencies</text>
@@ -263,7 +268,7 @@ a { color: var(--accent); }
         <text class="t-s" x="484" y="257" text-anchor="middle">invoke</text>
 
         <!-- PostgreSQL -->
-        <rect class="group" x="900" y="40" width="150" height="410" rx="10"/>
+        <rect class="group" x="900" y="40" width="150" height="430" rx="10"/>
         <text class="t-b" x="975" y="66" text-anchor="middle">PostgreSQL</text>
         <text class="t-s" x="975" y="83" text-anchor="middle">db postgres · :5432</text>
         <text class="t-m" x="916" y="110">users</text>
@@ -277,15 +282,16 @@ a { color: var(--accent); }
         <text class="t-m" x="916" y="254">notifications</text>
         <text class="t-m" x="916" y="272">incident_followers</text>
         <text class="t-m" x="916" y="290">engineer_reviews</text>
-        <text class="t-ms" x="916" y="310">view engineer_workload</text>
+        <text class="t-m" x="916" y="308">app_secrets</text>
+        <text class="t-ms" x="916" y="328">view engineer_workload</text>
 
-        <rect class="dash" x="912" y="328" width="126" height="64" rx="6"/>
-        <text class="t-acc" x="975" y="347" text-anchor="middle" font-size="12">trigger</text>
-        <text class="t-ms" x="975" y="364" text-anchor="middle">on incidents change</text>
-        <text class="t-ms" x="975" y="380" text-anchor="middle">writes history row</text>
+        <rect class="dash" x="912" y="346" width="126" height="64" rx="6"/>
+        <text class="t-acc" x="975" y="365" text-anchor="middle" font-size="12">trigger</text>
+        <text class="t-ms" x="975" y="382" text-anchor="middle">on incidents change</text>
+        <text class="t-ms" x="975" y="398" text-anchor="middle">writes history row</text>
 
-        <text class="t-ms" x="975" y="416" text-anchor="middle">schema.sql + seed.sql</text>
-        <text class="t-ms" x="975" y="432" text-anchor="middle">+ migrations/</text>
+        <text class="t-ms" x="975" y="434" text-anchor="middle">schema.sql + seed.sql</text>
+        <text class="t-ms" x="975" y="450" text-anchor="middle">+ migrations/</text>
 
         <line class="edge-acc" x1="814" y1="357" x2="898" y2="357" marker-end="url(#ar-acc)"/>
         <text class="t-s" x="856" y="349" text-anchor="middle">SQL</text>
@@ -530,7 +536,7 @@ a { color: var(--accent); }
   <figure>
     <h3>Sign-in and session</h3>
     <div class="diagram">
-      <svg viewBox="0 0 1010 220" role="img" aria-label="Employees register themselves and admins create engineer accounts; login checks the bcrypt password and active flag and issues an 8 hour token; every request re-checks the user; a 401 signs the user out and returns them to login.">
+      <svg viewBox="0 0 1010 220" role="img" aria-label="Employees register themselves and admins create engineer accounts; login checks the bcrypt password and active flag and issues an 8 hour token; while it has under an hour left the app renews it, up to 24 hours after sign-in; every request re-checks the user; a 401 signs the user out and returns them to login.">
         <defs>
           <marker id="a-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
           <marker id="a-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -556,7 +562,7 @@ a { color: var(--accent); }
 
         <rect class="dash" x="870" y="80" width="120" height="56" rx="8"/>
         <text class="t-b" x="930" y="104" text-anchor="middle">Signed out</text>
-        <text class="t-s" x="930" y="122" text-anchor="middle">expired or disabled</text>
+        <text class="t-s" x="930" y="122" text-anchor="middle">expired, disabled, 24 h</text>
 
         <line class="edge-acc" x1="180" y1="58" x2="238" y2="96" marker-end="url(#a-acc)"/>
         <text class="t-s" x="214" y="62">employee</text>
@@ -569,10 +575,13 @@ a { color: var(--accent); }
         <line class="edge" x1="820" y1="108" x2="868" y2="108" marker-end="url(#a-mut)"/>
         <text class="t-s" x="844" y="100" text-anchor="middle">401</text>
         <path class="edge" d="M930,136 V196 H320 V138" marker-end="url(#a-mut)"/>
+        <path class="edge-acc" d="M740,80 V46 H530 V78" marker-end="url(#a-acc)"/>
+        <text class="t-s" x="635" y="38" text-anchor="middle">POST /auth/refresh: fresh 8 h token</text>
+        <text class="t-s" x="635" y="64" text-anchor="middle">when under 1 h is left</text>
         <text class="t-s" x="625" y="190" text-anchor="middle">sign in again</text>
       </svg>
     </div>
-    <figcaption>Only employees can self-register; engineers get their account from a Facility Admin with a temporary password, and admin accounts come from the seed. Every request loads the user again, so a deactivated account loses access at once rather than when its token expires.</figcaption>
+    <figcaption>Only employees can self-register; engineers get their account from a Facility Admin with a temporary password, and an admin can make an employee a Facility Admin on the People page (the first admin comes from the seed or the <code>init_db</code> task). While a token has under an hour left, the app quietly swaps it for a fresh one; each renewal keeps the original sign-in time and is refused 24 hours after it. Every request loads the user again, so a role change or a deactivated account takes effect at once rather than when the token expires.</figcaption>
   </figure>
 
   <figure>
@@ -800,7 +809,7 @@ a { color: var(--accent); }
         <text class="l-adm" x="490" y="178" text-anchor="middle">delete if unused</text>
       </svg>
     </div>
-    <figcaption>Applies to buildings, floors and seats. Deleting is refused while any incident (or an engineer's home building) points at the item, so history is never broken; deactivate it instead. Engineers follow the same active/inactive states but are never deleted.</figcaption>
+    <figcaption>Applies to buildings, floors and seats. Deleting is refused while any incident (or an engineer's home building) points at the item, so history is never broken; deactivate it instead. Engineers follow the same active/inactive states but are never deleted. Accounts and roles are managed on the People page (<code>/users</code>): make an employee a Facility Admin or back, deactivate or reactivate; never yourself, never engineers (they stay on the Engineers page), and never down to zero active admins.</figcaption>
   </figure>
 
   <figure>
