@@ -57,6 +57,29 @@ Anyone with an `@acme.inc` email can register, and they always become an **Emplo
 3. A session ends 24 hours after signing in, whatever happens: renewal is refused, and the next expired token sends the user to sign-in. That limits how long a stolen token is useful.
 4. Because the bell calls the API every 30 seconds, an open tab stays signed in up to that limit.
 
+### How secure is signing in?
+
+The passwords, tokens and role checks are sound, and nothing is known to be exploitable. The open gaps are around the edges: a limit on login attempts first, then a stricter browser policy against script injection.
+
+**What protects a sign-in**
+
+| Protection | What it stops | Where |
+| --- | --- | --- |
+| bcrypt hash with a per-user salt (cost 10) | A leaked database revealing passwords | `app/core/security.py` |
+| Unknown emails are checked against a dummy hash | Timing the response to learn which emails have accounts | `verify_password` |
+| Token signed with a random 256-bit key, made at deploy time | Forging a token; the key is not in the code or the repo | `admin_tasks.py`, `app_secrets` table |
+| Only HS256 accepted when checking a token | Tokens that claim another algorithm, or none | `decode_access_token` |
+| User, role and active flag reloaded from the database on every request | A token outliving a role change or a deactivation | `app/api/deps.py` |
+| 8-hour token, 24-hour cap from sign-in | A stolen token staying useful for long | `config.py` |
+| HTTPS only (CloudFront redirects) | Reading the password or token on the network | `infra/cloudfront.tf` |
+
+**Known gaps, most important first**
+
+1. **No limit on login attempts.** Nothing slows down guessing passwords for one account, and the minimum is 8 characters. The Lambda URL is also public (`authorization_type = "NONE"`), so a rate limit placed only on CloudFront could be bypassed. Fix: a WAF rate rule on `/auth/login`, and let only CloudFront call the Lambda.
+2. **The token can be read by page scripts.** It sits in `sessionStorage`, and there is no Content-Security-Policy. An injected script could copy it. React escapes output, which lowers the risk. Fix: a CSP header, or an httpOnly cookie. The upside today: bearer tokens are not open to cross-site request forgery.
+3. **Signing out only clears the browser.** The server can't cancel a token, so a copied one works until it expires (up to 24 hours with renewals). Today the only cut-off is deactivating the account.
+4. **Smaller items:** bcrypt cost 10 (12 is the usual advice now), no check against common or breached passwords, and no second sign-in factor.
+
 ## Reporting an incident
 
 A new incident starts as **Open**, is unassigned, and gets a reference like `INC-000012`. Every Facility Admin is notified.
