@@ -129,8 +129,14 @@ REST + JSON under `/api/api-service`. The full endpoint table is in
 - **Methods and status codes:** `POST` creates (201), `GET` reads (200),
   `PUT`/`PATCH` update (200; `PUT` is an alias of `PATCH`), `DELETE` removes (204).
   Workflow actions are `POST /incidents/{id}/status|assign|escalate|notes`.
-- **Errors** always come back as `{"message": "..."}`. Validation errors also carry
-  `errors: [{loc, msg}]`, which the forms show under the matching field.
+- **Errors** always come back as `{"message": "..."}`. When the problem is about one
+  field, the response also carries `errors: [{loc, msg}]` naming it: invalid input, and
+  rule errors such as a duplicate email, a floor from another building or a full
+  engineer.
+  - The page shows each message directly **above** that field and moves the cursor to
+    the first one.
+  - An error that names no field (for example the server can't be reached) appears just
+    above the button that was clicked. Nothing is shown in a banner at the top of the page.
 
   | Code | Meaning |
   |---|---|
@@ -152,8 +158,8 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 247 | 99 % |
-| Frontend: Vitest + React Testing Library | 114 | 99 % lines |
+| Backend: pytest, unit + integration on a throwaway database | 254 | 99 % |
+| Frontend: Vitest + React Testing Library | 117 | 99 % lines |
 | End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 14 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 

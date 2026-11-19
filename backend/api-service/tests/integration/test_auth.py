@@ -37,7 +37,10 @@ def test_register_cannot_choose_role(client):
 def test_register_duplicate_email_is_conflict(client):
     r = register(client, email="EMMA@acme.inc")
     assert r.status_code == 409
-    assert r.json() == {"message": "An account with this email already exists."}
+    assert r.json() == {
+        "message": "An account with this email already exists.",
+        "errors": [{"loc": ["body", "email"], "msg": "An account with this email already exists."}],
+    }
 
 
 def test_register_validation_errors(client):
@@ -60,7 +63,11 @@ def test_login_failures_do_not_reveal_which_part_was_wrong(client):
     wrong_pw = login(client, "emma@acme.inc", "nope")
     unknown = login(client, "ghost@acme.inc")
     assert wrong_pw.status_code == unknown.status_code == 401
-    assert wrong_pw.json() == unknown.json() == {"message": "Invalid email or password."}
+    # identical answers, shown on the password field either way
+    assert wrong_pw.json() == unknown.json() == {
+        "message": "Invalid email or password.",
+        "errors": [{"loc": ["body", "password"], "msg": "Invalid email or password."}],
+    }
 
 
 def test_disabled_account_cannot_log_in(client, seed_conn):

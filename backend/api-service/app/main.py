@@ -62,7 +62,11 @@ app.add_middleware(StripPathPrefix, prefix=config.PATH_PREFIX)
 
 @app.exception_handler(HTTPException)
 async def http_error(_request: Request, exc: HTTPException):
-    return JSONResponse({"message": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+    body = {"message": exc.detail}
+    field = getattr(exc, "field", None)  # FieldError: tell the form which field it's about
+    if field:
+        body["errors"] = [{"loc": ["body", field], "msg": exc.detail}]
+    return JSONResponse(body, status_code=exc.status_code, headers=exc.headers)
 
 
 @app.exception_handler(RequestValidationError)

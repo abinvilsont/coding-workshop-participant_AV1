@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.core.errors import FieldError
 from app.models import Building, EngineerReview, Floor, Incident, IncidentHistory, IncidentNote, Seat, User
 from app.services import permissions as perms
 
@@ -156,19 +157,19 @@ def review_out(r: EngineerReview) -> dict:
 def validate_location(db: Session, building_id: int, floor_id: int | None, seat_id: int | None) -> None:
     """Friendly 400s for location mismatches (the DB also enforces these)."""
     if seat_id is not None and floor_id is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Choose a floor when choosing a seat.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "Choose a floor when choosing a seat.")
     building = db.get(Building, building_id)
     if building is None or not building.is_active:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That building doesn't exist or is no longer in use.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "building_id", "That building doesn't exist or is no longer in use.")
     if floor_id is not None:
         floor = db.get(Floor, floor_id)
         if floor is None or floor.building_id != building_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That floor is not in the selected building.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "That floor is not in the selected building.")
         if not floor.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That floor is no longer in use.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "floor_id", "That floor is no longer in use.")
     if seat_id is not None:
         seat = db.get(Seat, seat_id)
         if seat is None or seat.floor_id != floor_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That seat is not on the selected floor.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "seat_id", "That seat is not on the selected floor.")
         if not seat.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "That seat is no longer in use.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, "seat_id", "That seat is no longer in use.")

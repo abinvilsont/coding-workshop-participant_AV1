@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
-import useFieldErrors from '../hooks/useFieldErrors';
+import { Box, Button, Stack, Typography } from '@mui/material';
+import useFieldErrors, { focusFirstError } from '../hooks/useFieldErrors';
+import Field, { ErrorText } from './Field';
 import { useIsPhone } from '../hooks/useResponsive';
 import { getFacilities } from '../services/incidentService';
 import { CATEGORIES, PRIORITIES, categoryLabel, titleCase } from '../utils/format';
@@ -69,6 +70,7 @@ export default function IncidentForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const formEl = e.currentTarget;
     setError('');
     const problems = {};
     if (!form.title.trim()) problems.title = 'Enter a short title.';
@@ -77,7 +79,7 @@ export default function IncidentForm({
     if (!form.building_id) problems.building_id = 'Choose a building.';
     fe.set(problems);
     if (Object.keys(problems).length) {
-      setError('Please fix the highlighted fields.');
+      focusFirstError(formEl);
       return;
     }
     const payload = {
@@ -95,7 +97,9 @@ export default function IncidentForm({
     try {
       await onSubmit(payload);
     } catch (err) {
-      setError(fe.fromApi(err) ? 'Please fix the highlighted fields.' : err.message);
+      // A problem with one field is shown above that field; anything else above the buttons
+      if (fe.fromApi(err)) focusFirstError(formEl);
+      else setError(err.message);
       setSaving(false);
     }
   };
@@ -106,9 +110,7 @@ export default function IncidentForm({
   return (
     <Box component="form" onSubmit={handleSubmit} noValidate>
       <Stack spacing={2.5}>
-        {error && <Alert severity="error">{error}</Alert>}
-
-        <TextField
+        <Field
           label="Title"
           required
           disabled={saving}
@@ -119,7 +121,7 @@ export default function IncidentForm({
           slotProps={{ htmlInput: { maxLength: 200 } }}
         />
 
-        <TextField
+        <Field
           label="Description"
           required
           disabled={saving}
@@ -132,8 +134,8 @@ export default function IncidentForm({
           slotProps={{ htmlInput: { maxLength: 5000 } }}
         />
 
-        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: cols(showPriority ? 2 : 1) }}>
-          <TextField
+        <Box sx={{ display: 'grid', gap: 2, alignItems: 'end', gridTemplateColumns: cols(showPriority ? 2 : 1) }}>
+          <Field
             select
             label="Category"
             required
@@ -147,9 +149,9 @@ export default function IncidentForm({
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{categoryLabel(c)}</option>
             ))}
-          </TextField>
+          </Field>
           {showPriority && (
-            <TextField
+            <Field
               select
               label="Priority"
               disabled={saving}
@@ -161,15 +163,15 @@ export default function IncidentForm({
               {priorities.map((p) => (
                 <option key={p} value={p}>{titleCase(p)}</option>
               ))}
-            </TextField>
+            </Field>
           )}
         </Box>
 
         <Box component="fieldset" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2, m: 0, minWidth: 0 }}>
           <Typography component="legend" variant="subtitle2" sx={{ px: 0.5 }}>Location</Typography>
           <Stack spacing={2}>
-            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: cols(3) }}>
-              <TextField
+            <Box sx={{ display: 'grid', gap: 2, alignItems: 'end', gridTemplateColumns: cols(3) }}>
+              <Field
                 select
                 label="Building"
                 required
@@ -183,8 +185,8 @@ export default function IncidentForm({
                 {facilities?.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
-              </TextField>
-              <TextField
+              </Field>
+              <Field
                 select
                 label="Floor (optional)"
                 value={form.floor_id}
@@ -197,8 +199,8 @@ export default function IncidentForm({
                 {building?.floors.map((f) => (
                   <option key={f.id} value={f.id}>{f.name || `Floor ${f.floor_number}`}</option>
                 ))}
-              </TextField>
-              <TextField
+              </Field>
+              <Field
                 select
                 label="Seat (optional)"
                 value={form.seat_id}
@@ -213,9 +215,9 @@ export default function IncidentForm({
                     {s.seat_code}{s.description ? ` – ${s.description}` : ''}
                   </option>
                 ))}
-              </TextField>
+              </Field>
             </Box>
-            <TextField
+            <Field
               label="More details (optional)"
               value={form.location_details}
               onChange={set('location_details')}
@@ -227,16 +229,19 @@ export default function IncidentForm({
           </Stack>
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-          {onCancel && (
-            <Button variant="outlined" color="inherit" onClick={onCancel} disabled={saving}>
-              Cancel
+        <Box>
+          <ErrorText alert>{error}</ErrorText>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
+            {onCancel && (
+              <Button variant="outlined" color="inherit" onClick={onCancel} disabled={saving}>
+                Cancel
+              </Button>
+            )}
+            <Button type="submit" variant="contained" disabled={saving}>
+              {saving ? 'Saving…' : submitLabel}
             </Button>
-          )}
-          <Button type="submit" variant="contained" disabled={saving}>
-            {saving ? 'Saving…' : submitLabel}
-          </Button>
-        </Stack>
+          </Stack>
+        </Box>
       </Stack>
     </Box>
   );

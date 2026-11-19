@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { Context as ResponsiveContext } from 'react-responsive';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { FACILITIES, mockApi } from '../../test/mockApi';
 import Engineers from './Engineers';
+import { expectErrorAbove } from '../../test/fieldErrors';
 
 const ETHAN = {
   id: 2, name: 'Ethan Electrics', email: 'ethan.eng@acme.inc', phone: '+1-555-0110', department: 'Facilities',
@@ -76,10 +77,11 @@ describe('Engineers admin page', () => {
     await user.click(await screen.findByRole('button', { name: 'Add engineer' }));
 
     await user.click(screen.getByRole('button', { name: 'Create engineer' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    expect(field('Full name')).toHaveAccessibleDescription('Enter the engineer’s name.');
-    expect(field('Work email')).toHaveAccessibleDescription('Use an @acme.inc email address.');
-    expect(field('Temporary password')).toHaveAccessibleDescription('The temporary password needs at least 8 characters.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expectErrorAbove(field('Full name'), 'Enter the engineer’s name.');
+    expectErrorAbove(field('Work email'), 'Use an @acme.inc email address.');
+    expectErrorAbove(field('Temporary password'), 'The temporary password needs at least 8 characters.');
+    await waitFor(() => expect(field('Full name')).toHaveFocus());
 
     await user.type(field('Full name'), 'Grace');
     expect(field('Full name')).not.toHaveAttribute('aria-invalid', 'true');
@@ -105,7 +107,10 @@ describe('Engineers admin page', () => {
     const user = userEvent.setup();
     const api = backend({
       'PATCH /engineers/2': (body) => (body.is_active === false
-        ? { status: 409, body: { message: 'Ethan Electrics still has 5 active ticket(s). Reassign them first.' } }
+        ? { status: 409, body: {
+          message: 'Ethan Electrics still has 5 active ticket(s). Reassign them first.',
+          errors: [{ loc: ['body', 'is_active'], msg: 'Ethan Electrics still has 5 active ticket(s). Reassign them first.' }],
+        } }
         : { ...ETHAN, ...body }),
     });
     render(<Engineers />);
@@ -116,7 +121,7 @@ describe('Engineers admin page', () => {
     await user.selectOptions(field('Availability'), 'Busy');
     await user.click(screen.getByLabelText(/Account active/));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Reassign them first.');
+    await waitFor(() => expectErrorAbove(screen.getByLabelText(/Account active/), 'Reassign them first.'));
     expect(api.calls.at(-1).body).toMatchObject({ availability: 'busy', is_active: false });
 
     await user.click(screen.getByLabelText(/Account active/));

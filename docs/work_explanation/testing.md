@@ -30,8 +30,8 @@ There is also a **load test** with Artillery (`backend/api-service/tests/load/ap
 
 | Suite | Tests | Result | Coverage |
 | --- | --- | --- | --- |
-| Backend (pytest) | 247 | all pass, ~15 s | 99 % of `app/` |
-| Frontend (Vitest) | 114 | all pass, ~20 s | 99 % lines, 91 % branches, 91 % functions |
+| Backend (pytest) | 254 | all pass, ~15 s | 99 % of `app/` |
+| Frontend (Vitest) | 117 | all pass, ~20 s | 99 % lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 14 | all pass, ~90 s | every critical user path |
 
 Both coverage runs fail if coverage drops below 80 %.

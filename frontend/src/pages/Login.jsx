@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
   Alert, Avatar, Box, Button, IconButton, InputAdornment, List, ListItem, ListItemText, Paper, Stack, Tab, Tabs,
-  TextField, Typography,
+  Typography,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import useFieldErrors from '../hooks/useFieldErrors';
+import useFieldErrors, { focusFirstError } from '../hooks/useFieldErrors';
+import Field, { ErrorText } from '../components/Field';
 import { useIsPhone } from '../hooks/useResponsive';
 import { ACME_DOMAIN, isAcmeEmail, login, register } from '../services/authService';
 import ThemeToggle from '../components/ThemeToggle';
@@ -102,12 +103,13 @@ export default function Login({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const formEl = e.currentTarget;
     setError('');
     setNotice('');
     const problems = validate();
     fe.set(problems);
     if (Object.keys(problems).length) {
-      setError('Please fix the highlighted fields.');
+      focusFirstError(formEl);
       return;
     }
     setLoading(true);
@@ -122,7 +124,9 @@ export default function Login({ onLogin }) {
         onLogin?.(user);
       }
     } catch (err) {
-      setError(fe.fromApi(err) ? 'Please fix the highlighted fields.' : err.message);
+      // A problem with one field is shown above that field; anything else above the button
+      if (fe.fromApi(err)) focusFirstError(formEl);
+      else setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -171,11 +175,10 @@ export default function Login({ onLogin }) {
           </Typography>
 
           <Stack spacing={2}>
-            {error && <Alert severity="error">{error}</Alert>}
             {notice && <Alert severity="success" role="status">{notice}</Alert>}
 
             {isRegister && (
-              <TextField
+              <Field
                 label="Full name"
                 required
                 disabled={loading}
@@ -187,7 +190,7 @@ export default function Login({ onLogin }) {
               />
             )}
 
-            <TextField
+            <Field
               label="Work email"
               required
               disabled={loading}
@@ -199,7 +202,7 @@ export default function Login({ onLogin }) {
               placeholder={`name@${ACME_DOMAIN}`}
             />
 
-            <TextField
+            <Field
               label="Password"
               required
               disabled={loading}
@@ -228,7 +231,7 @@ export default function Login({ onLogin }) {
             />
 
             {isRegister && (
-              <TextField
+              <Field
                 label="Confirm password"
                 required
                 disabled={loading}
@@ -240,9 +243,12 @@ export default function Login({ onLogin }) {
               />
             )}
 
-            <Button type="submit" variant="contained" size="large" disabled={loading}>
-              {loading ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
-            </Button>
+            <Box>
+              <ErrorText alert>{error}</ErrorText>
+              <Button type="submit" variant="contained" size="large" fullWidth disabled={loading}>
+                {loading ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
+              </Button>
+            </Box>
 
             <Typography variant="caption" color="text.secondary" align="center">
               {isRegister

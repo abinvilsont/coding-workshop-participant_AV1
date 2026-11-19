@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FACILITIES, mockApi } from '../test/mockApi';
 import { ApiError } from '../services/apiClient';
 import IncidentForm from './IncidentForm';
+import { expectErrorAbove } from '../test/fieldErrors';
 
 const field = (name) => screen.getByLabelText(new RegExp(`^${name}`));
 
@@ -21,13 +22,13 @@ describe('IncidentForm', () => {
     const onSubmit = await renderForm();
     await user.type(field('Title'), '   ');
     await user.click(screen.getByRole('button', { name: 'Submit incident' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    // each problem is shown under its own field and marks it invalid
-    expect(field('Title')).toHaveAccessibleDescription('Enter a short title.');
-    expect(field('Title')).toHaveAttribute('aria-invalid', 'true');
-    expect(field('Description')).toHaveAccessibleDescription('Describe the problem.');
-    expect(field('Category')).toHaveAccessibleDescription('Choose a category.');
-    expect(field('Building')).toHaveAccessibleDescription('Choose a building.');
+    // no banner at the top: each problem is shown above its own field, and the cursor goes to the first
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expectErrorAbove(field('Title'), 'Enter a short title.');
+    expectErrorAbove(field('Description'), 'Describe the problem.');
+    expectErrorAbove(field('Category'), 'Choose a category.');
+    expectErrorAbove(field('Building'), 'Choose a building.');
+    await waitFor(() => expect(field('Title')).toHaveFocus());
     expect(onSubmit).not.toHaveBeenCalled();
 
     // typing fixes clear that field's message only
@@ -87,23 +88,35 @@ describe('IncidentForm', () => {
     expect(screen.queryByLabelText(/^Priority/)).not.toBeInTheDocument();
   });
 
-  it('shows server validation errors under the matching field', async () => {
+  it('shows server validation errors above the matching field', async () => {
     const user = userEvent.setup();
     const err = new ApiError(400, 'Title must be at most 200 characters.', { title: 'Title must be at most 200 characters.' });
     const onSubmit = vi.fn().mockRejectedValue(err);
     await renderForm({ onSubmit, initial: { title: 'T', description: 'D', category: 'hvac', building_id: 1 } });
     await user.click(screen.getByRole('button', { name: 'Submit incident' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    expect(field('Title')).toHaveAccessibleDescription('Title must be at most 200 characters.');
+    await waitFor(() => expectErrorAbove(field('Title'), 'Title must be at most 200 characters.'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('shows server errors and lets the user retry', async () => {
+  it('shows a location error from the server above the floor', async () => {
     const user = userEvent.setup();
-    const onSubmit = vi.fn().mockRejectedValue(new Error('That floor is not in the selected building.'));
+    const message = 'That floor is not in the selected building.';
+    const onSubmit = vi.fn().mockRejectedValue(new ApiError(400, message, { floor_id: message }));
     await renderForm({ onSubmit, initial: { title: 'T', description: 'D', category: 'hvac', building_id: 1 } });
     await user.click(screen.getByRole('button', { name: 'Submit incident' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('That floor is not in the selected building.');
-    expect(screen.getByRole('button', { name: 'Submit incident' })).toBeEnabled();
+    await waitFor(() => expectErrorAbove(field('Floor'), message));
+  });
+
+  it('shows errors that name no field above the buttons, and lets the user retry', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockRejectedValue(new Error('Cannot reach the server. Is the backend running?'));
+    await renderForm({ onSubmit, initial: { title: 'T', description: 'D', category: 'hvac', building_id: 1 } });
+    await user.click(screen.getByRole('button', { name: 'Submit incident' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Cannot reach the server.');
+    const submit = screen.getByRole('button', { name: 'Submit incident' });
+    expect(alert.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(submit).toBeEnabled();
   });
 
   it('reports when facilities cannot load', async () => {

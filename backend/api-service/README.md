@@ -34,6 +34,7 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 `Authorization: Bearer <token>`.
 - Errors come back as `{"message": "..."}`.
 - Invalid input returns **400** with an `errors: [{loc, msg}]` list, one entry per field.
+- Rule errors about one field (raised as `FieldError`, `app/core/errors.py`) carry the same list with that field, e.g. `409` duplicate email → `email`, a full engineer → `engineer_id`, a floor from another building → `floor_id`. The UI shows the message above that field.
 - `PUT` is accepted as an alias of every `PATCH` route.
 
 | Method | Path | Who | Purpose |

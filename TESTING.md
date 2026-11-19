@@ -28,8 +28,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 247 | all pass, ~15 s | **99 %** of `app/` (1368 statements, 13 missed) |
-| Frontend (Vitest) | 114 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| Backend (pytest) | 254 | all pass, ~13 s | **99 %** of `app/` (1385 statements, 13 missed) |
+| Frontend (Vitest) | 117 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 14 | all pass, ~90 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -71,6 +71,7 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
 | `test_reviews.py` | engineer reviews: reporter and follower each review once a closed incident, engineers never see reviews (incident detail, engineer endpoints, own profile, notifications), admins see all plus the average (rounded to 1 dp), edit / delete / re-review, 409 on a second review, refused for admins, engineers, other employees and unclosed incidents, rating and comment validation, deleted with the incident |
 | `test_merge.py` | merging duplicates: links both ways, the duplicate's reporter (and its own followers) follow the main incident, who is notified, followers get every update but not internal notes and can't confirm/cancel, chained merges, freed engineer capacity, candidates ordered by building + category, refusals (self, closed, already merged, non-admin), delete keeps the duplicate |
+| `test_field_errors.py` | rule errors name the field they're about (location parts, critical priority, assignment, escalation, merge target, duplicate email / building code / name / floor / seat, engineer deactivation); errors about the whole request name none |
 | `test_api_contract.py` | `{"message": ...}` error shape (400/404/405/500/503), malformed JSON and bad query values return 400, `PUT` works as an alias of every `PATCH` route, CloudFront path prefix, the Lambda handler with a real Function-URL event |
 
 ### Frontend: `frontend/src/**/*.test.{js,jsx}`
@@ -80,7 +81,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | Area | Covers |
 |---|---|
 | `services/` | auth header, query strings, 204, error messages, validation errors mapped onto fields, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
-| `Login` | sign in, client-side validation with messages under each field, server field errors, loading state, registration, show password |
+| `Login` | sign in, client-side validation with messages above each field and focus on the first, server field errors, loading state, registration, show password |
 | `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
 | `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |

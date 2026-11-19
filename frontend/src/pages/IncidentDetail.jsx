@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Chip, FormControlLabel, FormLabel, Link, List, ListItem, Rating, Stack, TextField,
+  Alert, Box, Button, Checkbox, Chip, FormControlLabel, FormLabel, Link, List, ListItem, Rating, Stack,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { EscalatedBadge, PriorityBadge, Section, StatusBadge } from '../components/Badges';
+import Field, { ErrorText } from '../components/Field';
 import IncidentForm from '../components/IncidentForm';
 import { ReviewItem } from '../components/Reviews';
 import { useIsPhone } from '../hooks/useResponsive';
@@ -59,6 +60,18 @@ function historyText(h) {
 
 const nativeSelect = { select: { native: true }, inputLabel: { shrink: true } };
 
+/**
+ * The last failed action's error, if it came from this box. `field(name)` = the API's
+ * message for that input; `general` = a message that names no field. Both are shown
+ * inside the box, above the field or buttons they're about.
+ */
+function boxError(err) {
+  return {
+    field: (name) => err?.fields?.[name],
+    general: err && !Object.keys(err.fields).length ? err.message : '',
+  };
+}
+
 /** One titled block in the Actions panel; a labelled region so tests and e2e can find it. */
 function ActionBlock({ id, title, children }) {
   return (
@@ -79,14 +92,16 @@ function ActionBlock({ id, title, children }) {
 function InlineForm({ children }) {
   const isPhone = useIsPhone();
   return (
-    <Stack direction={isPhone ? 'column' : 'row'} spacing={1} alignItems={isPhone ? 'stretch' : 'center'}>
+    // Buttons line up with the bottom of the field, also when an error sits above the field
+    <Stack direction={isPhone ? 'column' : 'row'} spacing={1} alignItems={isPhone ? 'stretch' : 'flex-end'}>
       {children}
     </Stack>
   );
 }
 
-function StatusActions({ incident, run }) {
+function StatusActions({ incident, run, err }) {
   const [comment, setComment] = useState('');
+  const e = boxError(err);
   const transitions = incident.permissions.status_transitions;
   if (!transitions.length) return null;
 
@@ -97,13 +112,15 @@ function StatusActions({ incident, run }) {
 
   return (
     <ActionBlock id="status" title="Update status">
-      <TextField
+      <ErrorText alert>{e.general}</ErrorText>
+      <Field
+        errorText={e.field('comment')}
         multiline
         minRows={2}
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         placeholder="Optional comment (added as a note)"
-        slotProps={{ htmlInput: { maxLength: 2000 } }}
+        slotProps={{ htmlInput: { maxLength: 2000, 'aria-label': 'Status comment' } }}
       />
       <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
         {transitions.map((to) => (
@@ -121,7 +138,8 @@ function StatusActions({ incident, run }) {
   );
 }
 
-function AssignAction({ incident, run }) {
+function AssignAction({ incident, run, err }) {
+  const e = boxError(err);
   const [engineers, setEngineers] = useState(null);
   const [selected, setSelected] = useState(incident.assigned_engineer_id ?? '');
 
@@ -139,9 +157,10 @@ function AssignAction({ incident, run }) {
   return (
     <ActionBlock id="assign" title={incident.assigned_engineer_id ? 'Reassign engineer' : 'Assign engineer'}>
       <InlineForm>
-        <TextField
+        <Field
           select
           label="Engineer"
+          errorText={e.field('engineer_id') || e.general}
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           disabled={!engineers}
@@ -159,7 +178,7 @@ function AssignAction({ incident, run }) {
               {e.specializations.includes(incident.category) ? ' ★' : ''}
             </option>
           ))}
-        </TextField>
+        </Field>
         <Button
           variant="contained"
           disabled={!selected || Number(selected) === incident.assigned_engineer_id}
@@ -173,7 +192,8 @@ function AssignAction({ incident, run }) {
   );
 }
 
-function PriorityAction({ incident, run }) {
+function PriorityAction({ incident, run, err }) {
+  const e = boxError(err);
   const suggested = incident.requested_priority ?? incident.priority;
   const [priority, setPriority] = useState(suggested);
   const [shownSuggestion, setShownSuggestion] = useState(suggested);
@@ -190,9 +210,10 @@ function PriorityAction({ incident, run }) {
         </Alert>
       )}
       <InlineForm>
-        <TextField
+        <Field
           select
           label="New priority"
+          errorText={e.field('priority') || e.field('is_escalated') || e.general}
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
           slotProps={nativeSelect}
@@ -200,7 +221,7 @@ function PriorityAction({ incident, run }) {
           {PRIORITIES.map((p) => (
             <option key={p} value={p}>{titleCase(p)}</option>
           ))}
-        </TextField>
+        </Field>
         <Button
           variant="contained"
           disabled={priority === incident.priority}
@@ -223,7 +244,8 @@ function PriorityAction({ incident, run }) {
   );
 }
 
-function EscalateAction({ incident, run }) {
+function EscalateAction({ incident, run, err }) {
+  const e = boxError(err);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [requested, setRequested] = useState('');
@@ -244,18 +266,20 @@ function EscalateAction({ incident, run }) {
 
   return (
     <ActionBlock id="escalate" title="Escalate incident">
-      <TextField
+      <Field
         multiline
         minRows={3}
+        errorText={e.field('reason') || e.general}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="Why is this urgent?"
-        slotProps={{ htmlInput: { maxLength: 2000 } }}
+        slotProps={{ htmlInput: { maxLength: 2000, 'aria-label': 'Reason for escalating' } }}
       />
       {higher.length > 0 && (
-        <TextField
+        <Field
           select
           label="Priority"
+          errorText={e.field('requested_priority')}
           value={requested}
           onChange={(e) => setRequested(e.target.value)}
           slotProps={nativeSelect}
@@ -264,7 +288,7 @@ function EscalateAction({ incident, run }) {
           {higher.map((p) => (
             <option key={p} value={p}>Request {titleCase(p)}</option>
           ))}
-        </TextField>
+        </Field>
       )}
       <Stack direction="row" spacing={1} justifyContent="flex-end">
         <Button variant="outlined" color="inherit" onClick={() => setOpen(false)}>Cancel</Button>
@@ -277,7 +301,8 @@ function EscalateAction({ incident, run }) {
 }
 
 /** Admin: merge this incident into another open one that reports the same problem. */
-function MergeAction({ incident, run }) {
+function MergeAction({ incident, run, err }) {
+  const e = boxError(err);
   const [candidates, setCandidates] = useState(null);
   const [target, setTarget] = useState('');
 
@@ -308,13 +333,13 @@ function MergeAction({ incident, run }) {
         <Typography variant="body2" color="text.secondary">No other open incidents to merge into.</Typography>
       ) : (
         <InlineForm>
-          <TextField
+          <Field
             select
             label="Merge into"
+            errorText={e.field('target_id') || e.general}
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             disabled={!candidates}
-            helperText="Same building and category first"
             slotProps={nativeSelect}
           >
             <option value="">{candidates ? 'Select incident…' : 'Loading…'}</option>
@@ -323,11 +348,14 @@ function MergeAction({ incident, run }) {
                 {c.reference} · {c.title} · {c.building} · {STATUS_LABELS[c.status]}
               </option>
             ))}
-          </TextField>
-          <Button variant="outlined" disabled={!chosen} onClick={merge} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+          </Field>
+          <Button variant="outlined" disabled={!chosen} onClick={merge} sx={{ flexShrink: 0 }}>
             Merge
           </Button>
         </InlineForm>
+      )}
+      {candidates?.length > 0 && (
+        <Typography variant="caption" color="text.secondary">Same building and category first</Typography>
       )}
     </ActionBlock>
   );
@@ -335,7 +363,8 @@ function MergeAction({ incident, run }) {
 
 /** Employee: rate the engineer once the incident is closed. Admin: read every review.
  *  The API never sends reviews to engineers, so they never see this section. */
-function ReviewSection({ incident, user, run }) {
+function ReviewSection({ incident, user, run, err }) {
+  const e = boxError(err);
   const isAdmin = user.role === 'facility_admin';
   const mine = incident.reviews.find((r) => r.reviewer_id === user.id);
   const [editing, setEditing] = useState(false);
@@ -391,6 +420,7 @@ function ReviewSection({ incident, user, run }) {
     <Section title={`Rate ${incident.assigned_engineer}`}>
       {mine && !editing ? (
         <>
+          <ErrorText alert>{e.general}</ErrorText>
           <ReviewItem review={mine} heading="Your review" />
           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
             <Button variant="outlined" onClick={startEdit}>Edit review</Button>
@@ -400,6 +430,7 @@ function ReviewSection({ incident, user, run }) {
       ) : canWrite ? (
         <Stack component="form" spacing={1.5} onSubmit={submit} aria-label="Review the engineer">
           <Box>
+            <ErrorText id="review-rating-error">{e.field('rating') || e.general}</ErrorText>
             <FormLabel id="review-rating-label" sx={{ display: 'block', mb: 0.5, fontSize: 14 }}>
               How did {incident.assigned_engineer} do?
             </FormLabel>
@@ -416,10 +447,11 @@ function ReviewSection({ incident, user, run }) {
               <Typography variant="body2" color="text.secondary">{shown ? RATING_LABELS[shown] : 'Choose 1–5 stars'}</Typography>
             </Stack>
           </Box>
-          <TextField
+          <Field
             multiline
             minRows={2}
             label="Comment (optional)"
+            errorText={e.field('comment')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             slotProps={{ htmlInput: { maxLength: 2000 } }}
@@ -446,7 +478,8 @@ const NOTE_TINTS = {
 };
 const noteTint = (kind) => NOTE_TINTS[kind] ?? { bgcolor: 'background.paper' };
 
-function Notes({ incident, user, run }) {
+function Notes({ incident, user, run, err }) {
+  const e = boxError(err);
   const isPhone = useIsPhone();
   const [body, setBody] = useState('');
   const [internal, setInternal] = useState(false);
@@ -505,13 +538,14 @@ function Notes({ incident, user, run }) {
 
       {p.can_add_note ? (
         <Stack component="form" spacing={1} onSubmit={submit}>
-          <TextField
+          <Field
             multiline
             minRows={3}
+            errorText={e.field('body') || e.field('is_internal') || e.general}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write a note…"
-            slotProps={{ htmlInput: { maxLength: 5000 } }}
+            slotProps={{ htmlInput: { maxLength: 5000, 'aria-label': 'Note' } }}
           />
           <Stack
             direction={isPhone ? 'column' : 'row'}
@@ -558,7 +592,7 @@ export default function IncidentDetail({ id, user }) {
   const isPhone = useIsPhone();
   const [incident, setIncident] = useState(null);
   const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
+  const [actionError, setActionError] = useState(null); // { box, message, fields } of the last failed action
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -580,16 +614,17 @@ export default function IncidentDetail({ id, user }) {
     load();
   }, [load]);
 
-  // Run an action that returns the updated incident. Resolves true on success.
-  const run = useCallback(async (action) => {
+  // Run an action that returns the updated incident. Resolves true on success. A failure
+  // is remembered with the box it came from, which shows it above its own field.
+  const run = useCallback(async (action, box) => {
     setBusy(true);
-    setActionError('');
+    setActionError(null);
     try {
       const updated = await action();
       if (updated) setIncident(updated);
       return true;
     } catch (err) {
-      setActionError(err.message);
+      setActionError({ box, message: err.message, fields: err.fields ?? {} });
       return false;
     } finally {
       setBusy(false);
@@ -607,13 +642,18 @@ export default function IncidentDetail({ id, user }) {
   if (!incident) return <Typography color="text.secondary">Loading incident…</Typography>;
 
   const p = incident.permissions;
+  // What each box needs: its own `run`, and the last error if it came from that box
+  const box = (name) => ({
+    run: (action) => run(action, name),
+    err: actionError?.box === name ? actionError : null,
+  });
   const hasActions =
     p.status_transitions.length || p.can_assign || p.can_set_priority || p.can_escalate || p.can_merge || p.can_delete;
   const following = incident.followers?.some((f) => f.id === user.id);
 
   const handleDelete = async () => {
     if (!window.confirm(`Permanently delete ${incident.reference}? This cannot be undone.`)) return;
-    if (await run(() => deleteIncident(incident.id))) navigate('/incidents');
+    if (await run(() => deleteIncident(incident.id), 'delete')) navigate('/incidents');
   };
 
   return (
@@ -667,7 +707,6 @@ export default function IncidentDetail({ id, user }) {
           every update; {incident.reported_by} confirms the fix.
         </Alert>
       )}
-      {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
 
       <Box
         aria-busy={busy}
@@ -708,9 +747,9 @@ export default function IncidentDetail({ id, user }) {
             </Section>
           )}
 
-          <ReviewSection incident={incident} user={user} run={run} />
+          <ReviewSection incident={incident} user={user} {...box('review')} />
 
-          <Notes incident={incident} user={user} run={run} />
+          <Notes incident={incident} user={user} {...box('notes')} />
 
           <Section title="History">
             <List disablePadding component="ol">
@@ -780,13 +819,14 @@ export default function IncidentDetail({ id, user }) {
 
           {hasActions ? (
             <Section title="Actions">
-              <StatusActions incident={incident} run={run} />
-              {p.can_assign && <AssignAction incident={incident} run={run} />}
-              {p.can_set_priority && <PriorityAction incident={incident} run={run} />}
-              {p.can_escalate && <EscalateAction incident={incident} run={run} />}
-              {p.can_merge && <MergeAction incident={incident} run={run} />}
+              <StatusActions incident={incident} {...box('status')} />
+              {p.can_assign && <AssignAction incident={incident} {...box('assign')} />}
+              {p.can_set_priority && <PriorityAction incident={incident} {...box('priority')} />}
+              {p.can_escalate && <EscalateAction incident={incident} {...box('escalate')} />}
+              {p.can_merge && <MergeAction incident={incident} {...box('merge')} />}
               {p.can_delete && (
                 <ActionBlock id="delete">
+                  <ErrorText alert>{box('delete').err?.message}</ErrorText>
                   <Button fullWidth variant="contained" color="error" onClick={handleDelete}>
                     Delete incident
                   </Button>

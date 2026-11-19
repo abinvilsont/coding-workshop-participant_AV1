@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import FieldError
 from app.api.deps import CurrentUser, DbSession
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User, UserRole
@@ -24,7 +25,7 @@ def register(body: RegisterIn, db: DbSession):
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.") from exc
+        raise FieldError(status.HTTP_409_CONFLICT, "email", "An account with this email already exists.") from exc
     return {"user": UserOut.from_user(user)}
 
 
@@ -33,9 +34,9 @@ def login(body: LoginIn, db: DbSession):
     """Sign in any persona; returns a bearer token valid for 8 hours."""
     user = db.scalar(select(User).where(User.email == body.email))
     if not verify_password(body.password, user.password_hash if user else None) or user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password.")
+        raise FieldError(status.HTTP_401_UNAUTHORIZED, "password", "Invalid email or password.")
     if not user.is_active:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your account is disabled. Contact your Facility Admin.")
+        raise FieldError(status.HTTP_403_FORBIDDEN, "email", "Your account is disabled. Contact your Facility Admin.")
 
     db.execute(update(User).where(User.id == user.id).values(last_login_at=func.now()))
     db.commit()

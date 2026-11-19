@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { Context as ResponsiveContext } from 'react-responsive';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FACILITIES, mockApi } from '../../test/mockApi';
 import Facilities from './Facilities';
+import { expectErrorAbove } from '../../test/fieldErrors';
 
 // A tiny in-memory facilities backend so every change is reloaded like the real one
 let tree;
@@ -115,6 +116,18 @@ describe('Facilities admin page', () => {
     await user.type(within(floor3).getByLabelText('New seat code'), '3-001');
     await user.click(within(floor3).getByRole('button', { name: 'Add seat' }));
     expect(await within(floor3).findByText('3-001')).toBeInTheDocument();
+  });
+
+  it('shows a clash right above the field that caused it, not at the top of the page', async () => {
+    const user = userEvent.setup();
+    const message = 'That seat code already exists on this floor.';
+    backend({ 'POST /seats': { status: 409, body: { message, errors: [{ loc: ['body', 'seat_code'], msg: message }] } } });
+    await renderPage();
+    const floor1 = screen.getByRole('region', { name: 'Floor 1' });
+    await user.type(within(floor1).getByLabelText('New seat code'), '1A-001');
+    await user.click(within(floor1).getByRole('button', { name: 'Add seat' }));
+    await waitFor(() => expectErrorAbove(within(floor1).getByLabelText('New seat code'), message));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('edits a building, a floor and a seat', async () => {

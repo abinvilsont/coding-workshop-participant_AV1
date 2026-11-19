@@ -4,6 +4,7 @@ import { Context as ResponsiveContext } from 'react-responsive';
 import { describe, expect, it, vi } from 'vitest';
 import { USERS, mockApi } from '../test/mockApi';
 import Login from './Login';
+import { expectErrorAbove } from '../test/fieldErrors';
 
 const input = (label) => screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
 
@@ -33,9 +34,11 @@ describe('Login page', () => {
     render(<Login />);
 
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    expect(input('Work email')).toHaveAccessibleDescription('Enter your work email.');
-    expect(input('Password')).toHaveAccessibleDescription('Enter your password.');
+    // no banner at the top: each message sits above its own field, and the cursor goes to the first
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expectErrorAbove(input('Work email'), 'Enter your work email.');
+    expectErrorAbove(input('Password'), 'Enter your password.');
+    await waitFor(() => expect(input('Work email')).toHaveFocus());
     expect(input('Work email')).toBeRequired();
 
     await fill(user, { 'Work email': 'me@gmail.com', Password: 'Password123!' });
@@ -55,6 +58,17 @@ describe('Login page', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.');
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+  });
+
+  it('shows a wrong password above the password field when the server names it', async () => {
+    const user = userEvent.setup();
+    const message = 'Invalid email or password.';
+    mockApi({ 'POST /auth/login': { status: 401, body: { message, errors: [{ loc: ['body', 'password'], msg: message }] } } });
+    render(<Login />);
+    await fill(user, { 'Work email': 'emma@acme.inc', Password: 'wrong-password' });
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expectErrorAbove(input('Password'), message));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('disables the button while signing in', async () => {
@@ -83,8 +97,9 @@ describe('Login page', () => {
       'Full name': 'Jane Doe', 'Work email': 'jane@acme.inc', Password: 'Password123!', 'Confirm password': 'Password123!',
     });
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    expect(input('Password')).toHaveAccessibleDescription('Password must be at most 72 characters.');
+    await waitFor(() => expectErrorAbove(input('Password'), 'Password must be at most 72 characters.'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await waitFor(() => expect(input('Password')).toHaveFocus());
   });
 
   it('registers an employee, then returns to sign in', async () => {
@@ -111,9 +126,9 @@ describe('Login page', () => {
 
     await fill(user, { 'Work email': 'jane@acme.inc', Password: 'short', 'Confirm password': 'short' });
     await user.click(screen.getByRole('button', { name: 'Create account' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
-    expect(input('Full name')).toHaveAccessibleDescription('Please enter your full name.');
-    expect(input('Password')).toHaveAccessibleDescription('Password must be at least 8 characters.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expectErrorAbove(input('Full name'), 'Please enter your full name.');
+    expectErrorAbove(input('Password'), 'Password must be at least 8 characters.');
 
     await fill(user, { 'Full name': 'Jane' });
     expect(input('Full name')).not.toHaveAttribute('aria-invalid', 'true'); // fixed as you type

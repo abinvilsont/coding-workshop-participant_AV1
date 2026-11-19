@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { USERS, incident, mockApi } from '../test/mockApi';
 import IncidentDetail from './IncidentDetail';
+import { expectErrorAbove } from '../test/fieldErrors';
 
 const NOTES = [
   { id: 1, body: 'Refrigerant is low.', is_internal: false, created_at: '2026-11-16T10:00:00Z', author_id: 2, author_name: 'Ethan Electrics', author_role: 'engineer' },
@@ -186,7 +187,8 @@ describe('IncidentDetail', () => {
     await within(assignBlock).findByRole('option', { name: /Tom Tech/ });
     await user.selectOptions(within(assignBlock).getByRole('combobox'), '4');
     await user.click(screen.getByRole('button', { name: 'Assign' }));
-    expect(await screen.findByText(message)).toBeInTheDocument();
+    // shown inside the Assign box, right above the engineer picker - not at the top of the page
+    await waitFor(() => expectErrorAbove(within(assignBlock).getByRole('combobox'), message));
   });
 
   it('edits details in place', async () => {

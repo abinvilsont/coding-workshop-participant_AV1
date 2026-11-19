@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, Chip, Grid, List, ListItemButton, ListItemText, Paper, Stack, Table,
-  TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
+  TableBody, TableCell, TableContainer, TableHead, TableRow, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { Section } from '../../components/Badges';
-import useAction from '../../hooks/useAction';
+import Field, { ErrorText } from '../../components/Field';
 import { useIsPhone } from '../../hooks/useResponsive';
 import {
   createBuilding, createFloor, createSeat, deleteBuilding, deleteFloor, deleteSeat,
@@ -19,6 +19,27 @@ const inactiveSx = (active) => (active ? {} : { opacity: 0.6 });
 
 function ActiveTag({ active }) {
   return active ? null : <Chip label="Inactive" size="small" sx={{ height: 20, fontSize: 11 }} />;
+}
+
+/**
+ * Runs one change through the page's `run` and keeps its error HERE, so it is shown
+ * beside the control that made it rather than at the top of the page.
+ * `fields` = messages for named fields; `general` = a message that names no field.
+ */
+function useLocalAction(run) {
+  const [err, setErr] = useState(null);
+  const act = async (fn) => {
+    setErr(null);
+    try {
+      return await run(fn);
+    } catch (e) {
+      setErr(e);
+      return undefined;
+    }
+  };
+  const fields = err?.fields ?? {};
+  const general = err && !Object.keys(fields).length ? err.message : '';
+  return { act, fields, general, clear: () => setErr(null) };
 }
 
 /** Small text buttons used for row actions (Edit / Deactivate / Delete). */
@@ -38,7 +59,7 @@ const EMPTY_BUILDING = { code: '', name: '', address: '', city: '', country: '' 
 
 const REQUIRED_BUILDING = { code: 'Enter a short code, e.g. HQ2.', name: 'Enter the building name.' };
 
-function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCancel, serverErrors = {}, busy = false }) {
+function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCancel, serverErrors = {}, error = '', busy = false }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_BUILDING,
     ...Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, v ?? ''])),
@@ -50,11 +71,11 @@ function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCance
     setEdited((t) => ({ ...t, [k]: true }));
   };
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
-  // Message under a field: a required field left empty, else the API's message for it
+  // Message above a field: a required field left empty, else the API's message for it
   const fieldProps = (k) => {
     const message = (REQUIRED_BUILDING[k] && touched[k] && !form[k].trim() && REQUIRED_BUILDING[k])
       || (!edited[k] && serverErrors[k]) || '';
-    return { error: Boolean(message), helperText: message || undefined, onBlur: blur(k), disabled: busy };
+    return { errorText: message || undefined, onBlur: blur(k), disabled: busy };
   };
   const submit = (e) => {
     e.preventDefault();
@@ -69,29 +90,30 @@ function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCance
   };
   return (
     <Box component="form" onSubmit={submit}>
-      <Grid container spacing={2}>
+      <Grid container spacing={2} sx={{ alignItems: 'flex-end' }}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField id="bld-code" label="Code" {...fieldProps('code')} value={form.code} onChange={set('code')} required
+          <Field id="bld-code" label="Code" {...fieldProps('code')} value={form.code} onChange={set('code')} required
             placeholder="HQ2" slotProps={{ htmlInput: { maxLength: 20 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 8 }}>
-          <TextField id="bld-name" label="Name" {...fieldProps('name')} value={form.name} onChange={set('name')} required
+          <Field id="bld-name" label="Name" {...fieldProps('name')} value={form.name} onChange={set('name')} required
             placeholder="ACME North Campus" slotProps={{ htmlInput: { maxLength: 150 } }} />
         </Grid>
         <Grid size={12}>
-          <TextField id="bld-address" label="Address (optional)" {...fieldProps('address')} value={form.address} onChange={set('address')}
+          <Field id="bld-address" label="Address (optional)" {...fieldProps('address')} value={form.address} onChange={set('address')}
             slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField id="bld-city" label="City (optional)" {...fieldProps('city')} value={form.city} onChange={set('city')}
+          <Field id="bld-city" label="City (optional)" {...fieldProps('city')} value={form.city} onChange={set('city')}
             slotProps={{ htmlInput: { maxLength: 100 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField id="bld-country" label="Country (optional)" {...fieldProps('country')} value={form.country} onChange={set('country')}
+          <Field id="bld-country" label="Country (optional)" {...fieldProps('country')} value={form.country} onChange={set('country')}
             slotProps={{ htmlInput: { maxLength: 100 } }} />
         </Grid>
       </Grid>
-      <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
+      <ErrorText alert sx={{ mt: 2 }}>{error}</ErrorText>
+      <Stack direction="row" spacing={1} sx={{ mt: error ? 0 : 2, justifyContent: 'flex-end' }}>
         <Button variant="outlined" color="inherit" onClick={onCancel} disabled={busy}>Cancel</Button>
         <Button type="submit" variant="contained" disabled={busy || !form.code.trim() || !form.name.trim()}>
           {submitLabel}
@@ -104,32 +126,37 @@ function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCance
 /* ------------------------------------------------------------ seats */
 
 function SeatActions({ seat, run, onEdit }) {
+  const { act, general } = useLocalAction(run);
   return (
-    <RowActions label={`Seat ${seat.seat_code} actions`}>
-      <ActionButton onClick={onEdit}>Edit</ActionButton>
-      <ActionButton onClick={() => run(() => updateSeat(seat.id, { is_active: !seat.is_active }))}>
-        {seat.is_active ? 'Deactivate' : 'Reactivate'}
-      </ActionButton>
-      <ActionButton
-        color="error"
-        onClick={() => window.confirm(`Delete seat ${seat.seat_code}?`) && run(() => deleteSeat(seat.id))}
-      >
-        Delete
-      </ActionButton>
-    </RowActions>
+    <Box>
+      <ErrorText alert>{general}</ErrorText>
+      <RowActions label={`Seat ${seat.seat_code} actions`}>
+        <ActionButton onClick={onEdit}>Edit</ActionButton>
+        <ActionButton onClick={() => act(() => updateSeat(seat.id, { is_active: !seat.is_active }))}>
+          {seat.is_active ? 'Deactivate' : 'Reactivate'}
+        </ActionButton>
+        <ActionButton
+          color="error"
+          onClick={() => window.confirm(`Delete seat ${seat.seat_code}?`) && act(() => deleteSeat(seat.id))}
+        >
+          Delete
+        </ActionButton>
+      </RowActions>
+    </Box>
   );
 }
 
 function useSeatEditor({ seat, run, onDone }) {
   const [code, setCode] = useState(seat.seat_code);
   const [desc, setDesc] = useState(seat.description ?? '');
+  const { act, fields, general } = useLocalAction(run);
   const save = async () => {
-    if (await run(() => updateSeat(seat.id, { seat_code: code.trim(), description: blankToNull(desc) }))) onDone();
+    if (await act(() => updateSeat(seat.id, { seat_code: code.trim(), description: blankToNull(desc) }))) onDone();
   };
   return {
-    code: <TextField value={code} onChange={(e) => setCode(e.target.value)}
+    code: <Field value={code} onChange={(e) => setCode(e.target.value)} errorText={fields.seat_code || general}
       slotProps={{ htmlInput: { 'aria-label': 'Seat code', maxLength: 30 } }} />,
-    desc: <TextField value={desc} onChange={(e) => setDesc(e.target.value)}
+    desc: <Field value={desc} onChange={(e) => setDesc(e.target.value)} errorText={fields.description}
       slotProps={{ htmlInput: { 'aria-label': 'Description', maxLength: 255 } }} />,
     actions: (
       <RowActions label={`Seat ${seat.seat_code} edit`}>
@@ -219,18 +246,22 @@ function SeatList({ seats, run }) {
 function AddSeat({ floorId, run }) {
   const [code, setCode] = useState('');
   const [desc, setDesc] = useState('');
+  const { act, fields, general } = useLocalAction(run);
   const submit = async (e) => {
     e.preventDefault();
-    if (await run(() => createSeat({ floor_id: floorId, seat_code: code.trim(), description: blankToNull(desc) }))) {
+    if (await act(() => createSeat({ floor_id: floorId, seat_code: code.trim(), description: blankToNull(desc) }))) {
       setCode('');
       setDesc('');
     }
   };
   return (
-    <Stack component="form" onSubmit={submit} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>
-      <TextField value={code} onChange={(e) => setCode(e.target.value)} placeholder="Seat code, e.g. 3A-042"
+    <Stack component="form" onSubmit={submit} direction={{ xs: 'column', sm: 'row' }} spacing={1}
+      sx={{ mt: 1.5, alignItems: { sm: 'flex-end' } }}>
+      <Field value={code} onChange={(e) => setCode(e.target.value)} placeholder="Seat code, e.g. 3A-042"
+        errorText={fields.seat_code || general} sx={{ flex: 1 }}
         slotProps={{ htmlInput: { 'aria-label': 'New seat code', maxLength: 30 } }} />
-      <TextField value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)"
+      <Field value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)"
+        errorText={fields.description} sx={{ flex: 1 }}
         slotProps={{ htmlInput: { 'aria-label': 'New seat description', maxLength: 255 } }} />
       <Button type="submit" variant="outlined" startIcon={<AddIcon />} disabled={!code.trim()} sx={{ flexShrink: 0 }}>
         Add seat
@@ -245,6 +276,8 @@ function FloorBlock({ floor, run }) {
   const [editing, setEditing] = useState(false);
   const [number, setNumber] = useState(String(floor.floor_number));
   const [name, setName] = useState(floor.name ?? '');
+  const edit = useLocalAction(run);
+  const rowAction = useLocalAction(run);
   const activeSeats = floor.seats.filter((s) => s.is_active).length;
 
   return (
@@ -255,17 +288,19 @@ function FloorBlock({ floor, run }) {
       sx={{ p: 2, mb: 2, bgcolor: floor.is_active ? 'background.paper' : 'action.hover' }}
     >
       {editing ? (
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <TextField type="number" value={number} onChange={(e) => setNumber(e.target.value)} sx={{ width: { sm: 100 } }}
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-end' } }}>
+          <Field type="number" value={number} onChange={(e) => setNumber(e.target.value)} sx={{ width: { sm: 160 } }}
+            errorText={edit.fields.floor_number || edit.general}
             slotProps={{ htmlInput: { 'aria-label': 'Floor number' } }} />
-          <TextField value={name} onChange={(e) => setName(e.target.value)} placeholder="Floor name"
+          <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="Floor name" sx={{ flex: 1 }}
+            errorText={edit.fields.name}
             slotProps={{ htmlInput: { 'aria-label': 'Floor name', maxLength: 100 } }} />
           <Button variant="outlined" color="inherit" onClick={() => setEditing(false)}>Cancel</Button>
           <Button
             variant="contained"
             disabled={number === ''}
             onClick={async () => {
-              if (await run(() => updateFloor(floor.id, { floor_number: Number(number), name: blankToNull(name) }))) {
+              if (await edit.act(() => updateFloor(floor.id, { floor_number: Number(number), name: blankToNull(name) }))) {
                 setEditing(false);
               }
             }}
@@ -281,20 +316,23 @@ function FloorBlock({ floor, run }) {
             <ActiveTag active={floor.is_active} />
             <Typography variant="caption" color="text.secondary">{plural(activeSeats, 'active seat')}</Typography>
           </Stack>
-          <RowActions label={`Floor ${floor.floor_number} actions`}>
-            <ActionButton onClick={() => setEditing(true)}>Edit</ActionButton>
-            <ActionButton onClick={() => run(() => updateFloor(floor.id, { is_active: !floor.is_active }))}>
-              {floor.is_active ? 'Deactivate' : 'Reactivate'}
-            </ActionButton>
-            <ActionButton
-              color="error"
-              onClick={() =>
-                window.confirm(`Delete floor ${floor.floor_number} and its seats?`) && run(() => deleteFloor(floor.id))
-              }
-            >
-              Delete
-            </ActionButton>
-          </RowActions>
+          <Box>
+            <ErrorText alert>{rowAction.general}</ErrorText>
+            <RowActions label={`Floor ${floor.floor_number} actions`}>
+              <ActionButton onClick={() => { edit.clear(); setEditing(true); }}>Edit</ActionButton>
+              <ActionButton onClick={() => rowAction.act(() => updateFloor(floor.id, { is_active: !floor.is_active }))}>
+                {floor.is_active ? 'Deactivate' : 'Reactivate'}
+              </ActionButton>
+              <ActionButton
+                color="error"
+                onClick={() =>
+                  window.confirm(`Delete floor ${floor.floor_number} and its seats?`) && rowAction.act(() => deleteFloor(floor.id))
+                }
+              >
+                Delete
+              </ActionButton>
+            </RowActions>
+          </Box>
         </Stack>
       )}
 
@@ -307,18 +345,22 @@ function FloorBlock({ floor, run }) {
 function AddFloor({ buildingId, run }) {
   const [number, setNumber] = useState('');
   const [name, setName] = useState('');
+  const { act, fields, general } = useLocalAction(run);
   const submit = async (e) => {
     e.preventDefault();
-    if (await run(() => createFloor({ building_id: buildingId, floor_number: Number(number), name: blankToNull(name) }))) {
+    if (await act(() => createFloor({ building_id: buildingId, floor_number: Number(number), name: blankToNull(name) }))) {
       setNumber('');
       setName('');
     }
   };
   return (
-    <Stack component="form" onSubmit={submit} direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-      <TextField type="number" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="No."
-        sx={{ width: { sm: 100 } }} slotProps={{ htmlInput: { 'aria-label': 'New floor number' } }} />
-      <TextField value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Third Floor - Sales"
+    <Stack component="form" onSubmit={submit} direction={{ xs: 'column', sm: 'row' }} spacing={1}
+      sx={{ alignItems: { sm: 'flex-end' } }}>
+      <Field type="number" value={number} onChange={(e) => setNumber(e.target.value)} placeholder="No."
+        errorText={fields.floor_number || general} sx={{ width: { sm: 160 } }}
+        slotProps={{ htmlInput: { 'aria-label': 'New floor number' } }} />
+      <Field value={name} onChange={(e) => setName(e.target.value)} placeholder="Name, e.g. Third Floor - Sales"
+        errorText={fields.name} sx={{ flex: 1 }}
         slotProps={{ htmlInput: { 'aria-label': 'New floor name', maxLength: 100 } }} />
       <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={number === ''} sx={{ flexShrink: 0 }}>
         Add floor
@@ -334,7 +376,7 @@ export default function Facilities() {
   const [selectedId, setSelectedId] = useState(null);
   const [mode, setMode] = useState('view'); // view | new | edit
   const [loadError, setLoadError] = useState('');
-  const { run: runRaw, busy, error, setError, fields } = useAction();
+  const [busy, setBusy] = useState(false);
 
   // State is set in promise callbacks, so calling load() from an effect is safe.
   const load = useCallback(
@@ -351,22 +393,32 @@ export default function Facilities() {
     load();
   }, [load]);
 
-  // Every change reloads the tree so counts and states stay accurate
+  // Every change reloads the tree so counts and states stay accurate. Errors are
+  // re-thrown to the part of the page that made the change (useLocalAction), which
+  // shows them beside its own fields or buttons.
   const run = useCallback(
     async (fn) => {
-      const result = await runRaw(fn);
-      if (result !== undefined) await load();
-      return result;
+      setBusy(true);
+      try {
+        const result = await fn();
+        await load();
+        return result ?? true;
+      } finally {
+        setBusy(false);
+      }
     },
-    [runRaw, load],
+    [load],
   );
+  const newBuilding = useLocalAction(run);
+  const editBuilding = useLocalAction(run);
+  const buildingAction = useLocalAction(run);
 
   const building = tree?.find((b) => b.id === selectedId);
 
   const select = (id) => {
     setSelectedId(id);
     setMode('view');
-    setError('');
+    buildingAction.clear();
   };
 
   return (
@@ -379,12 +431,12 @@ export default function Facilities() {
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0 }}
-          onClick={() => { setMode('new'); setError(''); }}>
+          onClick={() => { setMode('new'); newBuilding.clear(); }}>
           Add building
         </Button>
       </Stack>
 
-      {(loadError || error) && <Alert severity="error" sx={{ mb: 2 }}>{loadError || error}</Alert>}
+      {loadError && <Alert severity="error" sx={{ mb: 2 }}>{loadError}</Alert>}
       {!tree && !loadError && <Typography color="text.secondary">Loading facilities…</Typography>}
 
       {tree && (
@@ -421,12 +473,13 @@ export default function Facilities() {
             {mode === 'new' && (
               <Section title="New building">
                 <BuildingForm
-                  serverErrors={fields}
+                  serverErrors={newBuilding.fields}
+                  error={newBuilding.general}
                   busy={busy}
                   submitLabel="Create building"
                   onCancel={() => setMode('view')}
                   onSubmit={async (body) => {
-                    const created = await run(() => createBuilding(body));
+                    const created = await newBuilding.act(() => createBuilding(body));
                     if (created) {
                       setSelectedId(created.id);
                       setMode('view');
@@ -447,41 +500,46 @@ export default function Facilities() {
                 }
                 aside={
                   mode === 'view' && (
-                    <Stack direction="row" spacing={1} role="group" aria-label="Building actions" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-                      <Button size="small" variant="outlined" color="inherit" onClick={() => setMode('edit')}>Edit</Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="inherit"
-                        onClick={() => run(() => updateBuilding(building.id, { is_active: !building.is_active }))}
-                      >
-                        {building.is_active ? 'Deactivate' : 'Reactivate'}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        color="error"
-                        onClick={() =>
-                          window.confirm(`Delete ${building.name} with all its floors and seats?`) &&
-                          run(() => deleteBuilding(building.id))
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
+                    <Box>
+                      <ErrorText alert>{buildingAction.general}</ErrorText>
+                      <Stack direction="row" spacing={1} role="group" aria-label="Building actions" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                        <Button size="small" variant="outlined" color="inherit"
+                          onClick={() => { editBuilding.clear(); setMode('edit'); }}>Edit</Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="inherit"
+                          onClick={() => buildingAction.act(() => updateBuilding(building.id, { is_active: !building.is_active }))}
+                        >
+                          {building.is_active ? 'Deactivate' : 'Reactivate'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() =>
+                            window.confirm(`Delete ${building.name} with all its floors and seats?`) &&
+                            buildingAction.act(() => deleteBuilding(building.id))
+                          }
+                        >
+                          Delete
+                        </Button>
+                      </Stack>
+                    </Box>
                   )
                 }
               >
                 {mode === 'edit' ? (
                   <BuildingForm
                     key={building.id}
-                    serverErrors={fields}
+                    serverErrors={editBuilding.fields}
+                    error={editBuilding.general}
                     busy={busy}
                     initial={building}
                     submitLabel="Save changes"
                     onCancel={() => setMode('view')}
                     onSubmit={async (body) => {
-                      if (await run(() => updateBuilding(building.id, body))) setMode('view');
+                      if (await editBuilding.act(() => updateBuilding(building.id, body))) setMode('view');
                     }}
                   />
                 ) : (

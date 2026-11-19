@@ -8,6 +8,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.errors import FieldError
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.core.security import hash_password
 from app.models import ACTIVE_STATUSES, Building, EngineerProfile, EngineerReview, Incident, User, UserRole
@@ -52,7 +53,7 @@ def _engineer_or_404(db: Session, engineer_id: int) -> dict:
 
 def _check_building(db: Session, building_id: int | None):
     if building_id is not None and db.get(Building, building_id) is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Home building not found.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "home_building_id", "Home building not found.")
 
 
 @router.get("")
@@ -78,7 +79,7 @@ def create_engineer(body: EngineerCreate, db: DbSession, admin: AdminUser):
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.") from exc
+        raise FieldError(status.HTTP_409_CONFLICT, "email", "An account with this email already exists.") from exc
 
     db.add(EngineerProfile(
         user_id=user.id,
@@ -147,11 +148,11 @@ def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin
 
     for k in ("name", "specializations", "availability", "max_active_tickets", "is_active"):
         if k in changes and changes[k] is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{k} cannot be cleared.")
+            raise FieldError(status.HTTP_400_BAD_REQUEST, k, f"{k} cannot be cleared.")
     if "home_building_id" in changes:
         _check_building(db, changes["home_building_id"])
     if user.id == admin.id and changes.get("is_active") is False:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can't deactivate yourself.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "is_active", "You can't deactivate yourself.")
     if changes.get("is_active") is False:
         active = db.scalar(
             select(func.count()).select_from(Incident).where(
@@ -159,8 +160,8 @@ def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin
             )
         )
         if active:
-            raise HTTPException(
-                status.HTTP_409_CONFLICT,
+            raise FieldError(
+                status.HTTP_409_CONFLICT, "is_active",
                 f"{user.full_name} still has {active} active ticket(s). Reassign them first.",
             )
 

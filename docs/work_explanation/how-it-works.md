@@ -194,7 +194,7 @@ Every error comes back as `{"message": "..."}` in plain English, and the page sh
 
 | Code | When it happens | What you see |
 | --- | --- | --- |
-| 400 | A rule or field check failed, such as a wrong location, a missing field or an invalid email | "Please fix the highlighted fields." with the reason under each field, or one reason at the top, for example "That floor is not in the selected building." |
+| 400 | A rule or field check failed, such as a wrong location, a missing field or an invalid email | The reason in red directly above the field it's about, for example "That floor is not in the selected building." above Floor, and the cursor moves to the first one. Nothing appears at the top of the page. |
 | 401 | No token, an expired token (after 8 hours), or a deactivated account | You are signed out and sent back to the login page. A wrong password does not sign you out; it just shows the error. |
 | 403 | Your role isn't allowed to do this | "You can't change this incident from X to Y." or "You don't have permission to do that." |
 | 404 | The incident doesn't exist **or** you aren't allowed to see it | "Incident not found." The same answer for both, so nobody can guess other people's incidents. |
@@ -243,6 +243,7 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Duplicates are merged: the copy is cancelled and its reporter follows the main incident | One problem gets one engineer and one fix, and nobody is left without updates. Only the original reporter confirms the fix, so that decision stays with one person. Cancelled (not a new status) is used because the database requires an engineer for every other status. |
 | Reviews filtered on the server, never shown to engineers | Hiding them only in the UI would still send them to the engineer's browser. Filtering in one function (visible\_reviews) keeps employees' feedback honest. Each review stores the engineer at the time, so a later reassignment can't move a rating to someone else. |
 | Light and dark mode with a sun/moon button, following the device until you pick | Both colour sets live in one theme file as CSS variables, so switching only flips a class on the page and nothing reloads. The choice is saved in the browser, and a tiny script applies it before the app starts, so the screen never flashes white. No server change was needed. |
+| Errors shown above the field they're about, never in a banner at the top | People look at the field they just filled, not the top of the page, which may be scrolled away. The API names the field in the same errors list it uses for invalid input, so rule errors (a duplicate email, a full engineer) land in the right place too. Errors that name no field sit just above the button that was clicked. |
 
 **Reliability**
 

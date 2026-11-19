@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 17 · reflects local <code>main</code> @ <code>241e051</code> + uncommitted dark mode</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 18 · reflects local <code>main</code> @ <code>9e8042e</code> + uncommitted error placement</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -939,7 +939,7 @@ a { color: var(--accent); }
         <li><code>App.jsx</code> · <code>router.js</code>: hash routes <code>#/</code>, <code>#/incidents</code>, <code>#/incidents/new</code>, <code>#/incidents/:id</code>, <code>#/admin/facilities</code>, <code>#/admin/engineers</code> (admin only)</li>
         <li><code>pages/</code>: Login, Dashboard (engineer availability switch), IncidentList, NewIncident, IncidentDetail</li>
         <li><code>pages/admin/</code>: Facilities, Engineers</li>
-        <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints)</li>
+        <li><code>components/</code>: AppLayout (role-based nav; menu drawer on phones), NotificationBell, IncidentForm, IncidentTable (table, or cards on phones), Badges (status/priority chips, StatCard, Section), Reviews (stars), ThemeToggle (light ⇄ dark), Field (errors above the input) · <code>hooks/useAction</code>, <code>hooks/useResponsive</code> (React Responsive breakpoints)</li>
         <li><code>theme.js</code>: the Material UI theme with light and dark colour schemes as CSS variables (brand colours, chip colours for both schemes, type scale); <code>index.html</code> applies the saved scheme before React loads</li>
         <li><code>services/</code>: apiClient (token, 401 sign-out), authService, incidentService, adminService, notificationService</li>
       </ul>
@@ -1007,6 +1007,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 18</span>
+      <span class="log-what">Errors shown above the field that caused them</span>
+      <span class="log-detail">Rule errors about one field now name it: <code>FieldError</code> (<code>app/core/errors.py</code>) adds <code>errors: [{loc, msg}]</code> to the response, as validation errors already did (duplicate email → <code>email</code>, full or on-leave engineer → <code>engineer_id</code>, floor from another building → <code>floor_id</code>, building/floor/seat clashes, merge target, requested priority, engineer deactivation). The frontend's new <code>Field</code> component shows each message directly above its input and focuses the first; the "Please fix the highlighted fields" banners are gone. Errors naming no field sit just above the button that was clicked, and every incident action box and Facilities row keeps its own error. +7 backend tests (254), +3 frontend tests (117), 14 E2E pass.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 17</span>
       <span class="log-what">Light and dark mode</span>

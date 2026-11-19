@@ -7,6 +7,7 @@ from sqlalchemy import case, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import FieldError
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models import (
     FINAL_STATUSES, EngineerAvailability, EngineerProfile, EngineerReview, Incident, IncidentNote,
@@ -87,8 +88,8 @@ def list_incidents(
 def create_incident(body: IncidentCreate, db: DbSession, user: CurrentUser):
     """Report a new incident. Only admins may open one as 'critical'."""
     if body.priority == IncidentPriority.CRITICAL and not user.is_admin:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
+        raise FieldError(
+            status.HTTP_400_BAD_REQUEST, "priority",
             "Choose low, medium or high. Use escalation to request critical priority.",
         )
     svc.validate_location(db, body.building_id, body.floor_id, body.seat_id)
@@ -199,10 +200,10 @@ def assign_engineer(incident_id: int, body: AssignIn, db: DbSession, user: Admin
     profile = db.get(EngineerProfile, body.engineer_id, with_for_update=True)
     engineer = db.get(User, body.engineer_id)
     if profile is None or engineer is None or not engineer.is_active:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That engineer doesn't exist or is inactive.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "engineer_id", "That engineer doesn't exist or is inactive.")
     if profile.availability in UNASSIGNABLE:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
+        raise FieldError(
+            status.HTTP_400_BAD_REQUEST, "engineer_id",
             f"{engineer.full_name} is {profile.availability.value.replace('_', ' ')} and can't take new tickets.",
         )
 
@@ -228,8 +229,8 @@ def _check_capacity(db, engineer: User) -> None:
         {"id": engineer.id},
     ).one()
     if load.active_tickets >= load.max_active_tickets:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
+        raise FieldError(
+            status.HTTP_409_CONFLICT, "engineer_id",
             f"{engineer.full_name} is at full capacity ({load.active_tickets}/{load.max_active_tickets} active tickets). "
             "Choose another engineer, or raise their limit on the Engineers page.",
         )
@@ -242,7 +243,7 @@ def escalate(incident_id: int, body: EscalateIn, db: DbSession, user: CurrentUse
     if not perms.can_escalate(user, inc):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This incident can't be escalated.")
     if body.requested_priority and body.requested_priority.rank <= inc.priority.rank:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Requested priority must be higher than the current one.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "requested_priority", "Requested priority must be higher than the current one.")
 
     inc.is_escalated = True
     inc.escalated_at = _now()
@@ -301,7 +302,7 @@ def merge(incident_id: int, body: MergeIn, db: DbSession, user: AdminUser):
     already following it) follows the target from now on, so they get every update.
     """
     if body.target_id == incident_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "An incident can't be merged into itself.")
+        raise FieldError(status.HTTP_400_BAD_REQUEST, "target_id", "An incident can't be merged into itself.")
     # Lock both rows (in id order, so two opposite merges can't deadlock)
     db.execute(
         select(Incident.id).where(Incident.id.in_([incident_id, body.target_id])).order_by(Incident.id).with_for_update()
@@ -316,8 +317,8 @@ def merge(incident_id: int, body: MergeIn, db: DbSession, user: AdminUser):
     if source.status in FINAL_STATUSES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Closed or cancelled incidents can't be merged.")
     if target.status in FINAL_STATUSES or target.merged_into_id:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, f"{target.reference} is closed or cancelled. Merge into an open incident."
+        raise FieldError(
+            status.HTTP_400_BAD_REQUEST, "target_id", f"{target.reference} is closed or cancelled. Merge into an open incident."
         )
 
     source_reporters = notify.reporters(source)
@@ -377,7 +378,7 @@ def create_review(incident_id: int, body: ReviewIn, db: DbSession, user: Current
     inc = svc.get_incident_or_404(db, incident_id, user)
     _check_can_review(user, inc)
     if perms.own_review(user, inc):
-        raise HTTPException(status.HTTP_409_CONFLICT, "You've already reviewed this engineer. Edit your review instead.")
+        raise FieldError(status.HTTP_409_CONFLICT, "rating", "You've already reviewed this engineer. Edit your review instead.")
     db.add(EngineerReview(
         incident_id=inc.id, engineer_id=inc.assigned_engineer_id, reviewer_id=user.id,
         rating=body.rating, comment=body.comment,
