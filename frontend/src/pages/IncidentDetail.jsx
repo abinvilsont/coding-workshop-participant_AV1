@@ -595,6 +595,10 @@ export default function IncidentDetail({ id, user }) {
   const [actionError, setActionError] = useState(null); // { box, message, fields } of the last failed action
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  // updated_at of the copy the edit form started from; the API refuses the save (409)
+  // if someone changed the incident since, so neither person's change is lost
+  const [editBase, setEditBase] = useState(null);
+  const [editConflict, setEditConflict] = useState('');
 
   // State is set in promise callbacks, so calling load() from an effect is safe.
   const load = useCallback(
@@ -625,11 +629,20 @@ export default function IncidentDetail({ id, user }) {
       return true;
     } catch (err) {
       setActionError({ box, message: err.message, fields: err.fields ?? {} });
+      // Refused because the incident changed meanwhile (someone else acted first):
+      // show its current state so the buttons match it again
+      if (err.status === 403 || err.status === 409) load();
       return false;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [load]);
+
+  const startEditing = () => {
+    setEditBase(incident.updated_at);
+    setEditConflict('');
+    setEditing(true);
+  };
 
   if (error) {
     return (
@@ -647,8 +660,16 @@ export default function IncidentDetail({ id, user }) {
     run: (action) => run(action, name),
     err: actionError?.box === name ? actionError : null,
   });
-  const hasActions =
-    p.status_transitions.length || p.can_assign || p.can_set_priority || p.can_escalate || p.can_merge || p.can_delete;
+  // Which action boxes this person still has. After a refused action the page reloads,
+  // and the box that failed may be gone (e.g. no status moves left): its message is
+  // then shown at the top of the Actions panel instead, so it never disappears.
+  const shownBoxes = {
+    status: p.status_transitions.length > 0, assign: p.can_assign, priority: p.can_set_priority,
+    escalate: p.can_escalate, merge: p.can_merge, delete: p.can_delete,
+  };
+  const orphanError = actionError && actionError.box in shownBoxes && !shownBoxes[actionError.box]
+    ? actionError.message : '';
+  const hasActions = Object.values(shownBoxes).some(Boolean) || Boolean(orphanError);
   const me = incident.followers?.find((f) => f.id === user.id);
   // Followers who found this incident while reporting and asked for it to be escalated
   const askedToEscalate = (incident.followers ?? []).filter((f) => f.escalation_requested_at);
@@ -688,7 +709,7 @@ export default function IncidentDetail({ id, user }) {
           </Stack>
         </Box>
         {p.can_edit && !editing && (
-          <Button variant="outlined" onClick={() => setEditing(true)} sx={{ flexShrink: 0 }}>
+          <Button variant="outlined" onClick={startEditing} sx={{ flexShrink: 0 }}>
             Edit details
           </Button>
         )}
@@ -733,13 +754,27 @@ export default function IncidentDetail({ id, user }) {
                 submitLabel="Save changes"
                 onCancel={() => setEditing(false)}
                 onSubmit={async (payload) => {
-                  setIncident(await updateIncident(incident.id, payload));
-                  setEditing(false);
+                  try {
+                    setIncident(await updateIncident(incident.id, { ...payload, expected_updated_at: editBase }));
+                    setEditing(false);
+                  } catch (err) {
+                    if (err.status !== 409) throw err; // shown in the form, above its buttons
+                    // Someone saved first: show their version instead of overwriting it
+                    setEditConflict(err.message);
+                    setEditing(false);
+                    await load();
+                  }
                 }}
               />
             </Section>
           ) : (
             <Section title="Description">
+              {editConflict && (
+                <Alert severity="warning" role="alert" sx={{ mb: 2 }} onClose={() => setEditConflict('')}>
+                  Your changes weren't saved: someone updated this incident while you were editing. This is the
+                  latest version; edit again if you still need to.
+                </Alert>
+              )}
               <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{incident.description}</Typography>
               {incident.is_escalated && incident.escalation_reason && (
                 <Alert severity="error" variant="outlined" sx={{ mt: 2 }}>
@@ -835,6 +870,11 @@ export default function IncidentDetail({ id, user }) {
 
           {hasActions ? (
             <Section title="Actions">
+              {orphanError && (
+                <ActionBlock id="refused">
+                  <ErrorText alert>{orphanError}</ErrorText>
+                </ActionBlock>
+              )}
               <StatusActions incident={incident} {...box('status')} />
               {p.can_assign && <AssignAction incident={incident} {...box('assign')} />}
               {p.can_set_priority && <PriorityAction incident={incident} {...box('priority')} />}

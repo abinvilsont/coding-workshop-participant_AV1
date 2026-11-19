@@ -167,9 +167,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 295 | 99 % |
-| Frontend: Vitest + React Testing Library | 126 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 15 | every critical journey |
+| Backend: pytest, unit + integration on a throwaway database | 321 | 99 % |
+| Frontend: Vitest + React Testing Library | 144 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 17 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -248,6 +248,16 @@ sample password is `Password123!`.
   loads, so the page doesn't flash white.
 - **Engineer capacity is enforced on the server** with a row lock, so two admins
   can't both fill an engineer's last slot.
+- **People acting on the same incident at once never overwrite each other.**
+  - Every request that changes an incident locks its row first. A second request
+    waits, then re-checks its rules against what the first one saved. For example, a
+    cancel that arrives just after "Start work" is refused (403) instead of silently
+    winning.
+  - The edit form sends the version it started from (`expected_updated_at`). If
+    someone saved in between, the API answers 409, and the page shows their version
+    with a warning instead of overwriting it.
+  - Any refused action reloads the incident, so the buttons match its current
+    state.
 - **Merging a duplicate cancels it rather than adding a new status.**
   - The database already requires an engineer for any status other than
     Open or Cancelled, and a duplicate often has none.

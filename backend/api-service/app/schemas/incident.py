@@ -48,6 +48,9 @@ class IncidentUpdate(BaseModel):
     # admin only
     priority: IncidentPriority | None = None
     is_escalated: bool | None = None
+    # The incident's updated_at when the editor loaded it. If it changed since (someone
+    # else saved first), the edit is refused with 409 instead of overwriting their change.
+    expected_updated_at: datetime | None = None
 
 
 class StatusChange(BaseModel):

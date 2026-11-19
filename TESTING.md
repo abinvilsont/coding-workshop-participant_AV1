@@ -28,9 +28,9 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 313 | all pass, ~20 s | **99 %** of `app/` (1660 statements, 14 missed) |
-| Frontend (Vitest) | 142 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
-| End-to-end (Playwright) | 16 | all pass, ~90 s | every critical user path (below) |
+| Backend (pytest) | 321 | all pass, ~22 s | **99 %** of `app/` (1670 statements, 14 missed) |
+| Frontend (Vitest) | 144 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| End-to-end (Playwright) | 17 | all pass, ~90 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
 Both coverage runs enforce a minimum of 80 % and fail below it.
@@ -73,6 +73,7 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
 | `test_admin_tasks.py` | the Lambda's database tasks: `init_db` on an empty database (tables, admin, random JWT key, pooled connection left in normal mode), refuses a database with tables, sample data warns about passwords, input checks before touching anything, `migrate` repeatable and restores a missing key, `status` on a database from before `app_secrets`, direct invocations vs Function URL requests, tokens signed with the stored key |
+| `test_concurrency.py` | two changes to one incident at the same moment, made deterministic by holding the first transaction open: a cancel arriving just after "start work" is refused (and vice versa), a note waits for a close and is refused, changes to different fields are both kept; stale edits (`expected_updated_at`) get 409, current ones save, clients that don't send it still work. The race tests fail if the row lock is removed |
 | `test_users.py` | People admin: list and filter, make admin and back (takes effect on the next request, the person is notified), deactivate signs out and blocks sign-in, reactivate, not yourself, engineers refused, two admins demoting each other at once leave one admin (409), admins only, bad input |
 | `test_escalation_requests.py` | finding open incidents like a new report (same building + category + floor; resolved, closed and merged ignored; nothing about the reporter), `relation` for your own / followed ones; requesting escalation: follower, escalated with reason, note, history under the requester, notifications to reporter / engineer / admins, an already-escalated incident keeps its reason, once per employee, merged followers can ask once, refusals (own incident, resolved, admin, engineer, unknown, merged), reason length |
 | `test_reviews.py` | engineer reviews: reporter and follower each review once a closed incident, engineers never see reviews (incident detail, engineer endpoints, own profile, notifications), admins see all plus the average (rounded to 1 dp), edit / delete / re-review, 409 on a second review, refused for admins, engineers, other employees and unclosed incidents, rating and comment validation, deleted with the incident |
@@ -92,7 +93,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `pwa` (static) | manifest fields and icons browsers need to install, icon files really have their stated sizes, page links, the service worker never caches `/api/` and only precaches files that exist |
 | `NewIncident` | the "already reported" prompt: straight through when nothing matches, request escalation instead of a duplicate, refusal shown above the reason, report it anyway, back to the form, your own incident links instead, a failed check never blocks reporting, admins skip it, save errors inside the prompt |
 | `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
-| `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
+| `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes; edits send the version they started from, a stale edit closes the form on the latest version with a warning, a refused action reloads the incident and keeps its message visible even when its box disappears |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
 | `IncidentList` | filters and search sent to the API, role headings, paging, errors |
@@ -112,6 +113,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `access.spec.js` | registration (domain check, duplicate), wrong password, employee blocked from admin pages, engineer sees only own tickets, "cannot reach the server" message |
 | `admin.spec.js` | admin builds a building/floor/seat, the employee can pick it, then it is deleted; building in use cannot be deleted; admin creates an engineer who signs in and sets availability |
 | `reviews.spec.js` | the employee closes a fixed incident and rates the engineer; the engineer sees no trace of it; the admin sees it on the incident and in the engineer's reviews |
+| `parallel-updates.spec.js` | Emma cancels from a page still showing "Assigned" just after Tom started work: refused with a clear message and her page catches up; the admin saves an edit after Tom put the ticket on hold: warned, nothing overwritten, editing again saves |
 | `people.spec.js` | the admin makes a newly registered employee a Facility Admin (they get the admin pages), then deactivates them (their next page load signs them out) |
 | `already-reported.spec.js` | Emma reports a jammed printer; Liam starts reporting it too, is told it's already reported and requests escalation; he lands on Emma's incident as a follower, it's escalated, Emma and the admin are told, and a second attempt shows he's already following |
 | `merge.spec.js` | two employees report the same leak, the admin merges and assigns it, the engineer resolves it, both employees are notified and only the original reporter can close it |

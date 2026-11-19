@@ -84,6 +84,13 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
   the engineer. Admins see every review, an employee sees their own, and engineers
   see none (`visible_reviews()`).
 
+**Concurrency.** Every route that changes an incident loads it with
+`get_incident_or_404(..., for_update=True)`, which locks the row until the
+transaction ends. Concurrent changes therefore run one at a time, and each re-checks
+its rules against the latest saved state. `PATCH /incidents/{id}` also accepts
+`expected_updated_at`; if the incident changed since that time, the answer is 409
+and nothing is saved.
+
 Status, assignment, priority and escalation changes are written to
 `incident_history` by a database trigger; the API sets `app.user_id` per request
 so the acting user is recorded.

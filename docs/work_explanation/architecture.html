@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 21 · reflects local <code>main</code> @ <code>0a9b21b</code>, deployed to AWS</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 22 · reflects local <code>main</code> @ <code>0aa6221</code> + uncommitted parallel-update locking</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -521,7 +521,7 @@ a { color: var(--accent); }
         <text class="l-emp" x="262" y="186">cancel</text>
       </svg>
     </div>
-    <figcaption>Each arrow is coloured by the role that normally makes the move; the rules live in <code>app/services/permissions.py</code>. A Facility Admin can also make any move once an engineer is assigned, and can close or cancel. Notes can be added in every state except <em>closed</em> and <em>cancelled</em>. Escalation and priority requests are available to the reporter from <em>open</em> through <em>on_hold</em>.</figcaption>
+    <figcaption>Each arrow is coloured by the role that normally makes the move; the rules live in <code>app/services/permissions.py</code>. A Facility Admin can also make any move once an engineer is assigned, and can close or cancel. Notes can be added in every state except <em>closed</em> and <em>cancelled</em>. Escalation and priority requests are available to the reporter from <em>open</em> through <em>on_hold</em>. Two people moving the same incident at once never overwrite each other: every change locks the incident row, so the second request waits and re-checks its rule against what the first saved (a cancel arriving just after "start work" gets 403), and an edit made from an outdated copy (<code>expected_updated_at</code>) gets 409.</figcaption>
   </figure>
 </section>
 
@@ -1025,6 +1025,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 22</span>
+      <span class="log-what">Parallel updates: row locks and stale-edit check</span>
+      <span class="log-detail">Every route that changes an incident (status, edit, assign, escalate, note, reviews, delete) now locks its row with <code>get_incident_or_404(..., for_update=True)</code>, so concurrent changes run one at a time and each re-checks its rules against the latest state; before, a reporter's cancel and an engineer's "start work" could both pass and the last one won. <code>PATCH /incidents/{id}</code> takes <code>expected_updated_at</code> and answers 409 if the incident changed meanwhile; the edit form sends it and, on 409, shows the latest version with a warning. A refused action reloads the incident and keeps its message visible. Race tests hold the first transaction open (they fail without the lock). +8 backend tests (321), +2 frontend (144), new E2E journey (17).</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 21</span>
       <span class="log-what">Token refresh, installable app, People admin</span>

@@ -42,7 +42,17 @@ def summary(inc: Incident) -> dict:
     }
 
 
-def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
+def get_incident_or_404(db: Session, incident_id: int, user: User, for_update: bool = False) -> Incident:
+    """Load an incident the user may see (else 404).
+
+    for_update=True locks its row until the transaction ends. Every route that
+    changes an incident uses it, so two people acting at once are handled one
+    after the other: the second request waits, then re-checks its rules against
+    what the first one saved (e.g. a cancel arriving just after "start work" is
+    refused instead of silently overwriting it).
+    """
+    if for_update:
+        db.execute(select(Incident.id).where(Incident.id == incident_id).with_for_update())
     inc = db.scalar(
         select(Incident)
         .options(
@@ -57,6 +67,7 @@ def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
             ),
         )
         .where(Incident.id == incident_id)
+        .execution_options(populate_existing=True)  # never trust a copy loaded before the lock
     )
     # Same 404 whether it doesn't exist or the user may not see it
     if inc is None or not perms.can_view(user, inc):

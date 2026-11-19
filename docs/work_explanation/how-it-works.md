@@ -115,6 +115,27 @@ A reopened incident goes back to the engineer as In progress. Cancelled and Clos
 
 Admins can make any status move, except that an incident with no engineer can only stay Open or be Cancelled. The database enforces that rule too. Any other move returns **403** with "You can't change this incident from X to Y."
 
+## Two people acting at once
+
+When an engineer and an employee act on the same incident at the same moment, nobody's change is silently overwritten. The second request waits for the first, then checks its rules again against what the first one saved.
+
+![The second request waits for the first, then re-checks against what it saved](images/parallel-updates.png)
+
+**What happens behind the scenes**
+
+1. **Every change locks the incident first.** Status changes, edits, assignment, escalation, notes, reviews and deletion all load the incident with a row lock (`get_incident_or_404(..., for_update=True)`). A second request on the same incident waits until the first commits, usually a few milliseconds.
+2. **The rules are re-checked after the wait.** The waiting request then sees what the first one saved. A cancel that arrives just after "Start work" is refused with **403** ("You can't change this incident from in\_progress to cancelled") instead of quietly winning.
+3. **Edits carry the version they started from.** The edit form sends `expected_updated_at`. If someone saved the incident in between, the API answers **409** and nothing is saved. The page closes the form, shows the latest version and says "Your changes weren't saved: someone updated this incident while you were editing."
+4. **A refused action refreshes the page.** After a 403 or 409, the incident is reloaded so the buttons match its real state, and the message stays visible even if the box it came from has gone.
+
+| At the same moment | Result |
+| --- | --- |
+| Two notes | Both are saved |
+| Edits to different fields (e.g. title and status) | Both are kept |
+| Two status changes, or a status change and a cancel | The first wins; the second is re-checked and refused if no longer allowed |
+| An edit saved after someone else's change | Refused with 409; the editor sees the new version |
+| Two admins assigning an engineer's last slot | One succeeds, the other gets 409 "at full capacity" |
+
 ## Merging duplicate reports
 
 When two employees report the same problem, an admin merges one report into the other. From then on there is one incident, one engineer and one fix, and both employees get every update.
@@ -338,3 +359,4 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Every error is `{"message": "..."}` | The page shows any error as it is, with no special cases, and stack traces never reach the browser. |
 | Retry the database connection for up to 25 s on AWS | Aurora Serverless pauses when idle to save cost; without the retry, the first visit after a quiet spell failed. Tested on the live site: 200 in 6.6 s after 7 idle minutes. |
 | Hand-written service worker that never caches the API | About 60 lines with no plugin to learn or update. App files are cached for speed and offline start; data always comes live, so nobody sees stale incidents or leaves private data on a shared device. |
+| Lock the incident row on every change, plus a version check on edits | Without it, two requests could both pass their rule check on the same old status and the last save would win, which let a reporter cancel work already started. The lock makes concurrent changes run one at a time and costs a few milliseconds per incident; it never blocks other incidents. The version check stops an edit from overwriting a change made while the form was open. |

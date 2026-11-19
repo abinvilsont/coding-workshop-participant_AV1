@@ -207,6 +207,60 @@ describe('IncidentDetail', () => {
 
     expect(await screen.findByRole('heading', { name: 'AC broken' })).toBeInTheDocument();
     expect(api.calls.at(-1).body).not.toHaveProperty('priority');
+    // tells the API which version the edit started from
+    expect(api.calls.at(-1).body.expected_updated_at).toBe('2026-11-17T09:00:00Z');
+  });
+
+  it('does not overwrite a change someone else saved while you were editing', async () => {
+    const user = userEvent.setup();
+    let current = incident({ status: 'open', permissions: { can_edit: true } });
+    const api = setup(current, {
+      'GET /incidents/4': () => current,
+      'GET /facilities': [],
+      'PATCH /incidents/4': () => {
+        // Tom renamed it a moment earlier
+        current = incident({ title: 'AC fixed by Tom', status: 'open', updated_at: '2026-11-17T10:00:00Z',
+          permissions: { can_edit: true } });
+        return { status: 409, body: { message: 'Someone updated this incident while you were editing.' } };
+      },
+    });
+    render(<IncidentDetail id={4} user={USERS.employee} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }));
+    await user.clear(screen.getByLabelText(/^Title/));
+    await user.type(screen.getByLabelText(/^Title/), 'My stale title');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    // the form closes on the latest version, with a warning where it was
+    expect(await screen.findByRole('heading', { name: 'AC fixed by Tom' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent("Your changes weren't saved: someone updated this incident");
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+
+    // editing again starts from the new version
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Title/)).toHaveValue('AC fixed by Tom');
+    expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
+  });
+
+  it('reloads the incident when an action is refused because it changed meanwhile', async () => {
+    const user = userEvent.setup();
+    let current = incident({ status: 'assigned', permissions: { status_transitions: ['cancelled'] } });
+    const api = setup(current, {
+      'GET /incidents/4': () => current,
+      'POST /incidents/4/status': () => {
+        current = incident({ status: 'in_progress', permissions: { status_transitions: [] } }); // Tom started work
+        return { status: 403, body: { message: "You can't change this incident from in_progress to cancelled." } };
+      },
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<IncidentDetail id={4} user={USERS.employee} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel incident' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('from in_progress to cancelled');
+    await waitFor(() => expect(screen.getByTestId('incident-badges')).toHaveTextContent('In progress'));
+    expect(screen.queryByRole('button', { name: 'Cancel incident' })).not.toBeInTheDocument();
+    expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
   });
 
   it('deletes after confirmation and returns to the list', async () => {

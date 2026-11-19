@@ -161,8 +161,14 @@ def get_incident(incident_id: int, db: DbSession, user: CurrentUser):
 @router.patch("/{incident_id}", response_model=IncidentDetail)
 def update_incident(incident_id: int, body: IncidentUpdate, db: DbSession, user: CurrentUser):
     """Edit details. Reporter: while 'open'. Admin: any time, incl. priority / de-escalation."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     changes = body.model_dump(exclude_unset=True)
+    expected = changes.pop("expected_updated_at", None)
+    if expected is not None and expected != inc.updated_at:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Someone updated this incident while you were editing. Reload to see their changes, then edit again.",
+        )
 
     admin_only = {"priority", "is_escalated"} & changes.keys()
     if admin_only and not user.is_admin:
@@ -202,7 +208,7 @@ def update_incident(incident_id: int, body: IncidentUpdate, db: DbSession, user:
 @router.delete("/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_incident(incident_id: int, db: DbSession, user: AdminUser):
     """Permanently delete an incident with its notes and history (admin only)."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     notify.incident_deleted(db, inc, user)
     db.delete(inc)
     _commit(db)
@@ -214,7 +220,7 @@ def delete_incident(incident_id: int, db: DbSession, user: AdminUser):
 @router.post("/{incident_id}/status", response_model=IncidentDetail)
 def change_status(incident_id: int, body: StatusChange, db: DbSession, user: CurrentUser):
     """Move the incident through its lifecycle (allowed moves depend on role)."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     if body.status not in perms.allowed_transitions(user, inc):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
@@ -241,7 +247,7 @@ def change_status(incident_id: int, body: StatusChange, db: DbSession, user: Cur
 @router.post("/{incident_id}/assign", response_model=IncidentDetail)
 def assign_engineer(incident_id: int, body: AssignIn, db: DbSession, user: AdminUser):
     """Assign or reassign an engineer (admin only)."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     if inc.status in (S.CLOSED, S.CANCELLED):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Closed or cancelled incidents can't be assigned.")
     # Lock the engineer's profile row until commit, so two admins assigning at
@@ -288,7 +294,7 @@ def _check_capacity(db, engineer: User) -> None:
 @router.post("/{incident_id}/escalate", response_model=IncidentDetail)
 def escalate(incident_id: int, body: EscalateIn, db: DbSession, user: CurrentUser):
     """Reporter escalates the incident and may request a higher priority."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     if not perms.can_escalate(user, inc):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This incident can't be escalated.")
     if body.requested_priority and body.requested_priority.rank <= inc.priority.rank:
@@ -307,7 +313,7 @@ def escalate(incident_id: int, body: EscalateIn, db: DbSession, user: CurrentUse
 @router.post("/{incident_id}/notes", response_model=IncidentDetail, status_code=status.HTTP_201_CREATED)
 def add_note(incident_id: int, body: NoteCreate, db: DbSession, user: CurrentUser):
     """Add a note. Internal notes (hidden from employees) are for engineers and admins."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     if not perms.can_add_note(user, inc):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Notes can only be added to open incidents.")
     if body.is_internal and not perms.can_add_internal_note(user, inc):
@@ -424,7 +430,7 @@ def _own_review_or_404(user: User, inc: Incident) -> EngineerReview:
 @router.post("/{incident_id}/review", response_model=IncidentDetail, status_code=status.HTTP_201_CREATED)
 def create_review(incident_id: int, body: ReviewIn, db: DbSession, user: CurrentUser):
     """Rate the engineer who fixed your closed incident (reporter or follower, once each)."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     _check_can_review(user, inc)
     if perms.own_review(user, inc):
         raise FieldError(status.HTTP_409_CONFLICT, "rating", "You've already reviewed this engineer. Edit your review instead.")
@@ -444,7 +450,7 @@ def create_review(incident_id: int, body: ReviewIn, db: DbSession, user: Current
 @router.patch("/{incident_id}/review", response_model=IncidentDetail)
 def update_review(incident_id: int, body: ReviewIn, db: DbSession, user: CurrentUser):
     """Change your rating or comment."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     review = _own_review_or_404(user, inc)
     review.rating = body.rating
     review.comment = body.comment
@@ -455,7 +461,7 @@ def update_review(incident_id: int, body: ReviewIn, db: DbSession, user: Current
 @router.delete("/{incident_id}/review", status_code=status.HTTP_204_NO_CONTENT)
 def delete_review(incident_id: int, db: DbSession, user: CurrentUser):
     """Withdraw your review."""
-    inc = svc.get_incident_or_404(db, incident_id, user)
+    inc = svc.get_incident_or_404(db, incident_id, user, for_update=True)
     db.delete(_own_review_or_404(user, inc))
     _commit(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
