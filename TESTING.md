@@ -74,7 +74,7 @@ CI installs from `package.json` (the lockfile isn't committed) with Node 24 and 
 
 **Integration tests** (`tests/integration/`) run against a real PostgreSQL database:
 - The run creates a throwaway `facility_desk_test` database from `backend/db/schema.sql`.
-- `seed.sql` is reloaded before every test, so each test starts from the same 17 users (2 admins, 5 engineers, 10 employees) and 7 incidents.
+- `seed.sql` is reloaded before every test, so each test starts from the same 17 users (2 admins, 5 engineers, 10 employees), 5 buildings (21 floors, 115 seats) and 7 incidents.
 - The database is dropped at the end. Your `postgres` database is never touched.
 
 | File | Covers |

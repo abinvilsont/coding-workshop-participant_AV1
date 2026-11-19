@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 27 · reflects local <code>main</code> @ <code>eb5c180</code> (app as deployed to AWS; later commits change only checks, test tooling, sample data and docs)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 28 · reflects local <code>main</code> @ <code>3d4aeaf</code> (app as deployed to AWS; later commits change only checks, test tooling, sample data and docs)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -976,7 +976,7 @@ a { color: var(--accent); }
       <span class="path">backend/db/ · bin/ · infra/</span>
       <ul>
         <li><code>schema.sql</code>: tables, enums, triggers, workload view</li>
-        <li><code>seed.sql</code>: demo data for a fresh database (wipes first): 2 admins, 5 engineers, 10 employees, 2 buildings, 7 incidents; all passwords <code>Password123!</code></li>
+        <li><code>seed.sql</code>: demo data for a fresh database (wipes first): 2 admins, 5 engineers, 10 employees, 5 buildings (3 to 6 floors each, 21 in all), 115 seats (4 to 8 per floor), 7 incidents; all passwords <code>Password123!</code></li>
         <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building)</li>
         <li><code>bin/start-dev.sh</code>: Postgres, LocalStack, deploy, proxy</li>
         <li><code>infra/</code>: Terraform finds each folder under <code>backend/</code> and deploys it as a Lambda</li>
@@ -1027,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 28</span>
+      <span class="log-what">More buildings, floors and seats</span>
+      <span class="log-detail"><code>seed.sql</code> now has 5 buildings (was 2): Riverside Tower, North Campus and Logistics Centre are new, Headquarters gains Sales and Executive floors, the Innovation Hub a Design Studio floor. Every building has 3 to 6 floors (21 in all, was 5) and every floor 4 to 8 seats (115, was 9); the extra seats are written as runs of numbered codes (<code>R1-001</code> to <code>R1-008</code>) expanded with <code>generate_series</code>. New rows come after the existing ones, so existing ids and incidents are untouched. The live databases were added to, not reseeded: the missing buildings, floors and seats went in through the API as Alice, locally and on AWS. Facility counts in two tests updated; 329 backend tests and 27 E2E runs pass. No change to the app.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 27</span>
       <span class="log-what">More sample people</span>

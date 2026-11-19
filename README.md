@@ -105,6 +105,8 @@ Sample accounts (password `Password123!` for all):
 | Engineer (5) | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave), `hana.eng@acme.inc` |
 | Employee (10) | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc`, `ava.johnson@acme.inc`, `mason.clark@acme.inc`, `chloe.martin@acme.inc`, `lucas.brown@acme.inc`, `mia.wong@acme.inc`, `zara.ahmed@acme.inc` |
 
+Sample buildings: ACME Headquarters (HQ1), ACME Innovation Hub (INN), ACME Riverside Tower (RVT), ACME North Campus (NTH) and ACME Logistics Centre (LOG), with 3 to 6 floors each (21 in all) and 4 to 8 seats per floor (115 in all).
+
 **To redeploy backend changes to LocalStack**, run `./bin/start-dev.sh` again. If you
 call `./bin/deploy-backend.sh` yourself:
 - Pass `local`. Without it, the script deploys to **AWS**.
