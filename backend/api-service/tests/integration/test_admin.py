@@ -9,8 +9,9 @@ from tests.integration.conftest import PASSWORD, USERS
 
 def test_everyone_reads_active_facilities(client, as_):
     tree = client.get("/facilities", headers=as_("emma")).json()
-    assert [b["code"] for b in tree] == ["HQ1", "INN"]
-    assert sum(len(f["seats"]) for b in tree for f in b["floors"]) == 9
+    assert [b["code"] for b in tree] == ["HQ1", "INN", "LOG", "NTH", "RVT"]
+    assert sum(len(b["floors"]) for b in tree) == 21
+    assert sum(len(f["seats"]) for b in tree for f in b["floors"]) == 115
 
 
 def test_inactive_items_hidden_except_for_admin(client, as_, facilities):
@@ -20,12 +21,12 @@ def test_inactive_items_hidden_except_for_admin(client, as_, facilities):
     client.patch(f"/buildings/{facilities['inn']['id']}", headers=alice, json={"is_active": False})
 
     employee = client.get("/facilities", headers=as_("emma"), params={"include_inactive": True}).json()
-    assert [b["code"] for b in employee] == ["HQ1"]
+    assert [b["code"] for b in employee] == ["HQ1", "LOG", "NTH", "RVT"]
     seats = [s["id"] for b in employee for f in b["floors"] for s in f["seats"]]
     assert seat["id"] not in seats
 
     admin = client.get("/facilities", headers=alice, params={"include_inactive": True}).json()
-    assert len(admin) == 2
+    assert len(admin) == 5
 
 
 def test_create_building_floor_and_seat(client, as_):

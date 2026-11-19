@@ -45,7 +45,10 @@ INSERT INTO buildings (code, name, address, city, country, created_by)
 SELECT b.code, b.name, b.address, b.city, b.country, u.id
 FROM (VALUES
     ('HQ1', 'ACME Headquarters', '1 Acme Plaza',       'Springfield', 'USA'),
-    ('INN', 'ACME Innovation Hub', '200 Research Way', 'Springfield', 'USA')
+    ('INN', 'ACME Innovation Hub', '200 Research Way', 'Springfield', 'USA'),
+    ('RVT', 'ACME Riverside Tower', '50 River Road',  'Springfield', 'USA'),
+    ('NTH', 'ACME North Campus',   '12 Campus Drive',  'Shelbyville', 'USA'),
+    ('LOG', 'ACME Logistics Centre', '8 Depot Lane',   'Capital City', 'USA')
 ) AS b(code, name, address, city, country)
 CROSS JOIN users u WHERE u.email = 'alice.admin@acme.inc';
 
@@ -56,7 +59,23 @@ FROM (VALUES
     ('HQ1', 1, 'First Floor - Finance & HR'),
     ('HQ1', 2, 'Second Floor - Marketing'),
     ('INN', 0, 'Ground Floor - Labs'),
-    ('INN', 1, 'First Floor - Engineering')
+    ('INN', 1, 'First Floor - Engineering'),
+    ('HQ1', 3, 'Third Floor - Sales'),
+    ('HQ1', 4, 'Fourth Floor - Executive'),
+    ('INN', 2, 'Second Floor - Design Studio'),
+    ('RVT', 0, 'Ground Floor - Lobby'),
+    ('RVT', 1, 'First Floor - Customer Support'),
+    ('RVT', 2, 'Second Floor - Product'),
+    ('RVT', 3, 'Third Floor - Legal'),
+    ('RVT', 4, 'Fourth Floor - Operations'),
+    ('RVT', 5, 'Fifth Floor - Boardroom & Events'),
+    ('NTH', 0, 'Ground Floor - Cafe & Gym'),
+    ('NTH', 1, 'First Floor - Training Rooms'),
+    ('NTH', 2, 'Second Floor - Open Office'),
+    ('NTH', 3, 'Third Floor - Quiet Floor'),
+    ('LOG', 0, 'Ground Floor - Loading Bays'),
+    ('LOG', 1, 'First Floor - Warehouse Office'),
+    ('LOG', 2, 'Second Floor - Mezzanine')
 ) AS f(code, num, name)
 JOIN buildings b ON b.code = f.code;
 
@@ -75,6 +94,41 @@ FROM (VALUES
 ) AS s(code, num, seat_code, descr)
 JOIN buildings b ON b.code = s.code
 JOIN floors fl ON fl.building_id = b.id AND fl.floor_number = s.num;
+
+-- More seats, as runs of numbered codes (every floor ends up with 4 to 8 seats):
+-- e.g. ('RVT', 1, 'R1-', 3, 1, 8, ...) makes R1-001 to R1-008
+INSERT INTO seats (floor_id, seat_code, description)
+SELECT fl.id, r.prefix || lpad(n::text, r.width, '0'), r.descr
+FROM (VALUES
+    ('HQ1', 0, 'G-REC-', 2,  2,  2, 'Reception desk'),
+    ('HQ1', 0, 'G-SEC-', 2,  1,  2, 'Security desk'),
+    ('HQ1', 1, '1A-',    3,  3,  4, 'Finance pod'),
+    ('HQ1', 1, '1B-',    3, 11, 12, 'HR pod'),
+    ('HQ1', 2, '2A-',    3, 17, 19, 'Marketing open area'),
+    ('HQ1', 2, '2B-',    3,  1,  1, 'Marketing team table'),
+    ('HQ1', 3, '3A-',    3,  1,  6, 'Sales open area'),
+    ('HQ1', 4, '4A-',    3,  1,  4, 'Executive office'),
+    ('INN', 0, 'LAB-',   2,  2,  5, 'Hardware lab bench'),
+    ('INN', 1, '1E-',    3, 22, 27, 'Engineering pod'),
+    ('INN', 2, '2D-',    3,  1,  5, 'Design studio desk'),
+    ('RVT', 0, 'R0-',    3,  1,  4, 'Lobby help desk'),
+    ('RVT', 1, 'R1-',    3,  1,  8, 'Customer support desk'),
+    ('RVT', 2, 'R2-',    3,  1,  6, 'Product team desk'),
+    ('RVT', 3, 'R3-',    3,  1,  5, 'Legal office'),
+    ('RVT', 4, 'R4-',    3,  1,  6, 'Operations desk'),
+    ('RVT', 5, 'R5-',    3,  1,  4, 'Meeting and event room'),
+    ('NTH', 0, 'N0-',    3,  1,  4, 'Cafe and gym area'),
+    ('NTH', 1, 'N1-',    3,  1,  6, 'Training room'),
+    ('NTH', 2, 'N2-',    3,  1,  8, 'Open office desk'),
+    ('NTH', 3, 'N3-',    3,  1,  5, 'Quiet booth'),
+    ('LOG', 0, 'L0-',    3,  1,  4, 'Loading bay'),
+    ('LOG', 1, 'L1-',    3,  1,  6, 'Warehouse office desk'),
+    ('LOG', 2, 'L2-',    3,  1,  4, 'Mezzanine workstation')
+) AS r(code, num, prefix, width, first, last, descr)
+JOIN buildings b ON b.code = r.code
+JOIN floors fl ON fl.building_id = b.id AND fl.floor_number = r.num
+CROSS JOIN LATERAL generate_series(r.first, r.last) AS n
+ORDER BY b.id, r.num, r.prefix, n;
 
 -- Usual buildings (Noah and Zara have none, so the report form starts empty for him)
 UPDATE users u SET home_building_id = b.id
