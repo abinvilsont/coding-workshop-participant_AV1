@@ -1,0 +1,5 @@
+# Bandit reads this automatically when CI runs `bandit -r ./backend`.
+# Tests are left out: pytest tests use assert (B101) and fake passwords (B105/B106) by design.
+# The application code is still scanned in full.
+[bandit]
+exclude = tests

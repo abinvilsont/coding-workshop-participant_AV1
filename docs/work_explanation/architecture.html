@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>fbac27a</code> (deployed to AWS)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>3189541</code> (deployed to AWS) + uncommitted security-check fixes</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1023,6 +1023,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 26</span>
+      <span class="log-what">GitHub security checks pass</span>
+      <span class="log-detail">Bandit (<code>bandit -r ./backend</code>) now reads <code>backend/.bandit</code>, which leaves out <code>tests/</code>: every finding was pytest's <code>assert</code> or a fake test password, and the app code has none. npm audit flagged 3 critical advisories in the test runner (Vitest 3 → <code>tinypool</code>), never in what users download; Vitest is now 4.1.12 and the audit finds 0. All 157 unit tests, coverage thresholds and 27 E2E runs pass on Vitest 4 (it measures coverage more precisely: 96 % lines). No change to the deployed app.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 25</span>
       <span class="log-what">Soft note when reporting outside your usual building</span>

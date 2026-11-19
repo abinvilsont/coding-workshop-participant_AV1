@@ -168,7 +168,7 @@ cd frontend && npm run lint
 | Suite | Count | Coverage |
 |---|---|---|
 | Backend: pytest, unit + integration on a throwaway database | 329 | 99 % |
-| Frontend: Vitest + React Testing Library | 157 | 99 % lines |
+| Frontend: Vitest + React Testing Library | 157 | 96 % lines |
 | End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 27 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
