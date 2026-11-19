@@ -4,10 +4,11 @@ import CssBaseline from '@mui/material/CssBaseline'
 import { ThemeProvider } from '@mui/material/styles'
 import App from './App.jsx'
 import { theme } from './theme'
+import colorSchemeStorage from './utils/colorSchemeStorage'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={theme} storageManager={colorSchemeStorage}>
       <CssBaseline />
       <App />
     </ThemeProvider>
