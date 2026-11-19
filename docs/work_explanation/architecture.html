@@ -450,7 +450,7 @@ a { color: var(--accent); }
         <text class="t-s" x="746" y="466">about</text>
       </svg>
     </div>
-    <figcaption>Eleven tables and one view, created by <code>backend/db/schema.sql</code> (existing databases get <code>notifications</code> from <code>migrations/001_notifications.sql</code>, the merge column and <code>incident_followers</code> from <code>migrations/002_incident_merge.sql</code>, and <code>engineer_reviews</code> from <code>migrations/003_engineer_reviews.sql</code>; <code>escalation_requested_at</code> on followers from <code>migrations/004_escalation_requests.sql</code>). A review stores the engineer at the time it is written, and the database allows one per reviewer per incident and a rating from 1 to 5. A merged duplicate is stored as <em>cancelled</em> with <code>merged_into_id</code> set (a check constraint ties the two together), and its reporter gets a row in <code>incident_followers</code>; the SQLAlchemy models map onto them and never create tables. The database itself enforces the @acme.inc email rule, that a floor belongs to the incident's building and a seat to its floor, that only engineers get profiles, and that an incident past <em>open</em> has an engineer.</figcaption>
+    <figcaption>Eleven tables and one view (plus <code>app_secrets</code>, which holds the JWT key on AWS), created by <code>backend/db/schema.sql</code> (existing databases get <code>notifications</code> from <code>migrations/001_notifications.sql</code>, the merge column and <code>incident_followers</code> from <code>migrations/002_incident_merge.sql</code>, and <code>engineer_reviews</code> from <code>migrations/003_engineer_reviews.sql</code>; <code>escalation_requested_at</code> on followers from <code>migrations/004_escalation_requests.sql</code>; <code>app_secrets</code> from <code>migrations/005_app_secrets.sql</code>; and each person's usual building, <code>users.home_building_id</code>, from <code>migrations/006_user_home_building.sql</code>). A review stores the engineer at the time it is written, and the database allows one per reviewer per incident and a rating from 1 to 5. A merged duplicate is stored as <em>cancelled</em> with <code>merged_into_id</code> set (a check constraint ties the two together), and its reporter gets a row in <code>incident_followers</code>; the SQLAlchemy models map onto them and never create tables. The database itself enforces the @acme.inc email rule, that a floor belongs to the incident's building and a seat to its floor, that only engineers get profiles, and that an incident past <em>open</em> has an engineer.</figcaption>
   </figure>
 </section>
 
@@ -977,7 +977,7 @@ a { color: var(--accent); }
       <ul>
         <li><code>schema.sql</code>: tables, enums, triggers, workload view</li>
         <li><code>seed.sql</code>: demo data, all passwords <code>Password123!</code></li>
-        <li><code>migrations/</code>: additive changes for existing databases (001: notifications)</li>
+        <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building)</li>
         <li><code>bin/start-dev.sh</code>: Postgres, LocalStack, deploy, proxy</li>
         <li><code>infra/</code>: Terraform finds each folder under <code>backend/</code> and deploys it as a Lambda</li>
       </ul>
