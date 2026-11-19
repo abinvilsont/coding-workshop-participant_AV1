@@ -96,9 +96,15 @@ Reviews are removed on the server before a response is built, so an engineer's b
 | An engineer's review list (`GET /engineers/{id}/reviews`) | Admin-only route: **403** |
 | Their own profile, returned when they change availability (`PATCH /engineers/me/availability`) | `avg_rating` and `review_count` are removed from the response |
 | Notifications | Writing, editing or deleting a review sends none |
+| The incident list (`GET /incidents`) | The list summary has no reviews field at all |
+| One engineer's profile (`GET /engineers/{id}`) | Admin-only route: **403** |
 | Writing a review themselves | **403** |
 
 `visible_reviews(user, incident)` is the single filter for the incident view: admins get every review, an employee gets only their own, and an engineer gets nothing. Employees don't see each other's reviews either, for example a follower can't read the original reporter's.
+
+So an engineer who opens the network tab sees `"reviews": []`, 403s, and a profile without `avg_rating` or `review_count`. An employee sees only the review they wrote. The test `test_engineer_never_sees_reviews` in `tests/integration/test_reviews.py` signs in as an engineer and checks every read path in the table; `test_only_the_reporters_may_review` covers an engineer trying to write one.
+
+**Keep it that way:** the filter is applied by hand, endpoint by endpoint. A new endpoint that returns incidents or engineer stats must go through `visible_reviews()` or drop `RATING_FIELDS` (`app/api/routes/engineers.py`), and should get a line in that test.
 
 ## API reference
 

@@ -184,7 +184,7 @@ The hiding happens on the server, so an engineer who opens the browser's network
 | `PATCH /engineers/me/availability` | Their own profile with `avg_rating` and `review_count` removed (`RATING_FIELDS`) |
 | `GET /notifications` | No review notification is ever created |
 
-An employee's response carries only the review they wrote; an admin's carries all of them. The test `test_engineer_never_sees_reviews` checks every row above.
+An employee's response carries only the review they wrote; an admin's carries all of them. The test `test_engineer_never_sees_reviews` signs in as an engineer and checks every row above.
 
 **Keep it that way:** the filter is applied by hand. A new endpoint that returns incidents or engineer stats must go through `visible_reviews()` or drop `RATING_FIELDS`, and should get a line in that test.
 

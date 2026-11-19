@@ -54,6 +54,11 @@ def test_engineer_never_sees_reviews(client, as_, fixed):
     # nor through the engineer endpoints
     assert client.get(f"/engineers/{TOM}/reviews", headers=as_("tom")).status_code == 403
     assert client.get("/engineers", headers=as_("tom")).status_code == 403
+    assert client.get(f"/engineers/{TOM}", headers=as_("tom")).status_code == 403
+    # the incident list carries no review data at all
+    listed = client.get("/incidents", headers=as_("tom"), params={"q": inc["reference"]}).json()["items"]
+    [row] = [i for i in listed if i["id"] == inc["id"]]
+    assert not any("review" in k or "rating" in k for k in row)
     me = client.patch("/engineers/me/availability", headers=as_("tom"), json={"availability": "available"}).json()
     assert "avg_rating" not in me and "review_count" not in me
     # ...and no notification mentions it
