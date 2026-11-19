@@ -6,11 +6,11 @@
 
 ## The big picture
 
-Every click in the app turns into one API call that runs the same five steps. The React page sends the request. The API checks who you are and what you may do, then makes the change in PostgreSQL. In the same transaction it writes notifications for the other people involved, then sends the updated record back.
+Here's the gist. Every click in the app turns into one API call, and every call runs through the same few steps. The React page sends the request. The API checks who you are and what you're allowed to do, then makes the change in PostgreSQL. In that same transaction it writes notifications for everyone else involved, then sends the updated record back. Dead simple, and that's the point.
 
 ![One click is one API call, checked twice and saved in one transaction](images/request-path.png)
 
-When you run it locally, the dev proxy on port 3001 does CloudFront's job and LocalStack runs the Lambda.
+Running it on your own machine? The dev proxy on port 3001 does CloudFront's job, and LocalStack runs the Lambda.
 
 **The parts**
 
@@ -23,43 +23,43 @@ When you run it locally, the dev proxy on port 3001 does CloudFront's job and Lo
 **Every request, in order**
 
 1. The page calls the API with your sign-in token in the `Authorization` header.
-2. The API strips the `/api/api-service` prefix that CloudFront adds.
-3. It reads the token, loads your user, and stops with **401** if the token is missing, expired, or your account is disabled.
-4. It checks the role rules in `permissions.py`. If the action isn't allowed, you get **403** and nothing changes.
-5. It makes the change, adds notifications, and commits everything together. If one part fails, none of it is saved.
-6. A database trigger writes a history row for every incident change, recording who made it.
-7. The API returns the updated incident, including the list of actions you can take next. The page uses that list to decide which buttons to show.
+2. The API strips off the `/api/api-service` prefix that CloudFront tacks on.
+3. It reads the token and loads your user. No token, an expired one, or a disabled account? That's a **401**, and you're stopped right there.
+4. It checks the role rules in `permissions.py`. If you're not allowed, you get a **403** and nothing changes.
+5. It makes the change, adds the notifications and commits the lot together. If any part fails, none of it's saved.
+6. A database trigger writes a history row for every incident change, with the name of whoever made it.
+7. The API sends back the updated incident, along with the actions you're allowed to take next. The page uses that list to decide which buttons to show, so you're never offered something the server would turn down.
 
 ## Signing up and signing in
 
-Anyone with an `@acme.inc` email can register, and they always become an **Employee**. An admin has to create every Engineer account.
+Anybody with an `@acme.inc` email can sign themselves up, and they always come in as an **Employee**. Engineer accounts are different: an admin has to make every one of them.
 
-**Register** (`POST /auth/register`)
+**Signing up** (`POST /auth/register`)
 
-1. The form checks the email domain, a password of at least 8 characters, and that both passwords match.
-2. The API runs the same checks again and lowercases the email. It ignores any `role` field the request sends.
-3. It hashes the password with bcrypt before saving. The real password is never stored.
-4. If the email already has an account, you get **409** with "An account with this email already exists."
+1. The form checks the email domain, that the password's at least 8 characters, and that both passwords match.
+2. The API runs the same checks again and lowercases the email. If the request sneaks in a `role` field, it's ignored, so nobody can make themselves an admin. Catch yerself on.
+3. The password's hashed with bcrypt before it's saved. The real password is never stored anywhere.
+4. Already got an account with that email? You get a **409**: "An account with this email already exists."
 
-**Sign in** (`POST /auth/login`)
+**Signing in** (`POST /auth/login`)
 
 1. The API finds your account and checks the password against its hash.
-2. A wrong email and a wrong password both give the same message, "Invalid email or password.", so nobody can find out which emails are registered.
-3. A disabled account gets **403**.
-4. On success the API records the login time and returns a signed token (JWT) that lasts **8 hours**. The token carries your user id and role.
-5. The browser keeps the token in `sessionStorage`, so closing the tab signs you out. The tab title changes to "\<your name> · ACME Facility Desk".
-6. The page sends that token with every later request (see step 3 of the big picture).
+2. A wrong email and a wrong password get the exact same message, "Invalid email or password.", so nobody can go fishing for which emails are registered.
+3. A disabled account gets a **403**.
+4. If it all checks out, the API notes the sign-in time and hands back a signed token (a JWT) that's good for **8 hours**. The token carries your user id and your role.
+5. The browser keeps it in `sessionStorage`, so closing the tab signs you out. The tab title changes to "\<your name> · ACME Facility Desk".
+6. The page sends that token with every request after that (step 3 above).
 
 **Staying signed in** (`POST /auth/refresh`)
 
-1. Before each API call, the page checks how long the token has left. Under an hour, it first swaps the token for a fresh 8-hour one, without the user noticing. Concurrent calls share one renewal.
-2. The API checks the token, reloads the user (so a changed role or a deactivated account takes effect), and issues the new token with the **same** sign-in time.
-3. A session ends 24 hours after signing in, whatever happens: renewal is refused, and the next expired token sends the user to sign-in. That limits how long a stolen token is useful.
-4. Because the bell calls the API every 30 seconds, an open tab stays signed in up to that limit.
+1. Before each API call, the page checks how long the token has left. Under an hour, it quietly swaps it for a fresh 8-hour one first, and you're none the wiser. If several calls go out at once, they share the one renewal.
+2. The API checks the token, reloads the user (so a changed role or a deactivated account kicks in straight away), and issues the new token with the **same** sign-in time.
+3. A session ends 24 hours after you signed in, no matter what: renewal's refused, and the next expired token sends you back to sign in. That keeps a stolen token from being much use for long.
+4. Because the bell calls the API every 30 seconds, an open tab stays signed in right up to that limit.
 
 ### How secure is signing in?
 
-The passwords, tokens and role checks are sound, and nothing is known to be exploitable. The open gaps are around the edges: a limit on login attempts first, then a stricter browser policy against script injection.
+Short answer: sound enough. The passwords, tokens and role checks are solid, and nothing's known to be exploitable. The gaps are round the edges: a limit on login attempts is first on the list, then a stricter browser policy against script injection.
 
 **What protects a sign-in**
 
@@ -73,54 +73,54 @@ The passwords, tokens and role checks are sound, and nothing is known to be expl
 | 8-hour token, 24-hour cap from sign-in | A stolen token staying useful for long | `config.py` |
 | HTTPS only (CloudFront redirects) | Reading the password or token on the network | `infra/cloudfront.tf` |
 
-**Known gaps, most important first**
+**Known gaps, the most important first**
 
-1. **No limit on login attempts.** Nothing slows down guessing passwords for one account, and the minimum is 8 characters. The Lambda URL is also public (`authorization_type = "NONE"`), so a rate limit placed only on CloudFront could be bypassed. Fix: a WAF rate rule on `/auth/login`, and let only CloudFront call the Lambda.
-2. **The token can be read by page scripts.** It sits in `sessionStorage`, and there is no Content-Security-Policy. An injected script could copy it. React escapes output, which lowers the risk. Fix: a CSP header, or an httpOnly cookie. The upside today: bearer tokens are not open to cross-site request forgery.
-3. **Signing out only clears the browser.** The server can't cancel a token, so a copied one works until it expires (up to 24 hours with renewals). Today the only cut-off is deactivating the account.
-4. **Smaller items:** bcrypt cost 10 (12 is the usual advice now), no check against common or breached passwords, and no second sign-in factor.
+1. **No limit on login attempts.** Nothing slows down somebody guessing passwords for one account, and the minimum is only 8 characters. The Lambda URL is public too (`authorization_type = "NONE"`), so a rate limit on CloudFront alone could be got round. Fix: a WAF rate rule on `/auth/login`, and only let CloudFront call the Lambda.
+2. **Page scripts can read the token.** It sits in `sessionStorage`, and there's no Content-Security-Policy, so an injected script could copy it. React escapes what it shows, which takes a fair bit of the risk away. Fix: a CSP header, or an httpOnly cookie. The upside today: bearer tokens can't be used for cross-site request forgery.
+3. **Signing out only clears the browser.** The server can't cancel a token, so a copied one keeps working until it expires (up to 24 hours with renewals). For now, the only way to cut it off is to deactivate the account.
+4. **Wee things:** bcrypt cost is 10 (12 is the usual advice these days), there's no check against common or leaked passwords, and no second sign-in step.
 
 ## Reporting an incident
 
-A new incident starts as **Open**, is unassigned, and gets a reference like `INC-000012`. Every Facility Admin is notified.
+A new incident starts off **Open** and unassigned, and it gets a reference like `INC-000012`. Every Facility Admin hears about it.
 
-1. **The form loads.** The page calls `GET /auth/me` for your usual building, then `GET /facilities` to fill the Building, Floor and Seat lists. If a Facility Admin has set a usual building for you and it's still active, the form starts on it, with a note saying you can change it. Pick a different building and the note changes to "This isn't your usual building (ACME Headquarters). That's fine if the problem is here." It's only a nudge for an accidental change: the report sends as normal, and the API never compares the two. Picking a building limits the floors to that building, and picking a floor limits the seats.
-2. **You submit.** The form checks the required fields first: title, description, category, building. Then it sends `POST /incidents`.
+1. **The form loads.** The page asks `GET /auth/me` for your usual building, then `GET /facilities` to fill the Building, Floor and Seat lists. If an admin has set a usual building for you and it's still active, the form starts on it, with a wee note saying you can change it. Pick a different building and the note changes to "This isn't your usual building (ACME Headquarters). That's fine if the problem is here." It's only a nudge in case you changed it by accident: the report goes through as normal, and the API never compares the two. Picking a building narrows the floors to that building, and picking a floor narrows the seats.
+2. **You submit.** The form checks the required fields first: title, description, category and building. Then it sends `POST /incidents`.
 3. **The API checks the request:**
-   - Priority must be Low, Medium or High. Only admins can choose Critical; an employee gets **400** and is told to escalate instead.
-   - The floor must belong to the building and the seat must be on that floor. None of them can be deactivated.
+   - Priority has to be Low, Medium or High. Only admins can choose Critical; an employee who tries gets a **400** and is told to escalate instead.
+   - The floor has to belong to the building, and the seat has to be on that floor. None of them can be deactivated.
 4. **The database saves it.** It creates the row with status `open` and builds the `INC-` reference from the id. A trigger logs a "created" history entry.
-5. **Notifications are added** for every active admin, in the same transaction: "Alice reported INC-000012: Broken chair".
-6. **The page opens the new incident** at `/incidents/12`.
+5. **Notifications go out** to every active admin, in the same transaction: "Alice reported INC-000012: Broken chair".
+6. **The page opens your new incident** at `/incidents/12`.
 
 ## Already reported? Request escalation
 
-Before a new report is saved, the app checks whether the same problem is already open. If it is, the employee can ask for that incident to be escalated instead of reporting it twice.
+Before a new report's saved, the app checks whether somebody's already reported the same thing. If they have, the employee can ask for that one to be escalated instead of reporting it twice. Saves everybody a bit of bother.
 
 ![A report that is already open becomes an escalation request, not a duplicate](images/already-reported.png)
 
-**What the employee sees:** after clicking Submit, a **This may already be reported** box lists the open incidents at that place. Each has a **Request escalation** button with an optional "Why is it urgent?" box. They can also pick **It's a different problem, report it**, or go back to the form.
+**What the employee sees:** after clicking Submit, a **This may already be reported** box lists the open incidents at that spot. Each one has a **Request escalation** button with an optional "Why is it urgent?" box. Or they can pick **It's a different problem, report it**, or head back to the form.
 
 **What happens behind the scenes**
 
-1. **The check** (`GET /incidents/similar`) looks for incidents in the same building and category that are still being worked on (open, assigned, in progress or on hold) and not merged. When both have a floor, it must match. It returns at most 5, with no reporter name or description, and marks any that are already the caller's own or followed.
+1. **The check** (`GET /incidents/similar`) looks for incidents in the same building and category that are still being worked on (open, assigned, in progress or on hold) and haven't been merged. If both have a floor, it has to match. It returns 5 at most, with no reporter name or description, and marks any that are already the caller's own or ones they follow.
 2. **The request** (`POST /incidents/{id}/escalation-request`) runs in one transaction:
-   - It refuses admins and engineers (403), the incident's own reporter (400, use Escalate instead), incidents no longer being worked on (400), and a second request from the same person (409).
-   - It locks the incident, then adds the employee as a **follower** with the time they asked.
+   - It turns away admins and engineers (403), the incident's own reporter (400, they should use Escalate), incidents nobody's working on any more (400), and a second request from the same person (409).
+   - It locks the incident, then adds the employee as a **follower**, with the time they asked.
    - If the incident isn't escalated yet, it is now, with the reason "Liam Lee has the same problem and asked for it to be escalated". The history trigger records it under Liam's name.
    - It adds a note from Liam with his reason, so the engineer sees it.
-   - It notifies the admins and the engineer ("has the same problem and asked to escalate") and the original reporter.
-3. **The page opens the existing incident.** Liam sees "You're following this incident because you have the same problem and asked for it to be escalated". The details panel lists him under **Asked to escalate**.
+   - It lets the admins, the engineer ("has the same problem and asked to escalate") and the original reporter know.
+3. **The page opens the existing incident.** Liam sees "You're following this incident because you have the same problem and asked for it to be escalated", and the details panel lists him under **Asked to escalate**.
 
-The original reporter still owns the incident: only they confirm the fix, reopen or cancel it. A failed check never blocks reporting; the form simply saves as usual.
+The original reporter still owns the incident: only they can confirm the fix, reopen it or cancel it. And if the check itself fails for any reason, it never blocks a report; the form just saves as normal.
 
 ## The incident life cycle
 
-An incident goes **Open → Assigned → In progress → Resolved → Closed**. The reporter confirms the last step. Each move is one API call, checked against your role, and it notifies everyone involved except you.
+An incident goes **Open → Assigned → In progress → Resolved → Closed**, and it's the reporter who gets the final say. Each move is one API call, checked against your role, and it tells everyone involved except you.
 
 ![Incident lifecycle: the engineer resolves, only the reporter closes](images/incident-lifecycle.png)
 
-A reopened incident goes back to the engineer as In progress. Cancelled and Closed are final, so nothing changes after them.
+Reopen an incident and it goes back to the engineer as In progress. Cancelled and Closed are final: once it's there, that's it.
 
 | Step | Who | API call | What happens behind the scenes | Who is notified |
 | --- | --- | --- | --- | --- |
@@ -136,20 +136,20 @@ A reopened incident goes back to the engineer as In progress. Cancelled and Clos
 | Edit details | Employee while Open; admin any time before closing | `PATCH /incidents/{id}` | Re-checks the location and saves only the fields that changed. | Reporter and engineer, listing the changed fields |
 | Delete | Admin | `DELETE /incidents/{id}` | Removes the incident with its notes and history. | Reporter and engineer (the alert has no link) |
 
-Admins can make any status move, except that an incident with no engineer can only stay Open or be Cancelled. The database enforces that rule too. Any other move returns **403** with "You can't change this incident from X to Y."
+Admins can make any status move, with one exception: an incident with no engineer can only stay Open or be Cancelled. The database enforces that too. Anything else gets a **403**: "You can't change this incident from X to Y."
 
 ## Two people acting at once
 
-When an engineer and an employee act on the same incident at the same moment, nobody's change is silently overwritten. The second request waits for the first, then checks its rules again against what the first one saved.
+When an engineer and an employee do something to the same incident at the very same moment, neither change gets quietly overwritten. The second request waits for the first, then checks its rules again against what the first one saved.
 
 ![The second request waits for the first, then re-checks against what it saved](images/parallel-updates.png)
 
 **What happens behind the scenes**
 
-1. **Every change locks the incident first.** Status changes, edits, assignment, escalation, notes, reviews and deletion all load the incident with a row lock (`get_incident_or_404(..., for_update=True)`). A second request on the same incident waits until the first commits, usually a few milliseconds.
-2. **The rules are re-checked after the wait.** The waiting request then sees what the first one saved. A cancel that arrives just after "Start work" is refused with **403** ("You can't change this incident from in\_progress to cancelled") instead of quietly winning.
-3. **Edits carry the version they started from.** The edit form sends `expected_updated_at`. If someone saved the incident in between, the API answers **409** and nothing is saved. The page closes the form, shows the latest version and says "Your changes weren't saved: someone updated this incident while you were editing."
-4. **A refused action refreshes the page.** After a 403 or 409, the incident is reloaded so the buttons match its real state, and the message stays visible even if the box it came from has gone.
+1. **Every change locks the incident first.** Status changes, edits, assignment, escalation, notes, reviews and deletion all load the incident with a row lock (`get_incident_or_404(..., for_update=True)`). A second request on the same incident waits till the first one commits, usually just a few milliseconds.
+2. **The rules are checked again after the wait.** By then the waiting request can see what the first one saved. So a cancel that lands just after "Start work" is refused with a **403** ("You can't change this incident from in\_progress to cancelled") instead of sneakily winning.
+3. **Edits carry the version they started from.** The edit form sends `expected_updated_at`. If someone saved the incident in the meantime, the API answers **409** and nothing's saved. The page closes the form, shows the latest version and says "Your changes weren't saved: someone updated this incident while you were editing."
+4. **A refused action refreshes the page.** After a 403 or 409 the incident reloads, so the buttons match how things really stand, and the message stays on screen even if the box it came from has gone.
 
 | At the same moment | Result |
 | --- | --- |
@@ -162,24 +162,24 @@ When an engineer and an employee act on the same incident at the same moment, no
 
 ## Merging duplicate reports
 
-When two employees report the same problem, an admin merges one report into the other. From then on there is one incident, one engineer and one fix, and both employees get every update.
+When two employees report the same problem, an admin merges one report into the other. From then on there's one incident, one engineer and one fix, and both employees get every update. No more two engineers turning up for the one broken chair.
 
 ![Two reports become one incident, and both reporters get its updates](images/merging-duplicates.png)
 
-**What the admin does:** open the duplicate, choose an incident under **Merge duplicate**, and confirm. The list shows open incidents in the same building and category first. After the merge, the admin is taken to the main incident.
+**What the admin does:** open the duplicate, pick an incident under **Merge duplicate**, and confirm. The list puts open incidents in the same building and category first. After the merge, the admin lands on the main incident.
 
 **What happens behind the scenes** (`POST /incidents/{id}/merge`, one transaction):
 
-1. The API locks both incidents so two admins can't merge them at the same time. It refuses to merge an incident into itself, or to merge a closed, cancelled or already merged incident.
+1. The API locks both incidents, so two admins can't merge them at the same time. It won't merge an incident into itself, or merge one that's closed, cancelled or already merged.
 2. The duplicate's reporter becomes a **follower** of the main incident (a row in `incident_followers`). So does anyone already following the duplicate.
-3. Duplicates that were merged into this one earlier are pointed at the main incident too, so chains collapse.
-4. The duplicate is closed as cancelled and linked with `merged_into_id`. The app labels it **Merged** with a link to the main incident.
+3. Any duplicates merged into this one earlier get pointed at the main incident too, so chains fold up neatly.
+4. The duplicate's closed as cancelled and linked with `merged_into_id`. The app labels it **Merged**, with a link to the main incident.
 5. Two notes are added. The main incident gets the duplicate's title and description, so the engineer has the full picture. The duplicate gets "Merged into INC-…".
 6. Notifications go to:
    - the duplicate's reporter, with a link to the main incident;
    - the main incident's reporter ("Liam reported the same problem");
-   - its engineer, if one is assigned;
-   - the duplicate's engineer, who no longer has the ticket on their list.
+   - its engineer, if one's assigned;
+   - the duplicate's engineer, who no longer has that ticket on their list.
 
 **What a follower can do**
 
@@ -191,24 +191,24 @@ When two employees report the same problem, an admin merges one report into the 
 | Add notes | Yes | Yes |
 | Escalate, cancel, confirm the fix or reopen | Yes | No |
 
-The follower sees a notice explaining why they can see the incident, and the main incident lists them under **Also reported by**.
+The follower sees a wee notice explaining why they can see the incident, and the main incident lists them under **Also reported by**.
 
 ## Rating the engineer
 
-Once an incident is **Closed**, the employees who reported it can rate the engineer who fixed it: 1 to 5 stars and an optional comment. Admins use the ratings to see how engineers are doing. Engineers never see them.
+Once an incident's **Closed**, the employees who reported it can rate the engineer who fixed it: 1 to 5 stars, and a comment if they fancy. Admins use the ratings to see how engineers are getting on. Engineers never see them.
 
 ![A review reaches the reviewer and admins, never the engineer](images/engineer-reviews.png)
 
-**What the employee does:** after confirming the fix, a **Rate Tom Tech** box appears on the incident. They pick the stars, add a comment if they like, and submit. Later they can edit or delete their review.
+**What the employee does:** after confirming the fix, a **Rate Tom Tech** box appears on the incident. They pick the stars, add a comment if they like, and submit. They can edit or delete it later.
 
 **What happens behind the scenes** (`POST /incidents/{id}/review`):
 
-1. The API checks that the caller is the reporter or a follower, that the incident is closed, and that an engineer worked on it. Admins and engineers get a 403.
-2. It saves one row in `engineer_reviews` with the rating, the comment, the reviewer and the engineer at that moment. The database allows one review per person per incident; a second try gets a 409.
-3. It returns the incident. The incident's reviews are filtered on the server by `visible_reviews()`: admins get every review, an employee gets their own, and an engineer gets an empty list.
+1. The API checks the caller is the reporter or a follower, that the incident's closed, and that an engineer actually worked on it. Admins and engineers get a 403.
+2. It saves one row in `engineer_reviews` with the rating, the comment, the reviewer and the engineer at that moment. The database allows one review per person per incident; a second go gets a 409.
+3. It returns the incident. Its reviews are filtered on the server by `visible_reviews()`: admins get every review, an employee gets their own, and an engineer gets an empty list.
 4. No notification is sent, so nothing reaches the engineer that way either.
 
-**Where admins see ratings:** on the incident (every review), and on the **Engineers** page, which shows each engineer's average and count. Clicking the average opens all their reviews, each linked to its incident (`GET /engineers/{id}/reviews`, admin only).
+**Where admins see ratings:** on the incident (every review), and on the **Engineers** page, which shows each engineer's average and how many reviews it's from. Click the average to see all their reviews, each linked to its incident (`GET /engineers/{id}/reviews`, admin only).
 
 |  | Reviewer | Other reporters | Facility Admin | Engineer |
 | --- | --- | --- | --- | --- |
@@ -219,7 +219,7 @@ Once an incident is **Closed**, the employees who reported it can rate the engin
 
 ### What an engineer's browser receives
 
-The hiding happens on the server, so an engineer who opens the browser's network tab finds no reviews or ratings in any response. Each endpoint that could carry them returns this to an engineer:
+The hiding happens on the server, so an engineer who has a nosy at the browser's network tab finds no reviews or ratings in any response. Here's what each endpoint that could carry them gives an engineer:
 
 | Endpoint | What an engineer gets |
 | --- | --- |
@@ -229,31 +229,31 @@ The hiding happens on the server, so an engineer who opens the browser's network
 | `PATCH /engineers/me/availability` | Their own profile with `avg_rating` and `review_count` removed (`RATING_FIELDS`) |
 | `GET /notifications` | No review notification is ever created |
 
-An employee's response carries only the review they wrote; an admin's carries all of them. The test `test_engineer_never_sees_reviews` signs in as an engineer and checks every row above.
+An employee's response carries only the review they wrote; an admin's carries the lot. The test `test_engineer_never_sees_reviews` signs in as an engineer and checks every row above.
 
-**Keep it that way:** the filter is applied by hand. A new endpoint that returns incidents or engineer stats must go through `visible_reviews()` or drop `RATING_FIELDS`, and should get a line in that test.
+**Keep it that way:** the filter's applied by hand. Any new endpoint that returns incidents or engineer stats has to go through `visible_reviews()` or drop `RATING_FIELDS`, and should get a line in that test.
 
 ## Notes, notifications and the dashboard
 
-Notifications are rows in the database, not pushed messages. The bell asks the API for new ones every 30 seconds.
+Notifications are just rows in the database, not pushed messages. The bell asks the API for new ones every 30 seconds.
 
 **Adding a note** (`POST /incidents/{id}/notes`)
 
-1. Anyone who can see the incident can add a note until it is Closed or Cancelled.
-2. Engineers and admins can tick **Internal**. The API leaves internal notes out of the incident whenever an employee loads it, so employees never see them.
-3. A public note notifies the reporter and the engineer. An internal note notifies only the admins and the engineer.
+1. Anybody who can see the incident can add a note, right up until it's Closed or Cancelled.
+2. Engineers and admins can tick **Internal**. The API leaves internal notes out whenever an employee loads the incident, so employees never see them. Handy for talking about costs or suppliers.
+3. A public note tells the reporter and the engineer. An internal note tells only the admins and the engineer.
 
 **The notification bell**
 
-1. Each notification is written in the same transaction as the change it describes, so you never get an alert for a change that failed.
-2. You are never notified about your own actions.
+1. Each notification is written in the same transaction as the change it's about, so you never get an alert for something that didn't actually happen.
+2. You're never notified about your own actions.
 3. Every 30 seconds the bell calls `GET /notifications/unread-count`, which only counts rows, and updates the red badge.
 4. Opening the bell loads your latest 20 (`GET /notifications`). Clicking one marks it read and opens the incident.
-5. **Mark all read** (`POST /notifications/read-all`) clears the badge. You can only read or mark your own notifications.
+5. **Mark all read** (`POST /notifications/read-all`) clears the badge. You can only read or mark your own.
 
 **The dashboard** (`GET /dashboard`)
 
-One call returns a different summary for each role:
+One call, and each role gets its own summary:
 
 | Role | What the dashboard shows |
 | --- | --- |
@@ -263,42 +263,42 @@ One call returns a different summary for each role:
 
 ## Admin actions
 
-Only a Facility Admin can manage buildings and engineers. Anyone else gets **403** "You don't have permission to do that.", and the admin menu and pages are hidden from them.
+Only a Facility Admin can manage buildings and engineers. Anybody else gets a **403**, "You don't have permission to do that.", and never sees the admin menu or pages in the first place.
 
 **Buildings, floors and seats** (`/buildings`, `/floors`, `/seats`)
 
-1. **Create:** the hierarchy is building → floor → seat. A duplicate code or number in the same parent gets **409**.
-2. **Edit or deactivate:** a deactivated location stays on old incidents but no longer appears in the new-incident form.
-3. **Delete:** the database refuses if any incident or engineer still uses the location. The API turns that into **409** "… Deactivate it instead." so old incidents keep a valid location.
+1. **Create:** it goes building → floor → seat. A duplicate code or number under the same parent gets a **409**.
+2. **Edit or deactivate:** a deactivated location stays on old incidents, but it's no longer offered on the new-incident form.
+3. **Delete:** the database says no if any incident or engineer still uses the location. The API turns that into a **409**, "… Deactivate it instead.", so old incidents keep a valid location.
 
 **Engineers** (`/engineers`)
 
-1. **Create:** the API creates two linked rows in one transaction, a user with role Engineer and an engineer profile. The profile holds specialisations, availability, maximum active tickets and home building. The admin gives the engineer their first password.
-2. **Edit:** change details, capacity or availability.
-3. **Deactivate:** refused with **409** while the engineer still has active tickets ("Reassign them first"). You also can't deactivate yourself. A deactivated engineer can't sign in, and their existing token stops working on the next request.
+1. **Create:** the API makes two linked rows in one transaction: a user with the Engineer role, and an engineer profile with their specialisations, availability, maximum active tickets and home building. The admin gives them their first password.
+2. **Edit:** change their details, capacity or availability.
+3. **Deactivate:** refused with a **409** while the engineer still has active tickets ("Reassign them first"), and you can't deactivate yourself. A deactivated engineer can't sign in, and any token they have stops working on the next request. The engineer's profile is locked while this is checked, the same lock an assignment takes, so a deactivation can't slip past an assignment landing at the same moment.
 
 **People** (`/users`)
 
-1. **The list** shows every account with its role, department, usual building and last sign-in. You can search by name or email, filter by role, and show inactive accounts.
-2. **Usual building:** pick one from the row and it saves straight away (`PATCH /users/{id}` with `home_building_id`; `null` clears it). It must be an active building. Admins can set their own. When that person opens **Report incident**, the page asks the API for their account (`GET /auth/me`) and the form starts on that building, with a note saying so. Asking fresh means a change applies without signing in again. A building that's been deactivated is ignored; deleting a building clears it for everyone (`ON DELETE SET NULL`). The column comes from migration 006.
-3. **Make admin / Make employee** changes an employee into a Facility Admin or back. It takes effect on that person's next request, because every request reads the role from the database, and they get a notification.
-4. **Deactivate** signs the person out on their next request and blocks sign-in. **Reactivate** lets them back in.
-5. **Safeguards:** you can't change your own role or deactivate yourself; engineers are managed on the Engineers page (their tickets and capacity rules live there); and there is always at least one active Facility Admin. If two admins demote each other at the same moment, the API locks the admin rows and refuses the second change with **409**.
+1. **The list** shows every account with its role, department, usual building and last sign-in. You can search by name or email, filter by role, and show inactive accounts too.
+2. **Usual building:** pick one from the row and it saves straight away (`PATCH /users/{id}` with `home_building_id`; `null` clears it). It has to be an active building, and admins can set their own. When that person opens **Report incident**, the page asks the API for their account (`GET /auth/me`) and the form starts on that building, with a note saying so. Because it asks fresh each time, a change applies without signing in again. A deactivated building is ignored, and deleting a building clears it for everyone (`ON DELETE SET NULL`). The column comes from migration 006.
+3. **Make admin / Make employee** turns an employee into a Facility Admin or back again. It kicks in on that person's next request, because every request reads the role from the database, and they get a notification.
+4. **Deactivate** signs the person out on their next request and stops them signing in. **Reactivate** lets them back in.
+5. **Safeguards:** you can't change your own role or deactivate yourself; engineers are managed on the Engineers page (their tickets and capacity rules live there); and there's always at least one active Facility Admin. If two admins demote each other at the same moment, the API locks the admin rows and refuses the second change with a **409**. Nobody locks the whole place out by accident.
 
 ## Install it as an app
 
-The app is a **progressive web app (PWA)**. Chrome, Edge and phones offer to install it, and it then opens in its own window with the ACME icon.
+The app's a **progressive web app (PWA)**, so Chrome, Edge and phones will offer to install it. It then opens in its own window with the ACME icon, like any other app.
 
-- `manifest.webmanifest` gives the name, colours and icons.
-- `sw.js`, a service worker, caches the app's files, so it opens instantly and still loads offline (it then says it can't reach the server).
-- The service worker **never caches `/api/` responses**: incident data is always live, and nothing private is stored on the device.
-- Pages are fetched from the network first, so a new deploy shows up on the next visit.
+- `manifest.webmanifest` sets the name, colours and icons.
+- `sw.js`, a service worker, caches the app's files, so it opens in a flash and still loads offline (it then tells you it can't reach the server).
+- The service worker **never caches `/api/` responses**: incident data is always live, and nothing private is left lying about on the device.
+- Pages come from the network first, so a new deploy shows up on your next visit.
 
 ## Running on AWS
 
-The same code runs on AWS: the React app on S3 behind CloudFront, and the API on Lambda, connected to Aurora PostgreSQL. The workshop scripts deploy it: `deploy-backend.sh aws`, then `deploy-frontend.sh aws`.
+The same code runs on AWS: the React app on S3 behind CloudFront, and the API on Lambda, talking to Aurora PostgreSQL. The workshop scripts deploy it: `deploy-backend.sh aws`, then `deploy-frontend.sh aws`.
 
-**Setting up the database.** Aurora has no public address, so the tables are created by the Lambda itself. Someone with AWS credentials invokes it directly with a task; web requests can never trigger these.
+**Setting up the database.** Aurora has no public address, so the Lambda creates the tables itself. Someone with AWS credentials invokes it directly with a task; a web request can never set these off.
 
 | Task | What it does |
 | --- | --- |
@@ -306,25 +306,25 @@ The same code runs on AWS: the React app on S3 behind CloudFront, and the API on
 | `init_db` | Empty database only: creates the tables, an admin (or the sample data) and a random 256-bit token-signing key |
 | `migrate` | Runs every migration (each safe to repeat). Use it after deploying a version that adds tables or columns |
 
-**What changes on AWS** (`IS_LOCAL=false`):
+**What's different on AWS** (`IS_LOCAL=false`):
 
-- the database connection requires TLS (`sslmode=require`);
-- tokens are signed with the random key `init_db` stored in the database, not one derived from settings;
-- Aurora pauses after 5 idle minutes, so the API retries the connection for up to 25 seconds while it wakes: the first visit after a quiet spell takes a few seconds instead of failing. That limit stays under CloudFront's 30-second timeout.
+- the database connection needs TLS (`sslmode=require`);
+- tokens are signed with the random key `init_db` stored in the database, not one worked out from settings;
+- Aurora has a wee nap after 5 idle minutes, so the API keeps retrying the connection for up to 25 seconds while it wakes up. The first visit after a quiet spell takes a few seconds instead of failing, and that limit stays under CloudFront's 30-second timeout.
 
 ## Security checks on every push
 
 GitHub runs three scans on every push and pull request:
 
-- **Bandit** reads the Python code for risky patterns. A small `backend/.bandit` file leaves out the tests folder, because tests use `assert` and fake passwords on purpose; the app code is scanned in full and has no findings.
-- **npm audit** checks the frontend's packages against known vulnerabilities and fails on anything high or critical. It found three critical advisories in Vitest 3, the test runner, never in what users download; Vitest 4 cleared them.
+- **Bandit** reads the Python code for risky patterns. A wee `backend/.bandit` file leaves out the tests folder, because tests use `assert` and fake passwords on purpose; the app code's scanned in full and comes up clean.
+- **npm audit** checks the frontend's packages against known vulnerabilities and fails on anything high or critical. It found three critical advisories in Vitest 3, the test runner (never in anything users download), and Vitest 4 cleared them.
 - **Checkov** reviews the Terraform in `infra/` and only reports.
 
-Bandit and npm audit both pass.
+Bandit and npm audit both pass, sound.
 
 ## When things go wrong
 
-Every error comes back as `{"message": "..."}` in plain English, and the page shows that message as it is. A failed request changes nothing, because the whole transaction is rolled back.
+Every error comes back as `{"message": "..."}` in plain English, and the page shows it as it is. A failed request changes nothing at all, because the whole transaction's rolled back.
 
 | Code | When it happens | What you see |
 | --- | --- | --- |
@@ -339,7 +339,7 @@ Every error comes back as `{"message": "..."}` in plain English, and the page sh
 
 ## Why it's built this way
 
-Most choices follow from two facts. The workshop deploys to Lambda, which keeps no memory between requests and can't hold connections open. And an incident tool has to be trustworthy: the right people see the right things, and nothing is lost.
+Most of these choices come down to two things. The workshop deploys to Lambda, which keeps no memory between requests and can't hold connections open. And an incident tool has to be one people can trust: the right folk see the right things, and nothing goes missing.
 
 **Architecture**
 
