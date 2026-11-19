@@ -6,7 +6,11 @@ them, and Engineers fix them. Everyone involved is kept informed in the app.
 
 Built for the coding workshop. The workshop brief and evaluation guides are in
 [`docs/`](docs/README.md); the original brief is in
-[`docs/WORKSHOP-BRIEF.md`](docs/WORKSHOP-BRIEF.md).
+[`docs/WORKSHOP-BRIEF.md`](docs/WORKSHOP-BRIEF.md). How the app works, step by step and with
+diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
+
+**View in your browser:** [How ACME Facility Desk Works](https://claude.ai/artifact/4zg4HwDhZH7Agf9TZVPy6h)
+· [Architecture page](https://claude.ai/artifact/5K5Hw9Gkc1Lg2SGG9JziYM)
 
 ## What it does
 
@@ -47,7 +51,9 @@ an optional comment, and edit or delete that review later.
 ```
 
 - **Frontend:** React 19, Material UI 7, React Responsive, Vite. Hash routing, so it
-  works on S3 without rewrite rules.
+  works on S3 without rewrite rules. Light and dark mode: the sun/moon button in
+  the top bar (and on the sign-in page) switches, and the choice is remembered on
+  that device. Until someone picks, the app follows the device's own setting.
 - **Backend:** one FastAPI service (`backend/api-service`) running on Lambda through
   Mangum. It uses SQLAlchemy 2, Pydantic 2, JWT auth and bcrypt hashing.
 - **Database:** PostgreSQL. The schema is in [`backend/db/schema.sql`](backend/db/schema.sql),
@@ -147,7 +153,7 @@ cd frontend && npm run lint
 | Suite | Count | Coverage |
 |---|---|---|
 | Backend: pytest, unit + integration on a throwaway database | 247 | 99 % |
-| Frontend: Vitest + React Testing Library | 110 | 99 % lines |
+| Frontend: Vitest + React Testing Library | 114 | 99 % lines |
 | End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 14 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
@@ -189,6 +195,10 @@ Before the first cloud deploy:
 - **The connection pool depends on where the API runs:** 1+1 connections on Lambda,
   10+30 under uvicorn. This was found by the load test.
 - **Native `<select>` styled by Material UI** so phones show their own pickers.
+- **Dark mode uses Material UI's colour schemes as CSS variables.** Both palettes
+  live in `src/theme.js`, and switching only changes a class on `<html>`, so nothing
+  re-renders. A small script in `index.html` applies the saved choice before React
+  loads, so the page doesn't flash white.
 - **Engineer capacity is enforced on the server** with a row lock, so two admins
   can't both fill an engineer's last slot.
 - **Merging a duplicate cancels it rather than adding a new status.**

@@ -5,6 +5,16 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ACME Facility Desk</title>
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Apply the saved light/dark choice before React loads, so the page doesn't flash.
+      // Same storage key and <html> class as MUI's colour-scheme switch (src/theme.js).
+      try {
+        var mode = localStorage.getItem('mui-mode') || 'system';
+        var dark = mode === 'dark' || (mode === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

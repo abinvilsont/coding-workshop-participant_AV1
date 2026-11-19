@@ -8,6 +8,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import useFieldErrors from '../hooks/useFieldErrors';
 import { useIsPhone } from '../hooks/useResponsive';
 import { ACME_DOMAIN, isAcmeEmail, login, register } from '../services/authService';
+import ThemeToggle from '../components/ThemeToggle';
 
 const PERSONAS = [
   { role: 'Employee', text: 'Report and track facility & workplace tech issues' },
@@ -27,7 +28,7 @@ function BrandPanel() {
         background: 'linear-gradient(160deg, #1f4fd8 0%, #163a9f 100%)',
       }}
     >
-      <Avatar variant="rounded" sx={{ width: 56, height: 56, bgcolor: 'rgba(255,255,255,0.18)', fontSize: 28, fontWeight: 700 }}>
+      <Avatar variant="rounded" sx={{ width: 56, height: 56, bgcolor: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: 28, fontWeight: 700 }}>
         A
       </Avatar>
       <Typography variant="h1" sx={{ fontSize: '2rem' }}>ACME Facility Desk</Typography>
@@ -54,7 +55,7 @@ function BrandPanel() {
 function BrandHeader() {
   return (
     <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3 }}>
-      <Avatar variant="rounded" sx={{ bgcolor: 'primary.main', fontWeight: 700 }}>A</Avatar>
+      <Avatar variant="rounded" sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', fontWeight: 700 }}>A</Avatar>
       <Box>
         <Typography variant="h1" sx={{ fontSize: '1.25rem' }}>ACME Facility Desk</Typography>
         <Typography variant="body2" color="text.secondary">{TAGLINE}</Typography>
@@ -135,8 +136,12 @@ export default function Login({ onLogin }) {
 
       <Box
         component="main"
-        sx={{ flex: '1 1 55%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, sm: 4 } }}
+        sx={{
+          flex: '1 1 55%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, sm: 4 },
+          position: 'relative',
+        }}
       >
+        <ThemeToggle sx={{ position: 'absolute', top: 8, right: 8 }} />
         <Paper
           component="form"
           variant="outlined"

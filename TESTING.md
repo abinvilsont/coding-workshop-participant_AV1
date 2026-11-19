@@ -29,7 +29,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
 | Backend (pytest) | 247 | all pass, ~15 s | **99 %** of `app/` (1368 statements, 13 missed) |
-| Frontend (Vitest) | 110 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| Frontend (Vitest) | 114 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 14 | all pass, ~90 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -89,6 +89,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation with per-field messages (incl. server field errors), conflict messages, inactive toggle, engineer ratings and reviews panel |
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
 | `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive), table vs phone cards |
+| `ThemeToggle` | light ⇄ dark switch, choice saved and restored, `<html>` class, hidden outside the theme provider |
 
 ### End-to-end: `frontend/e2e/`
 

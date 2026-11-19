@@ -8,6 +8,7 @@ import { EscalatedBadge, PriorityBadge, Section, StatusBadge } from '../componen
 import IncidentForm from '../components/IncidentForm';
 import { ReviewItem } from '../components/Reviews';
 import { useIsPhone } from '../hooks/useResponsive';
+import { schemeSx } from '../theme';
 import { navigate } from '../router';
 import { markAllRead } from '../services/notificationService';
 import {
@@ -438,6 +439,13 @@ function ReviewSection({ incident, user, run }) {
   );
 }
 
+// Internal notes are amber, your own notes faintly blue; tints work on light and dark
+const NOTE_TINTS = {
+  internal: schemeSx({ bgcolor: '#fffbeb' }, { bgcolor: 'rgba(245,158,11,0.10)' }),
+  own: schemeSx({ bgcolor: '#f5f8ff' }, { bgcolor: 'rgba(109,140,255,0.10)' }),
+};
+const noteTint = (kind) => NOTE_TINTS[kind] ?? { bgcolor: 'background.paper' };
+
 function Notes({ incident, user, run }) {
   const isPhone = useIsPhone();
   const [body, setBody] = useState('');
@@ -463,14 +471,16 @@ function Notes({ incident, user, run }) {
             <ListItem
               key={n.id}
               disableGutters
-              sx={{
-                display: 'block',
-                p: 1.5,
-                borderRadius: 1,
-                border: 1,
-                borderColor: n.is_internal ? 'warning.light' : 'divider',
-                bgcolor: n.is_internal ? '#fffbeb' : n.author_id === user.id ? '#f5f8ff' : 'background.paper',
-              }}
+              sx={[
+                noteTint(n.is_internal ? 'internal' : n.author_id === user.id ? 'own' : null),
+                {
+                  display: 'block',
+                  p: 1.5,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: n.is_internal ? 'warning.light' : 'divider',
+                },
+              ]}
             >
               <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: 'wrap', mb: 0.5 }}>
                 <Typography component="strong" sx={{ fontWeight: 700 }}>{n.author_name}</Typography>

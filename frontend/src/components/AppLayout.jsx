@@ -7,6 +7,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import { useIsCompact } from '../hooks/useResponsive';
 import { ROLE_LABELS } from '../utils/format';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 
 const NAV = [
   { href: '#/', label: 'Dashboard', match: (p) => p === '/' },
@@ -19,7 +20,7 @@ const NAV = [
 function Brand({ short }) {
   return (
     <Box component="a" href="#/" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.primary', textDecoration: 'none' }}>
-      <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontWeight: 700, fontSize: 16 }}>A</Avatar>
+      <Avatar variant="rounded" sx={{ width: 32, height: 32, bgcolor: 'primary.main', color: 'primary.contrastText', fontWeight: 700, fontSize: 16 }}>A</Avatar>
       {!short && <Typography sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>ACME Facility Desk</Typography>}
     </Box>
   );
@@ -62,6 +63,7 @@ export default function AppLayout({ user, path, onLogout, children }) {
             </Box>
           )}
           <Box sx={{ flexGrow: 1 }} />
+          <ThemeToggle />
           <NotificationBell path={path} />
           {!compact && (
             <>
