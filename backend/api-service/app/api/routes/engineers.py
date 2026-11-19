@@ -140,7 +140,9 @@ def engineer_reviews(engineer_id: int, db: DbSession, _user: AdminUser):
 @router.patch("/{engineer_id}")
 def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin: AdminUser):
     """Update an engineer's profile, capacity, availability or deactivate the account."""
-    profile = db.get(EngineerProfile, engineer_id)
+    # Lock the profile like assignment does, so deactivating can't slip past an
+    # assignment that is landing at the same moment (and leave a live ticket behind).
+    profile = db.get(EngineerProfile, engineer_id, with_for_update=True)
     if profile is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Engineer not found.")
     user = db.get(User, engineer_id)
