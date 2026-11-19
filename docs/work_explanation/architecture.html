@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 28 · reflects local <code>main</code> @ <code>3d4aeaf</code> (app as deployed to AWS; later commits change only checks, test tooling, sample data and docs)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 29 · reflects local <code>main</code> @ <code>a547670</code> (as deployed to AWS)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1027,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 29</span>
+      <span class="log-what">Final check: engineer deactivation race fixed</span>
+      <span class="log-detail">A full check (every test suite, lint, build, Bandit as CI runs it, npm audit, the requirements table and the guide's expectations) found one gap: <code>PATCH /engineers/{id}</code> counted the engineer's active tickets without a lock, so a deactivation and an assignment landing together could both pass, leaving an inactive engineer holding a live ticket. It now locks the engineer's profile row (<code>with_for_update</code>), the lock assignment already took, so whichever comes second waits and is refused. +3 race tests: two admins taking the last free slot, deactivation during an assignment (failed before the fix), and the reverse order; the race helper always releases its lock so a failure can't block later tests. 332 backend tests, 157 frontend, 27 E2E runs pass. Deployed to AWS.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 28</span>
       <span class="log-what">More buildings, floors and seats</span>

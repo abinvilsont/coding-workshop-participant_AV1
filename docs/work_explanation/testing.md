@@ -30,7 +30,7 @@ There is also a **load test** with Artillery (`backend/api-service/tests/load/ap
 
 | Suite | Tests | Result | Coverage |
 | --- | --- | --- | --- |
-| Backend (pytest) | 329 | all pass, ~15 s | 99 % of `app/` |
+| Backend (pytest) | 332 | all pass, ~25 s | 99 % of `app/` |
 | Frontend (Vitest 4) | 157 | all pass, ~20 s | 96 % lines, 88 % branches, 93 % functions |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path |
 
