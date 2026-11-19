@@ -5,7 +5,11 @@ import { STATUS_LABELS, titleCase } from '../utils/format';
 
 const chipSx = ([color, bgcolor]) => ({ color, bgcolor, height: 24 });
 
-export function StatusBadge({ status }) {
+/** A merged duplicate is stored as cancelled but shown as "Merged". */
+export function StatusBadge({ status, merged = false }) {
+  if (merged) {
+    return <Chip size="small" label="Merged" sx={chipSx(STATUS_COLORS.merged)} />;
+  }
   return (
     <Chip
       size="small"

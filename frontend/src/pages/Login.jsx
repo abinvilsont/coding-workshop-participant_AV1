@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import useFieldErrors from '../hooks/useFieldErrors';
 import { useIsPhone } from '../hooks/useResponsive';
 import { ACME_DOMAIN, isAcmeEmail, login, register } from '../services/authService';
 
@@ -70,35 +71,42 @@ export default function Login({ onLogin }) {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const fe = useFieldErrors();
 
   const isRegister = mode === 'register';
 
-  const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
+  const update = (field) => (e) => {
+    fe.clear(field);
+    setForm({ ...form, [field]: e.target.value });
+  };
 
   const switchMode = (next) => {
     setMode(next);
     setError('');
     setNotice('');
+    fe.clear();
   };
 
+  // Returns { field: message } for every problem (empty when the form is valid)
   const validate = () => {
-    if (!form.email || !form.password) return 'Email and password are required.';
-    if (!isAcmeEmail(form.email)) return `Please use your @${ACME_DOMAIN} email address.`;
-    if (isRegister) {
-      if (!form.name.trim()) return 'Please enter your full name.';
-      if (form.password.length < 8) return 'Password must be at least 8 characters.';
-      if (form.password !== form.confirm) return 'Passwords do not match.';
-    }
-    return '';
+    const problems = {};
+    if (isRegister && !form.name.trim()) problems.name = 'Please enter your full name.';
+    if (!form.email) problems.email = 'Enter your work email.';
+    else if (!isAcmeEmail(form.email)) problems.email = `Please use your @${ACME_DOMAIN} email address.`;
+    if (!form.password) problems.password = 'Enter your password.';
+    else if (isRegister && form.password.length < 8) problems.password = 'Password must be at least 8 characters.';
+    if (isRegister && form.password !== form.confirm) problems.confirm = 'Passwords do not match.';
+    return problems;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setNotice('');
-    const problem = validate();
-    if (problem) {
-      setError(problem);
+    const problems = validate();
+    fe.set(problems);
+    if (Object.keys(problems).length) {
+      setError('Please fix the highlighted fields.');
       return;
     }
     setLoading(true);
@@ -113,7 +121,7 @@ export default function Login({ onLogin }) {
         onLogin?.(user);
       }
     } catch (err) {
-      setError(err.message);
+      setError(fe.fromApi(err) ? 'Please fix the highlighted fields.' : err.message);
     } finally {
       setLoading(false);
     }
@@ -164,6 +172,9 @@ export default function Login({ onLogin }) {
             {isRegister && (
               <TextField
                 label="Full name"
+                required
+                disabled={loading}
+                {...fe.props('name')}
                 autoComplete="name"
                 value={form.name}
                 onChange={update('name')}
@@ -173,6 +184,9 @@ export default function Login({ onLogin }) {
 
             <TextField
               label="Work email"
+              required
+              disabled={loading}
+              {...fe.props('email')}
               type="email"
               autoComplete="email"
               value={form.email}
@@ -182,6 +196,9 @@ export default function Login({ onLogin }) {
 
             <TextField
               label="Password"
+              required
+              disabled={loading}
+              {...fe.props('password')}
               type={passwordType}
               autoComplete={isRegister ? 'new-password' : 'current-password'}
               value={form.password}
@@ -208,6 +225,9 @@ export default function Login({ onLogin }) {
             {isRegister && (
               <TextField
                 label="Confirm password"
+                required
+                disabled={loading}
+                {...fe.props('confirm')}
                 type={passwordType}
                 autoComplete="new-password"
                 value={form.confirm}

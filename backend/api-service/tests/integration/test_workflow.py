@@ -75,7 +75,7 @@ def test_admin_can_override_status(client, as_):
 
 
 def test_unknown_status_is_validation_error(client, as_):
-    assert status(client, as_("alice"), AC, "done").status_code == 422
+    assert status(client, as_("alice"), AC, "done").status_code == 400
 
 
 # ---------------------------------------------------------------- assignment
@@ -180,7 +180,7 @@ def test_admin_approves_escalation(client, as_):
     ("sofia", WIFI, {"reason": "again"}, 403),                          # already escalated
     ("emma", CHAIR, {"reason": "x"}, 403),                              # closed
     ("ethan", AC, {"reason": "x"}, 403),                                # not the reporter
-    ("emma", AC, {"reason": "  "}, 422),                                # reason required
+    ("emma", AC, {"reason": "  "}, 400),                                # reason required
 ])
 def test_escalation_rules(client, as_, who, incident_id, body, code):
     assert client.post(f"/incidents/{incident_id}/escalate", headers=as_(who), json=body).status_code == code
@@ -203,4 +203,4 @@ def test_note_rules(client, as_):
                        json={"body": "secret", "is_internal": True}).status_code == 403
     assert client.post(f"/incidents/{CHAIR}/notes", headers=as_("emma"), json={"body": "hi"}).status_code == 403
     assert client.post(f"/incidents/{AC}/notes", headers=as_("liam"), json={"body": "hi"}).status_code == 404
-    assert client.post(f"/incidents/{TAP}/notes", headers=as_("liam"), json={"body": " "}).status_code == 422
+    assert client.post(f"/incidents/{TAP}/notes", headers=as_("liam"), json={"body": " "}).status_code == 400

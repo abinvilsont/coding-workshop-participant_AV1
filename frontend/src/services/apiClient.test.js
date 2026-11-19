@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mockApi } from '../test/mockApi';
-import { ApiError, apiRequest, saveSession, setUnauthorizedHandler } from './apiClient';
+import { ApiError, apiRequest, fieldErrors, saveSession, setUnauthorizedHandler } from './apiClient';
 
 describe('apiRequest', () => {
   it('sends JSON with the bearer token and returns the parsed body', async () => {
@@ -64,5 +64,25 @@ describe('apiRequest', () => {
     await expect(apiRequest('/dashboard')).rejects.toThrow('expired');
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     setUnauthorizedHandler(() => {});
+  });
+
+  it('maps validation errors from the API onto fields', async () => {
+    mockApi({ 'POST /incidents': { status: 400, body: {
+      message: 'Please check the form.',
+      errors: [
+        { loc: ['body', 'title'], msg: 'Value error, Title is required.' },
+        { loc: ['body', 'building_id'], msg: 'Input should be a valid integer' },
+        { loc: ['body', 'title'], msg: 'second message for the same field is ignored' },
+      ],
+    } } });
+    const err = await apiRequest('/incidents', { method: 'POST', body: {} }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(400);
+    expect(err.fields).toEqual({ title: 'Title is required.', building_id: 'Input should be a valid integer' });
+  });
+
+  it('has no field errors for other failures', () => {
+    expect(fieldErrors(undefined)).toEqual({});
+    expect(fieldErrors([{ loc: ['body'], msg: 'x' }, null])).toEqual({});
   });
 });

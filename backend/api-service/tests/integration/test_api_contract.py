@@ -2,7 +2,12 @@
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeout
+
+from tests.integration.conftest import TAP, USERS
 
 
 def test_health(client):
@@ -29,8 +34,41 @@ def test_wrong_method_uses_standard_error_shape(client):
 def test_validation_errors_list_every_field(client, as_):
     r = client.post("/incidents", headers=as_("emma"), json={})
     body = r.json()
-    assert r.status_code == 422 and body["message"]
+    assert r.status_code == 400 and body["message"]
     assert {e["loc"][-1] for e in body["errors"]} == {"title", "description", "category", "building_id"}
+
+
+def test_malformed_json_is_a_400(client, as_):
+    headers = {**as_("emma"), "Content-Type": "application/json"}
+    r = client.post("/incidents", headers=headers, content="{not json")
+    assert r.status_code == 400 and r.json()["message"]
+
+
+def test_wrong_types_and_bad_query_values_are_400(client, as_):
+    assert client.get("/incidents/abc", headers=as_("alice")).status_code == 400
+    assert client.get("/incidents", headers=as_("alice"), params={"limit": 0}).status_code == 400
+
+
+@pytest.mark.parametrize("path, body, check", [
+    ("/incidents/{TAP}", {"title": "Tap still dripping"}, ("title", "Tap still dripping")),
+    ("/buildings/{hq}", {"name": "ACME HQ (renamed)"}, ("name", "ACME HQ (renamed)")),
+    ("/floors/{floor}", {"name": "First Floor West"}, ("name", "First Floor West")),
+    ("/seats/{seat}", {"description": "Window desk"}, ("description", "Window desk")),
+    ("/engineers/{tom}", {"max_active_tickets": 9}, ("max_active_tickets", 9)),
+])
+def test_put_is_an_alias_of_patch(client, as_, facilities, path, body, check):
+    floor = facilities["hq_floor1"]
+    url = path.format(TAP=TAP, hq=facilities["hq"]["id"], floor=floor["id"],
+                      seat=floor["seats"][0]["id"], tom=USERS["tom"][0])
+    r = client.put(url, headers=as_("alice"), json=body)
+    assert r.status_code == 200, r.text
+    field, value = check
+    assert r.json()[field] == value
+
+
+def test_engineer_sets_availability_with_put(client, as_):
+    r = client.put("/engineers/me/availability", headers=as_("tom"), json={"availability": "busy"})
+    assert r.status_code == 200 and r.json()["availability"] == "busy"
 
 
 def test_unexpected_errors_return_safe_500(seed_conn, as_, monkeypatch):
@@ -87,11 +125,6 @@ def test_lambda_handler_end_to_end(seed_conn):
 
     r = handler(url_event("GET", "/incidents"), _Context())
     assert r["statusCode"] == 401 and json.loads(r["body"]) == {"message": "Please sign in."}
-
-
-import pytest
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.exc import TimeoutError as PoolTimeout
 
 
 @pytest.mark.parametrize("error, message", [

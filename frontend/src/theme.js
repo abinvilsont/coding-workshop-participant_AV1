@@ -34,6 +34,7 @@ export const STATUS_COLORS = {
   resolved: ['#166534', '#dcfce7'],
   closed: ['#334155', '#f1f5f9'],
   cancelled: ['#64748b', '#f1f5f9'],
+  merged: ['#0f766e', '#ccfbf1'],
 };
 
 export const PRIORITY_COLORS = {

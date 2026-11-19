@@ -35,6 +35,7 @@ def summary(inc: Incident) -> dict:
         "location_details": inc.location_details,
         "reported_by": inc.reporter.full_name,
         "assigned_engineer": inc.engineer.full_name if inc.engineer else None,
+        "merged_into_id": inc.merged_into_id,
     }
 
 
@@ -45,6 +46,9 @@ def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
             *SUMMARY_OPTIONS,
             selectinload(Incident.notes).joinedload(IncidentNote.author),
             selectinload(Incident.history).joinedload(IncidentHistory.actor),
+            selectinload(Incident.followers),
+            selectinload(Incident.merged_into),
+            selectinload(Incident.merged_from).joinedload(Incident.reporter),
         )
         .where(Incident.id == incident_id)
     )
@@ -118,6 +122,16 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
         "notes": notes,
         "history": history,
         "permissions": perms.permissions(user, inc),
+        "merged_into": (
+            {"id": inc.merged_into.id, "reference": inc.merged_into.reference, "title": inc.merged_into.title}
+            if inc.merged_into
+            else None
+        ),
+        "merged_from": [
+            {"id": m.id, "reference": m.reference, "title": m.title, "reported_by": m.reporter.full_name}
+            for m in inc.merged_from
+        ],
+        "followers": [{"id": f.id, "name": f.full_name} for f in inc.followers],
     }
 
 

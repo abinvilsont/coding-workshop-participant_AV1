@@ -24,3 +24,8 @@ export const escalateIncident = (id, reason, requestedPriority) =>
   });
 export const addNote = (id, body, isInternal = false) =>
   apiRequest(`/incidents/${id}/notes`, { method: 'POST', body: { body, is_internal: isInternal } });
+
+// Duplicates (admin): open incidents to merge into, likeliest first; merge returns the target incident
+export const getMergeCandidates = (id) => apiRequest(`/incidents/${id}/merge-candidates`);
+export const mergeIncident = (id, targetId) =>
+  apiRequest(`/incidents/${id}/merge`, { method: 'POST', body: { target_id: targetId } });

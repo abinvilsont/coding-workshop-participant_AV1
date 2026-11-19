@@ -83,6 +83,7 @@ def create_engineer(body: EngineerCreate, db: DbSession, admin: AdminUser):
     return _engineer_or_404(db, user.id)
 
 
+@router.put("/me/availability")  # PUT is accepted as an alias of PATCH
 @router.patch("/me/availability")
 def update_my_availability(body: AvailabilityUpdate, db: DbSession, user: CurrentUser):
     """Engineers set their own availability (available / busy / on_leave / offline)."""
@@ -99,6 +100,7 @@ def get_engineer(engineer_id: int, db: DbSession, _user: AdminUser):
     return _engineer_or_404(db, engineer_id)
 
 
+@router.put("/{engineer_id}")  # PUT is accepted as an alias of PATCH
 @router.patch("/{engineer_id}")
 def update_engineer(engineer_id: int, body: EngineerUpdate, db: DbSession, admin: AdminUser):
     """Update an engineer's profile, capacity, availability or deactivate the account."""

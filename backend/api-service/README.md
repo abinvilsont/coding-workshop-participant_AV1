@@ -20,17 +20,21 @@ api-service/
     │                      #   Incident, IncidentNote, IncidentHistory + enums
     ├── schemas/           # Pydantic request/response models
     ├── services/
-    │   ├── permissions.py # role-based rules (single source of truth)
-    │   └── incidents.py   # query helpers, response builders
+    │   ├── permissions.py   # role-based rules (single source of truth)
+    │   ├── notifications.py # who is notified for each event
+    │   └── incidents.py     # query helpers, response builders
     └── api/
         ├── deps.py        # get_current_user, require_roles(), AdminUser
-        └── routes/        # auth, incidents, dashboard, lookups
+        └── routes/        # auth, incidents, dashboard, facilities, engineers, notifications
 ```
 
 ## Endpoints
 
 All routes except `/auth/register`, `/auth/login` and `/health` need
-`Authorization: Bearer <token>`. Errors are returned as `{"message": "..."}`.
+`Authorization: Bearer <token>`.
+- Errors come back as `{"message": "..."}`.
+- Invalid input returns **400** with an `errors: [{loc, msg}]` list, one entry per field.
+- `PUT` is accepted as an alias of every `PATCH` route.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
@@ -40,15 +44,23 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | GET | `/incidents` | any | List (scoped by role); filters `status`, `priority`, `escalated`, `unassigned`, `q`, `limit`, `offset` |
 | POST | `/incidents` | any | Report an incident |
 | GET | `/incidents/{id}` | can view | Detail + notes + history + `permissions` |
-| PATCH | `/incidents/{id}` | reporter (while open) / admin | Edit details; admin also `priority`, `is_escalated: false` |
+| PATCH / PUT | `/incidents/{id}` | reporter (while open) / admin | Edit details; admin also `priority`, `is_escalated: false` |
 | DELETE | `/incidents/{id}` | admin | Delete |
 | POST | `/incidents/{id}/status` | role-dependent | Change status (+ optional comment) |
-| POST | `/incidents/{id}/assign` | admin | Assign / reassign engineer |
+| POST | `/incidents/{id}/assign` | admin | Assign / reassign; refuses on-leave, offline, inactive (400) or full (409) engineers |
 | POST | `/incidents/{id}/escalate` | reporter | Escalate, optionally request higher priority |
 | POST | `/incidents/{id}/notes` | can view, not closed | Add note (`is_internal` for engineers/admins) |
+| GET | `/incidents/{id}/merge-candidates` | admin | Open incidents to merge into, same building + category first |
+| POST | `/incidents/{id}/merge` | admin | `{target_id}`: merge this duplicate into another open incident; its reporter follows the target |
 | GET | `/dashboard` | any | Role-specific summary |
-| GET | `/facilities` | any | Buildings → floors → seats |
-| GET | `/engineers` | admin | Engineers with workload |
+| GET | `/facilities` | any | Buildings → floors → seats (`include_inactive` for admins) |
+| POST, PATCH / PUT, DELETE | `/buildings`, `/floors`, `/seats` (`/{id}`) | admin | Manage locations; delete refused (409) while in use |
+| GET, POST | `/engineers` | admin | List with workload / create engineer account |
+| GET, PATCH / PUT | `/engineers/{id}` | admin | View / update profile, capacity, availability, active flag |
+| PATCH / PUT | `/engineers/me/availability` | engineer | Set own availability |
+| GET | `/notifications` | any | Own notifications, newest first, + unread count |
+| GET | `/notifications/unread-count` | any | Cheap badge count (polled every 30 s) |
+| POST | `/notifications/{id}/read`, `/notifications/read-all` | any | Mark read (optionally for one incident) |
 
 ### Role rules (see `app/services/permissions.py`)
 
@@ -56,7 +68,9 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
   work starts; closes (confirms) or reopens a `resolved` incident.
 - **Engineer** sees assigned incidents; `assigned → in_progress ⇄ on_hold → resolved`
   (and can reopen `resolved`); can add internal notes.
-- **Facility Admin** sees and manages everything.
+- **Facility Admin** sees and manages everything, including merging duplicates.
+- **Follower** (reporter of a duplicate merged into the incident) can view it, add
+  notes and gets every update the reporter gets, but can't confirm, reopen or cancel.
 
 Status, assignment, priority and escalation changes are written to
 `incident_history` by a database trigger; the API sets `app.user_id` per request

@@ -74,7 +74,9 @@ async def validation_error(_request: Request, exc: RequestValidationError):
     # Our own validators already produce full sentences; prefix field for built-in ones
     if field and not msg.endswith("."):
         msg = f"{field}: {msg}"
-    return JSONResponse({"message": msg, "errors": jsonable_errors(errors)}, status_code=422)
+    # 400 (not FastAPI's default 422) for any invalid or malformed request body,
+    # query or path value, matching the API contract.
+    return JSONResponse({"message": msg, "errors": jsonable_errors(errors)}, status_code=400)
 
 
 def jsonable_errors(errors):

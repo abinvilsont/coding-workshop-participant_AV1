@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
+import useFieldErrors from '../hooks/useFieldErrors';
 import { useIsPhone } from '../hooks/useResponsive';
 import { getFacilities } from '../services/incidentService';
 import { CATEGORIES, PRIORITIES, categoryLabel, titleCase } from '../utils/format';
@@ -40,6 +41,7 @@ export default function IncidentForm({
   const [facilities, setFacilities] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const fe = useFieldErrors();
 
   useEffect(() => {
     getFacilities()
@@ -55,6 +57,7 @@ export default function IncidentForm({
 
   const set = (field) => (e) => {
     const value = e.target.value;
+    fe.clear(field);
     setForm((f) => {
       const next = { ...f, [field]: value };
       // Changing a parent location clears its children
@@ -67,8 +70,14 @@ export default function IncidentForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.title.trim() || !form.description.trim() || !form.category || !form.building_id) {
-      setError('Please fill in the title, description, category and building.');
+    const problems = {};
+    if (!form.title.trim()) problems.title = 'Enter a short title.';
+    if (!form.description.trim()) problems.description = 'Describe the problem.';
+    if (!form.category) problems.category = 'Choose a category.';
+    if (!form.building_id) problems.building_id = 'Choose a building.';
+    fe.set(problems);
+    if (Object.keys(problems).length) {
+      setError('Please fix the highlighted fields.');
       return;
     }
     const payload = {
@@ -86,7 +95,7 @@ export default function IncidentForm({
     try {
       await onSubmit(payload);
     } catch (err) {
-      setError(err.message);
+      setError(fe.fromApi(err) ? 'Please fix the highlighted fields.' : err.message);
       setSaving(false);
     }
   };
@@ -101,6 +110,9 @@ export default function IncidentForm({
 
         <TextField
           label="Title"
+          required
+          disabled={saving}
+          {...fe.props('title')}
           value={form.title}
           onChange={set('title')}
           placeholder="e.g. Air conditioning not working"
@@ -109,6 +121,9 @@ export default function IncidentForm({
 
         <TextField
           label="Description"
+          required
+          disabled={saving}
+          {...fe.props('description')}
           multiline
           minRows={4}
           value={form.description}
@@ -118,14 +133,31 @@ export default function IncidentForm({
         />
 
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: cols(showPriority ? 2 : 1) }}>
-          <TextField select label="Category" value={form.category} onChange={set('category')} slotProps={NATIVE}>
+          <TextField
+            select
+            label="Category"
+            required
+            disabled={saving}
+            {...fe.props('category')}
+            value={form.category}
+            onChange={set('category')}
+            slotProps={NATIVE}
+          >
             <option value="">Select…</option>
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{categoryLabel(c)}</option>
             ))}
           </TextField>
           {showPriority && (
-            <TextField select label="Priority" value={form.priority} onChange={set('priority')} slotProps={NATIVE}>
+            <TextField
+              select
+              label="Priority"
+              disabled={saving}
+              {...fe.props('priority')}
+              value={form.priority}
+              onChange={set('priority')}
+              slotProps={NATIVE}
+            >
               {priorities.map((p) => (
                 <option key={p} value={p}>{titleCase(p)}</option>
               ))}
@@ -140,9 +172,11 @@ export default function IncidentForm({
               <TextField
                 select
                 label="Building"
+                required
+                {...fe.props('building_id')}
                 value={form.building_id}
                 onChange={set('building_id')}
-                disabled={!facilities}
+                disabled={!facilities || saving}
                 slotProps={NATIVE}
               >
                 <option value="">{facilities ? 'Select…' : 'Loading…'}</option>
@@ -155,7 +189,8 @@ export default function IncidentForm({
                 label="Floor (optional)"
                 value={form.floor_id}
                 onChange={set('floor_id')}
-                disabled={!building}
+                {...fe.props('floor_id')}
+                disabled={!building || saving}
                 slotProps={NATIVE}
               >
                 <option value="">—</option>
@@ -168,7 +203,8 @@ export default function IncidentForm({
                 label="Seat (optional)"
                 value={form.seat_id}
                 onChange={set('seat_id')}
-                disabled={!floor?.seats.length}
+                {...fe.props('seat_id')}
+                disabled={!floor?.seats.length || saving}
                 slotProps={NATIVE}
               >
                 <option value="">—</option>
@@ -183,6 +219,8 @@ export default function IncidentForm({
               label="More details (optional)"
               value={form.location_details}
               onChange={set('location_details')}
+              disabled={saving}
+              {...fe.props('location_details')}
               placeholder="e.g. Kitchen next to lift B"
               slotProps={{ htmlInput: { maxLength: 255 } }}
             />

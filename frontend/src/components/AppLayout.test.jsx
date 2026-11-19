@@ -56,6 +56,12 @@ describe('IncidentTable', () => {
     expect(list).toHaveTextContent('Unassigned · Updated');
   });
 
+  it('labels merged duplicates as Merged', () => {
+    render(<IncidentTable incidents={[incident({ id: 5, status: 'cancelled', merged_into_id: 4 })]} empty="None" />);
+    expect(screen.getByText('Merged')).toBeInTheDocument();
+    expect(screen.queryByText('Cancelled')).not.toBeInTheDocument();
+  });
+
   it('shows the empty message', () => {
     render(<IncidentTable incidents={[]} empty="No incidents yet." />);
     expect(screen.getByText('No incidents yet.')).toBeInTheDocument();

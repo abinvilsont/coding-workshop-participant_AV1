@@ -12,7 +12,8 @@ test('a new employee registers with an acme.inc email and signs in', async ({ pa
   await page.locator('input[autocomplete="new-password"]').first().fill(PASSWORD);
   await page.getByLabel('Confirm password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toHaveText('Please use your @acme.inc email address.');
+  await expect(page.getByRole('alert')).toHaveText('Please fix the highlighted fields.');
+  await expect(page.getByLabel('Work email')).toHaveAccessibleDescription('Please use your @acme.inc email address.');
 
   await page.getByLabel('Work email').fill(email);
   await page.getByRole('button', { name: 'Create account' }).click();

@@ -2,7 +2,8 @@
 -- ACME Facility Incident Management - PostgreSQL schema
 --
 -- Tables: users, buildings, floors, seats, engineer_profiles,
---         incidents, incident_notes, incident_history
+--         incidents, incident_followers, incident_notes, incident_history,
+--         notifications
 --
 -- Run:  psql -h <host> -U <user> -d <db> -f backend/db/schema.sql
 -- WARNING: re-running drops and recreates all of these tables (data is lost).
@@ -17,6 +18,7 @@ SET LOCAL client_min_messages = warning;
 DROP VIEW  IF EXISTS engineer_workload;
 DROP TABLE IF EXISTS notifications     CASCADE;
 DROP TABLE IF EXISTS incident_history  CASCADE;
+DROP TABLE IF EXISTS incident_followers CASCADE;
 DROP TABLE IF EXISTS incident_notes    CASCADE;
 DROP TABLE IF EXISTS incidents         CASCADE;
 DROP TABLE IF EXISTS engineer_profiles CASCADE;
@@ -222,7 +224,12 @@ CREATE TABLE incidents (
     resolved_at           TIMESTAMPTZ,
     closed_at             TIMESTAMPTZ,
 
+    -- duplicates: an admin merges this incident into another (it is then cancelled)
+    merged_into_id        BIGINT REFERENCES incidents (id) ON DELETE SET NULL,
+
     CONSTRAINT incidents_reference_uq UNIQUE (reference),
+    CONSTRAINT incidents_not_merged_into_self_chk CHECK (merged_into_id IS NULL OR merged_into_id <> id),
+    CONSTRAINT incidents_merged_is_cancelled_chk CHECK (merged_into_id IS NULL OR status = 'cancelled'),
     CONSTRAINT incidents_floor_fk FOREIGN KEY (floor_id, building_id)
         REFERENCES floors (id, building_id) ON DELETE RESTRICT,
     CONSTRAINT incidents_seat_fk FOREIGN KEY (seat_id, floor_id)
@@ -240,9 +247,24 @@ CREATE INDEX incidents_reported_by_idx ON incidents (reported_by);
 CREATE INDEX incidents_engineer_idx    ON incidents (assigned_engineer_id) WHERE assigned_engineer_id IS NOT NULL;
 CREATE INDEX incidents_building_idx    ON incidents (building_id);
 CREATE INDEX incidents_created_at_idx  ON incidents (created_at DESC);
+CREATE INDEX incidents_merged_into_idx ON incidents (merged_into_id) WHERE merged_into_id IS NOT NULL;
 
 CREATE TRIGGER incidents_updated_at BEFORE UPDATE ON incidents
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- Incident followers - other employees who reported the same problem
+-- (added when an admin merges their duplicate into this incident).
+-- They can view the incident, add notes and get the reporter's updates.
+-- ---------------------------------------------------------------------
+CREATE TABLE incident_followers (
+    incident_id  BIGINT      NOT NULL REFERENCES incidents (id) ON DELETE CASCADE,
+    user_id      BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    added_by     BIGINT      REFERENCES users (id) ON DELETE SET NULL,
+    added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (incident_id, user_id)
+);
+CREATE INDEX incident_followers_user_idx ON incident_followers (user_id);
 
 -- ---------------------------------------------------------------------
 -- Incident notes - conversation between employee, engineer and admin

@@ -76,6 +76,32 @@ describe('Facilities admin page', () => {
     expect(screen.getByText('No floors yet.')).toBeInTheDocument();
   });
 
+  it('flags an empty required field when you leave it, and shows server field errors under the field', async () => {
+    const user = userEvent.setup();
+    backend({ 'POST /buildings': { status: 400, body: {
+      message: 'code: String should have at most 20 characters',
+      errors: [{ loc: ['body', 'code'], msg: 'String should have at most 20 characters' }],
+    } } });
+    await renderPage();
+    await user.click(screen.getByRole('button', { name: 'Add building' }));
+
+    const code = screen.getByLabelText(/^Code/);
+    await user.click(code);
+    await user.tab();
+    expect(code).toHaveAccessibleDescription('Enter a short code, e.g. HQ2.');
+    expect(code).toHaveAttribute('aria-invalid', 'true');
+
+    await user.type(code, 'LON');
+    expect(code).not.toHaveAttribute('aria-invalid', 'true');
+    await user.type(screen.getByLabelText(/^Name/), 'London Office');
+    await user.click(screen.getByRole('button', { name: 'Create building' }));
+    expect(await screen.findByText('String should have at most 20 characters')).toBeInTheDocument();
+    expect(code).toHaveAccessibleDescription('String should have at most 20 characters');
+
+    await user.type(code, 'X'); // editing the field hides the stale server message
+    expect(code).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('adds a floor and a seat', async () => {
     const user = userEvent.setup();
     await renderPage();

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { FACILITIES, mockApi } from '../test/mockApi';
+import { ApiError } from '../services/apiClient';
 import IncidentForm from './IncidentForm';
 
 const field = (name) => screen.getByLabelText(new RegExp(`^${name}`));
@@ -20,8 +21,19 @@ describe('IncidentForm', () => {
     const onSubmit = await renderForm();
     await user.type(field('Title'), '   ');
     await user.click(screen.getByRole('button', { name: 'Submit incident' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Please fill in the title, description, category and building.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    // each problem is shown under its own field and marks it invalid
+    expect(field('Title')).toHaveAccessibleDescription('Enter a short title.');
+    expect(field('Title')).toHaveAttribute('aria-invalid', 'true');
+    expect(field('Description')).toHaveAccessibleDescription('Describe the problem.');
+    expect(field('Category')).toHaveAccessibleDescription('Choose a category.');
+    expect(field('Building')).toHaveAccessibleDescription('Choose a building.');
     expect(onSubmit).not.toHaveBeenCalled();
+
+    // typing fixes clear that field's message only
+    await user.type(field('Title'), 'Projector broken');
+    expect(field('Title')).not.toHaveAttribute('aria-invalid', 'true');
+    expect(field('Description')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('cascades building -> floor -> seat and submits numeric ids', async () => {
@@ -73,6 +85,16 @@ describe('IncidentForm', () => {
     expect(field('Title')).toHaveValue('Old title');
     expect(field('Category')).toHaveValue('hvac');
     expect(screen.queryByLabelText(/^Priority/)).not.toBeInTheDocument();
+  });
+
+  it('shows server validation errors under the matching field', async () => {
+    const user = userEvent.setup();
+    const err = new ApiError(400, 'Title must be at most 200 characters.', { title: 'Title must be at most 200 characters.' });
+    const onSubmit = vi.fn().mockRejectedValue(err);
+    await renderForm({ onSubmit, initial: { title: 'T', description: 'D', category: 'hvac', building_id: 1 } });
+    await user.click(screen.getByRole('button', { name: 'Submit incident' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Please fix the highlighted fields.');
+    expect(field('Title')).toHaveAccessibleDescription('Title must be at most 200 characters.');
   });
 
   it('shows server errors and lets the user retry', async () => {

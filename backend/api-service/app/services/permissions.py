@@ -9,12 +9,15 @@ Engineer  : sees incidents assigned to them; moves them through
             assigned -> in_progress <-> on_hold -> resolved; adds notes
             (incl. internal notes).
 Admin     : sees and manages everything: edit, priority, assignment,
-            any status change, delete.
+            any status change, merging duplicates, delete.
+Follower  : an employee whose duplicate report was merged into this
+            incident. Can view it, add notes and is kept informed, but
+            only the original reporter confirms, reopens or cancels.
 """
 
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 
-from app.models import FINAL_STATUSES, Incident, IncidentStatus as S, User
+from app.models import FINAL_STATUSES, Incident, IncidentStatus as S, User, incident_followers
 
 # Transitions an assigned engineer may make
 ENGINEER_TRANSITIONS = {
@@ -42,15 +45,29 @@ def is_assignee(user: User, inc: Incident) -> bool:
     return inc.assigned_engineer_id == user.id
 
 
+def is_follower(user: User, inc: Incident) -> bool:
+    return any(f.id == user.id for f in inc.followers)
+
+
 def can_view(user: User, inc: Incident) -> bool:
-    return user.is_admin or is_reporter(user, inc) or is_assignee(user, inc)
+    return user.is_admin or is_reporter(user, inc) or is_assignee(user, inc) or is_follower(user, inc)
 
 
 def visibility_filter(user: User):
     """SQL WHERE clause restricting incidents to those the user may see."""
     if user.is_admin:
         return True
-    return or_(Incident.reported_by_id == user.id, Incident.assigned_engineer_id == user.id)
+    followed = select(incident_followers.c.incident_id).where(incident_followers.c.user_id == user.id)
+    return or_(
+        Incident.reported_by_id == user.id,
+        Incident.assigned_engineer_id == user.id,
+        Incident.id.in_(followed),
+    )
+
+
+def can_merge(user: User, inc: Incident) -> bool:
+    """Admins merge a duplicate into another incident while both are still open for work."""
+    return user.is_admin and inc.status not in FINAL_STATUSES and inc.merged_into_id is None
 
 
 def allowed_transitions(user: User, inc: Incident) -> set[S]:
@@ -101,5 +118,6 @@ def permissions(user: User, inc: Incident) -> dict:
         "can_add_note": can_add_note(user, inc),
         "can_add_internal_note": can_add_internal_note(user, inc),
         "can_delete": user.is_admin,
+        "can_merge": can_merge(user, inc),
         "status_transitions": sorted(allowed_transitions(user, inc), key=order.index),
     }

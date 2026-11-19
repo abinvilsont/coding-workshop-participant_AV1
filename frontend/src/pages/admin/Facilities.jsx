@@ -36,14 +36,29 @@ const ActionButton = (props) => <Button size="small" sx={{ minWidth: 0 }} {...pr
 
 const EMPTY_BUILDING = { code: '', name: '', address: '', city: '', country: '' };
 
-function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCancel }) {
+const REQUIRED_BUILDING = { code: 'Enter a short code, e.g. HQ2.', name: 'Enter the building name.' };
+
+function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCancel, serverErrors = {}, busy = false }) {
   const [form, setForm] = useState(() => ({
     ...EMPTY_BUILDING,
     ...Object.fromEntries(Object.entries(initial).map(([k, v]) => [k, v ?? ''])),
   }));
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const [touched, setTouched] = useState({});
+  const [edited, setEdited] = useState({}); // fields changed since the last server error
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+    setEdited((t) => ({ ...t, [k]: true }));
+  };
+  const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
+  // Message under a field: a required field left empty, else the API's message for it
+  const fieldProps = (k) => {
+    const message = (REQUIRED_BUILDING[k] && touched[k] && !form[k].trim() && REQUIRED_BUILDING[k])
+      || (!edited[k] && serverErrors[k]) || '';
+    return { error: Boolean(message), helperText: message || undefined, onBlur: blur(k), disabled: busy };
+  };
   const submit = (e) => {
     e.preventDefault();
+    setEdited({});
     onSubmit({
       code: form.code.trim(),
       name: form.name.trim(),
@@ -56,29 +71,29 @@ function BuildingForm({ initial = EMPTY_BUILDING, submitLabel, onSubmit, onCance
     <Box component="form" onSubmit={submit}>
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <TextField id="bld-code" label="Code" value={form.code} onChange={set('code')} required
+          <TextField id="bld-code" label="Code" {...fieldProps('code')} value={form.code} onChange={set('code')} required
             placeholder="HQ2" slotProps={{ htmlInput: { maxLength: 20 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 8 }}>
-          <TextField id="bld-name" label="Name" value={form.name} onChange={set('name')} required
+          <TextField id="bld-name" label="Name" {...fieldProps('name')} value={form.name} onChange={set('name')} required
             placeholder="ACME North Campus" slotProps={{ htmlInput: { maxLength: 150 } }} />
         </Grid>
         <Grid size={12}>
-          <TextField id="bld-address" label="Address (optional)" value={form.address} onChange={set('address')}
+          <TextField id="bld-address" label="Address (optional)" {...fieldProps('address')} value={form.address} onChange={set('address')}
             slotProps={{ htmlInput: { maxLength: 255 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField id="bld-city" label="City (optional)" value={form.city} onChange={set('city')}
+          <TextField id="bld-city" label="City (optional)" {...fieldProps('city')} value={form.city} onChange={set('city')}
             slotProps={{ htmlInput: { maxLength: 100 } }} />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>
-          <TextField id="bld-country" label="Country (optional)" value={form.country} onChange={set('country')}
+          <TextField id="bld-country" label="Country (optional)" {...fieldProps('country')} value={form.country} onChange={set('country')}
             slotProps={{ htmlInput: { maxLength: 100 } }} />
         </Grid>
       </Grid>
       <Stack direction="row" spacing={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
-        <Button variant="outlined" color="inherit" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" variant="contained" disabled={!form.code.trim() || !form.name.trim()}>
+        <Button variant="outlined" color="inherit" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button type="submit" variant="contained" disabled={busy || !form.code.trim() || !form.name.trim()}>
           {submitLabel}
         </Button>
       </Stack>
@@ -319,7 +334,7 @@ export default function Facilities() {
   const [selectedId, setSelectedId] = useState(null);
   const [mode, setMode] = useState('view'); // view | new | edit
   const [loadError, setLoadError] = useState('');
-  const { run: runRaw, busy, error, setError } = useAction();
+  const { run: runRaw, busy, error, setError, fields } = useAction();
 
   // State is set in promise callbacks, so calling load() from an effect is safe.
   const load = useCallback(
@@ -406,6 +421,8 @@ export default function Facilities() {
             {mode === 'new' && (
               <Section title="New building">
                 <BuildingForm
+                  serverErrors={fields}
+                  busy={busy}
                   submitLabel="Create building"
                   onCancel={() => setMode('view')}
                   onSubmit={async (body) => {
@@ -458,6 +475,8 @@ export default function Facilities() {
                 {mode === 'edit' ? (
                   <BuildingForm
                     key={building.id}
+                    serverErrors={fields}
+                    busy={busy}
                     initial={building}
                     submitLabel="Save changes"
                     onCancel={() => setMode('view')}

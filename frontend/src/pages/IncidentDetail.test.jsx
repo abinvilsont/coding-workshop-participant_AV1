@@ -239,4 +239,82 @@ describe('IncidentDetail', () => {
     expect(await screen.findByText('Notes are closed for this incident.')).toBeInTheDocument();
     expect(screen.getByText('No notes yet.')).toBeInTheDocument();
   });
+
+  describe('duplicates', () => {
+    const CANDIDATES = [
+      incident({ id: 9, reference: 'INC-000009', title: 'AC blowing warm air', status: 'assigned' }),
+      incident({ id: 12, reference: 'INC-000012', title: 'Lights flicker', status: 'open' }),
+    ];
+
+    it('admin merges this incident into another and is taken there', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const api = setup(incident({ status: 'open', permissions: { can_merge: true } }), {
+        'GET /incidents/4/merge-candidates': CANDIDATES,
+        'POST /incidents/4/merge': incident({ id: 9, reference: 'INC-000009' }),
+      });
+      render(<IncidentDetail id={4} user={USERS.admin} />);
+
+      const block = await screen.findByRole('region', { name: 'Merge duplicate' });
+      const select = within(block).getByLabelText(/^Merge into/);
+      await within(block).findByRole('option', { name: /INC-000009 · AC blowing warm air · ACME Headquarters · Assigned/ });
+      expect(within(block).getByRole('button', { name: 'Merge' })).toBeDisabled();
+
+      await user.selectOptions(select, '9');
+      await user.click(within(block).getByRole('button', { name: 'Merge' }));
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Merge INC-000004 into INC-000009?'));
+      expect(api.calls.find((c) => c.path === '/incidents/4/merge').body).toEqual({ target_id: 9 });
+      await vi.waitFor(() => expect(window.location.hash).toBe('#/incidents/9'));
+    });
+
+    it('does nothing when the admin cancels the confirmation', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      const api = setup(incident({ status: 'open', permissions: { can_merge: true } }), {
+        'GET /incidents/4/merge-candidates': CANDIDATES,
+      });
+      render(<IncidentDetail id={4} user={USERS.admin} />);
+      const block = await screen.findByRole('region', { name: 'Merge duplicate' });
+      await within(block).findByRole('option', { name: /INC-000012/ });
+      await user.selectOptions(within(block).getByLabelText(/^Merge into/), '12');
+      await user.click(within(block).getByRole('button', { name: 'Merge' }));
+      expect(api.calls.some((c) => c.path === '/incidents/4/merge')).toBe(false);
+    });
+
+    it('says so when there is nothing to merge into', async () => {
+      setup(incident({ status: 'open', permissions: { can_merge: true } }), {
+        'GET /incidents/4/merge-candidates': [],
+      });
+      render(<IncidentDetail id={4} user={USERS.admin} />);
+      expect(await screen.findByText('No other open incidents to merge into.')).toBeInTheDocument();
+    });
+
+    it('shows a merged duplicate with a link to the main incident', async () => {
+      setup(incident({ status: 'cancelled', merged_into: { id: 9, reference: 'INC-000009', title: 'AC blowing warm air' } }));
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+      expect(await screen.findByRole('link', { name: 'INC-000009 · AC blowing warm air' })).toHaveAttribute('href', '#/incidents/9');
+      expect(within(screen.getByTestId('incident-badges')).getByText('Merged')).toBeInTheDocument();
+      expect(screen.queryByText('Cancelled')).not.toBeInTheDocument();
+    });
+
+    it('lists who else reported it and tells a follower why they see it', async () => {
+      const liam = { id: 7, name: 'Liam Lee', email: 'liam.lee@acme.inc', role: 'employee' };
+      setup(incident({
+        merged_from: [{ id: 15, reference: 'INC-000015', title: 'AC warm', reported_by: 'Liam Lee' }],
+        followers: [{ id: 7, name: 'Liam Lee' }],
+      }));
+      render(<IncidentDetail id={4} user={liam} />);
+      const details = await screen.findByTestId('incident-details');
+      expect(details).toHaveTextContent('Also reported byLiam Lee (INC-000015)');
+      expect(within(details).getByRole('link', { name: 'INC-000015' })).toHaveAttribute('href', '#/incidents/15');
+      expect(screen.getByText(/You're following this incident/)).toHaveTextContent('Emma Employee confirms the fix.');
+    });
+
+    it('does not show the follower notice to the original reporter', async () => {
+      setup(incident({ followers: [{ id: 7, name: 'Liam Lee' }] }));
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+      await screen.findByRole('heading', { name: 'Air conditioning not cooling' });
+      expect(screen.queryByText(/You're following this incident/)).not.toBeInTheDocument();
+    });
+  });
 });

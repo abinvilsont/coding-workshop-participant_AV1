@@ -10,7 +10,7 @@ import { navigate } from '../router';
 import { markAllRead } from '../services/notificationService';
 import {
   addNote, assignEngineer, changeStatus, deleteIncident, escalateIncident, getEngineers,
-  getIncident, updateIncident,
+  getIncident, getMergeCandidates, mergeIncident, updateIncident,
 } from '../services/incidentService';
 import {
   AVAILABILITY_LABELS, PRIORITIES, ROLE_LABELS, STATUS_LABELS, categoryLabel, formatDateTime,
@@ -273,6 +273,63 @@ function EscalateAction({ incident, run }) {
   );
 }
 
+/** Admin: merge this incident into another open one that reports the same problem. */
+function MergeAction({ incident, run }) {
+  const [candidates, setCandidates] = useState(null);
+  const [target, setTarget] = useState('');
+
+  useEffect(() => {
+    getMergeCandidates(incident.id).then(setCandidates).catch(() => setCandidates([]));
+  }, [incident.id]);
+
+  const chosen = candidates?.find((c) => c.id === Number(target));
+
+  const merge = async () => {
+    const ok = window.confirm(
+      `Merge ${incident.reference} into ${chosen.reference}? ${incident.reference} will be closed as a duplicate, ` +
+      `and ${incident.reported_by} will get ${chosen.reference}'s updates.`,
+    );
+    if (!ok) return;
+    // The response is the other incident, so open it instead of showing it here
+    if (await run(async () => { await mergeIncident(incident.id, chosen.id); return null; })) {
+      navigate(`/incidents/${chosen.id}`);
+    }
+  };
+
+  return (
+    <ActionBlock id="merge" title="Merge duplicate">
+      <Typography variant="body2" color="text.secondary">
+        Same problem reported twice? Merge this one into the other: both reporters then get every update.
+      </Typography>
+      {candidates?.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">No other open incidents to merge into.</Typography>
+      ) : (
+        <InlineForm>
+          <TextField
+            select
+            label="Merge into"
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            disabled={!candidates}
+            helperText="Same building and category first"
+            slotProps={nativeSelect}
+          >
+            <option value="">{candidates ? 'Select incident…' : 'Loading…'}</option>
+            {candidates?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.reference} · {c.title} · {c.building} · {STATUS_LABELS[c.status]}
+              </option>
+            ))}
+          </TextField>
+          <Button variant="outlined" disabled={!chosen} onClick={merge} sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+            Merge
+          </Button>
+        </InlineForm>
+      )}
+    </ActionBlock>
+  );
+}
+
 function Notes({ incident, user, run }) {
   const isPhone = useIsPhone();
   const [body, setBody] = useState('');
@@ -433,7 +490,8 @@ export default function IncidentDetail({ id, user }) {
 
   const p = incident.permissions;
   const hasActions =
-    p.status_transitions.length || p.can_assign || p.can_set_priority || p.can_escalate || p.can_delete;
+    p.status_transitions.length || p.can_assign || p.can_set_priority || p.can_escalate || p.can_merge || p.can_delete;
+  const following = incident.followers?.some((f) => f.id === user.id);
 
   const handleDelete = async () => {
     if (!window.confirm(`Permanently delete ${incident.reference}? This cannot be undone.`)) return;
@@ -463,7 +521,7 @@ export default function IncidentDetail({ id, user }) {
             sx={{ flexWrap: 'wrap' }}
             data-testid="incident-badges"
           >
-            <StatusBadge status={incident.status} />
+            <StatusBadge status={incident.status} merged={Boolean(incident.merged_into)} />
             <PriorityBadge priority={incident.priority} requested={incident.requested_priority} />
             {incident.is_escalated && <EscalatedBadge />}
             <Typography variant="body2" color="text.secondary">{categoryLabel(incident.category)}</Typography>
@@ -476,6 +534,21 @@ export default function IncidentDetail({ id, user }) {
         )}
       </Stack>
 
+      {incident.merged_into && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          This report was merged into{' '}
+          <Link href={`#/incidents/${incident.merged_into.id}`}>
+            {incident.merged_into.reference} · {incident.merged_into.title}
+          </Link>
+          , which is about the same problem. Updates continue there.
+        </Alert>
+      )}
+      {following && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          You're following this incident because your report of the same problem was merged into it. You'll get
+          every update; {incident.reported_by} confirms the fix.
+        </Alert>
+      )}
       {actionError && <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>}
 
       <Box
@@ -563,6 +636,16 @@ export default function IncidentDetail({ id, user }) {
                 )}
               </DetailRow>
               <DetailRow label="Reported by">{incident.reported_by}</DetailRow>
+              {incident.merged_from?.length > 0 && (
+                <DetailRow label="Also reported by">
+                  {incident.merged_from.map((m, idx) => (
+                    <span key={m.id}>
+                      {idx > 0 && <br />}
+                      {m.reported_by} (<Link href={`#/incidents/${m.id}`}>{m.reference}</Link>)
+                    </span>
+                  ))}
+                </DetailRow>
+              )}
               <DetailRow label="Engineer">
                 {incident.assigned_engineer ?? (
                   <Typography component="span" variant="body2" color="text.secondary">Not assigned yet</Typography>
@@ -581,6 +664,7 @@ export default function IncidentDetail({ id, user }) {
               {p.can_assign && <AssignAction incident={incident} run={run} />}
               {p.can_set_priority && <PriorityAction incident={incident} run={run} />}
               {p.can_escalate && <EscalateAction incident={incident} run={run} />}
+              {p.can_merge && <MergeAction incident={incident} run={run} />}
               {p.can_delete && (
                 <ActionBlock id="delete">
                   <Button fullWidth variant="contained" color="error" onClick={handleDelete}>
