@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>67e47d3</code> (deployed to AWS, migration 006 applied)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>4fbf1d2</code> (deployed to AWS) + uncommitted soft note</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1023,6 +1023,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 25</span>
+      <span class="log-what">Soft note when reporting outside your usual building</span>
+      <span class="log-detail">When someone picks a building other than their usual one, the note under the location changes to "This isn't your usual building (…). That's fine if the problem is here." It's a polite live region, so screen readers hear it too. A nudge only: no confirmation, and the API doesn't compare the two. +1 frontend test (157); the usual-building E2E journey checks it.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 24</span>
       <span class="log-what">Usual building for employees</span>

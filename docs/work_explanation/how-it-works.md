@@ -84,7 +84,7 @@ The passwords, tokens and role checks are sound, and nothing is known to be expl
 
 A new incident starts as **Open**, is unassigned, and gets a reference like `INC-000012`. Every Facility Admin is notified.
 
-1. **The form loads.** The page calls `GET /auth/me` for your usual building, then `GET /facilities` to fill the Building, Floor and Seat lists. If a Facility Admin has set a usual building for you and it's still active, the form starts on it, with a note saying you can change it. Picking a building limits the floors to that building, and picking a floor limits the seats.
+1. **The form loads.** The page calls `GET /auth/me` for your usual building, then `GET /facilities` to fill the Building, Floor and Seat lists. If a Facility Admin has set a usual building for you and it's still active, the form starts on it, with a note saying you can change it. Pick a different building and the note changes to "This isn't your usual building (ACME Headquarters). That's fine if the problem is here." It's only a nudge for an accidental change: the report sends as normal, and the API never compares the two. Picking a building limits the floors to that building, and picking a floor limits the seats.
 2. **You submit.** The form checks the required fields first: title, description, category, building. Then it sends `POST /incidents`.
 3. **The API checks the request:**
    - Priority must be Low, Medium or High. Only admins can choose Critical; an employee gets **400** and is told to escalate instead.

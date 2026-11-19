@@ -29,7 +29,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
 | Backend (pytest) | 329 | all pass, ~22 s | **99 %** of `app/` (1670 statements, 14 missed) |
-| Frontend (Vitest) | 156 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| Frontend (Vitest) | 157 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -92,7 +92,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `People` | list with role, department and last sign-in, "You" and engineer rows, make admin after confirming, cancelled confirm does nothing, deactivate hides unless inactive shown, refusal above that row's buttons, usual-building picker saves straight away (and clears), its refusal shown above it, a deactivated building stays visible, search and role filter, load error, empty, phone cards |
 | `pwa` (static) | manifest fields and icons browsers need to install, icon files really have their stated sizes, page links, the service worker never caches `/api/` and only precaches files that exist |
 | `NewIncident` | the "already reported" prompt: straight through when nothing matches, request escalation instead of a duplicate, refusal shown above the reason, report it anyway, back to the form, your own incident links instead, a failed check never blocks reporting, admins skip it, save errors inside the prompt; starts on the usual building from `/auth/me`, and still works if that check fails |
-| `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors, starts on the usual building (with a hint) unless it's been deactivated |
+| `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors, starts on the usual building (with a hint) unless it's been deactivated, a soft note (never a block) when another building is picked, and that report still sends |
 | `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes; edits send the version they started from, a stale edit closes the form on the latest version with a warning, a refused action reloads the incident and keeps its message visible even when its box disappears |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
@@ -114,7 +114,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `admin.spec.js` | admin builds a building/floor/seat, the employee can pick it, then it is deleted; building in use cannot be deleted; admin creates an engineer who signs in and sets availability |
 | `reviews.spec.js` | the employee closes a fixed incident and rates the engineer; the engineer sees no trace of it; the admin sees it on the incident and in the engineer's reviews |
 | `parallel-updates.spec.js` | Emma cancels from a page still showing "Assigned" just after Tom started work: refused with a clear message and her page catches up; the admin saves an edit after Tom put the ticket on hold: warned, nothing overwritten, editing again saves |
-| `people.spec.js` | the admin makes a newly registered employee a Facility Admin (they get the admin pages), then deactivates them (their next page load signs them out); the admin sets a new employee's usual building and their report form starts on it without signing in again |
+| `people.spec.js` | the admin makes a newly registered employee a Facility Admin (they get the admin pages), then deactivates them (their next page load signs them out); the admin sets a new employee's usual building and their report form starts on it without signing in again, and picking another building shows the soft note |
 | `already-reported.spec.js` | Emma reports a jammed printer; Liam starts reporting it too, is told it's already reported and requests escalation; he lands on Emma's incident as a follower, it's escalated, Emma and the admin are told, and a second attempt shows he's already following |
 | `merge.spec.js` | two employees report the same leak, the admin merges and assigns it, the engineer resolves it, both employees are notified and only the original reporter can close it |
 | `responsive.spec.js` | every role's pages (dashboard, incident list, report form, an incident, and the three admin pages) at 320 px, a Pixel 7, an iPad Mini portrait (768) and landscape (1024): no page or table scrolls sideways (lists switch to cards; admins get the menu drawer below 1200 px) |

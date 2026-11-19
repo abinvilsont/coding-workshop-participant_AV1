@@ -66,6 +66,7 @@ export default function IncidentForm({
     [facilities, form.building_id],
   );
   const floor = building?.floors.find((f) => f.id === Number(form.floor_id));
+  const usualName = facilities?.find((b) => b.id === usualBuilding)?.name;
 
   const set = (field) => (e) => {
     const value = e.target.value;
@@ -229,9 +230,14 @@ export default function IncidentForm({
                 ))}
               </Field>
             </Box>
-            {usualBuilding && form.building_id === String(usualBuilding) && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-                Your usual building is filled in. Change it if the problem is somewhere else.
+            {usualBuilding && (
+              // A nudge, never a block: people do report problems in other buildings
+              <Typography variant="body2" color="text.secondary" aria-live="polite" sx={{ mt: -1 }}>
+                {form.building_id === String(usualBuilding)
+                  ? 'Your usual building is filled in. Change it if the problem is somewhere else.'
+                  : form.building_id
+                    ? `This isn't your usual building (${usualName}). That's fine if the problem is here.`
+                    : ''}
               </Typography>
             )}
             <Field

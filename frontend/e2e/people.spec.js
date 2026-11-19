@@ -59,4 +59,9 @@ test("admin sets someone's usual building and their reports start there", async 
   await bea.reload();
   await expect(bea.getByLabel('Building').locator('option:checked')).toHaveText('ACME Innovation Hub');
   await expect(bea.getByText('Your usual building is filled in.', { exact: false })).toBeVisible();
+
+  // reporting somewhere else gets a gentle note, not a block
+  await bea.getByLabel('Building').selectOption({ label: 'ACME Headquarters' });
+  await expect(bea.getByText("This isn't your usual building (ACME Innovation Hub). That's fine if the problem is here."))
+    .toBeVisible();
 });

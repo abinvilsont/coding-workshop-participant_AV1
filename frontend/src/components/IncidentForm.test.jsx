@@ -131,8 +131,27 @@ describe('IncidentForm', () => {
     expect(field('Building')).toHaveValue('1');
     expect(field('Floor')).toBeEnabled();
     expect(screen.getByText(/Your usual building is filled in/)).toBeInTheDocument();
+    // another building: a soft note, never a block
     await user.selectOptions(field('Building'), '2');
     expect(screen.queryByText(/Your usual building is filled in/)).not.toBeInTheDocument();
+    expect(screen.getByText(
+      "This isn't your usual building (ACME Headquarters). That's fine if the problem is here.",
+    )).toBeInTheDocument();
+    // back again: the first note returns
+    await user.selectOptions(field('Building'), '1');
+    expect(screen.getByText(/Your usual building is filled in/)).toBeInTheDocument();
+    expect(screen.queryByText(/This isn't your usual building/)).not.toBeInTheDocument();
+  });
+
+  it('still sends a report for another building', async () => {
+    const user = userEvent.setup();
+    const onSubmit = await renderForm({ defaultBuildingId: 1 });
+    await user.type(field('Title'), 'Lift stuck');
+    await user.type(field('Description'), 'Between floors 1 and 2.');
+    await user.selectOptions(field('Category'), 'plumbing');
+    await user.selectOptions(field('Building'), '2');
+    await user.click(screen.getByRole('button', { name: 'Submit incident' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ building_id: 2 }));
   });
 
   it('ignores a usual building that is no longer active', async () => {
