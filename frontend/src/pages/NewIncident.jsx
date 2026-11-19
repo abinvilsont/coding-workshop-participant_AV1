@@ -1,13 +1,30 @@
+import { useState } from 'react';
 import { Box, Link, Typography } from '@mui/material';
+import AlreadyReportedDialog from '../components/AlreadyReportedDialog';
 import { Section } from '../components/Badges';
 import IncidentForm from '../components/IncidentForm';
 import { navigate } from '../router';
-import { createIncident } from '../services/incidentService';
+import { createIncident, findSimilarIncidents } from '../services/incidentService';
 
 export default function NewIncident({ user }) {
-  const handleSubmit = async (payload) => {
+  // Set when the report looks like an open incident: { matches, payload }
+  const [similar, setSimilar] = useState(null);
+
+  const create = async (payload) => {
     const created = await createIncident(payload);
     navigate(`/incidents/${created.id}`);
+  };
+
+  const handleSubmit = async (payload) => {
+    if (user.role === 'employee') {
+      // A failed check never stops someone reporting
+      const matches = await findSimilarIncidents(payload).catch(() => []);
+      if (matches.length) {
+        setSimilar({ matches, payload });
+        return;
+      }
+    }
+    await create(payload);
   };
 
   return (
@@ -27,6 +44,14 @@ export default function NewIncident({ user }) {
           onCancel={() => window.history.back()}
         />
       </Section>
+      {similar && (
+        <AlreadyReportedDialog
+          matches={similar.matches}
+          category={similar.payload.category}
+          onReportAnyway={() => create(similar.payload)}
+          onClose={() => setSimilar(null)}
+        />
+      )}
     </>
   );
 }

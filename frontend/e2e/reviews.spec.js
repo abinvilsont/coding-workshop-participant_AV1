@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ACCOUNTS, actions, asUser, stamp } from './helpers.js';
+import { ACCOUNTS, actions, asUser, stamp, submitReport } from './helpers.js';
 
 /** Choose the option whose text contains `text` (option labels carry extra details). */
 async function choose(select, text) {
@@ -21,7 +21,7 @@ test('employee reviews the engineer; admins see it, the engineer does not', asyn
   await emma.getByLabel('Description').fill('The lamp on my desk flickers on and off.');
   await emma.getByLabel('Category').selectOption('electrical');
   await emma.getByLabel('Building').selectOption({ label: 'ACME Headquarters' });
-  await emma.getByRole('button', { name: 'Submit incident' }).click();
+  await submitReport(emma);
   await expect(emma.getByRole('heading', { name: title })).toBeVisible();
   const url = emma.url();
 

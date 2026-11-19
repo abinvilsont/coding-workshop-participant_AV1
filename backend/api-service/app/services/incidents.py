@@ -5,7 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.core.errors import FieldError
-from app.models import Building, EngineerReview, Floor, Incident, IncidentHistory, IncidentNote, Seat, User
+from app.models import (
+    Building, EngineerReview, Floor, Incident, IncidentHistory, IncidentNote, Seat, User, incident_followers,
+)
 from app.services import permissions as perms
 
 # Eager-load everything a summary row needs in one round trip
@@ -110,6 +112,12 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
         for h in inc.history
     ]
 
+    # When each follower asked to escalate (None for followers added by a merge)
+    asked = dict(db.execute(
+        select(incident_followers.c.user_id, incident_followers.c.escalation_requested_at)
+        .where(incident_followers.c.incident_id == inc.id)
+    ).all()) if inc.followers else {}
+
     return {
         **summary(inc),
         "description": inc.description,
@@ -135,7 +143,9 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
             {"id": m.id, "reference": m.reference, "title": m.title, "reported_by": m.reporter.full_name}
             for m in inc.merged_from
         ],
-        "followers": [{"id": f.id, "name": f.full_name} for f in inc.followers],
+        "followers": [
+            {"id": f.id, "name": f.full_name, "escalation_requested_at": asked.get(f.id)} for f in inc.followers
+        ],
         "reviews": [review_out(r) for r in perms.visible_reviews(user, inc)],
     }
 

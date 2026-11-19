@@ -16,6 +16,7 @@ SET LOCAL client_min_messages = warning;
 -- Clean slate (reverse dependency order)
 -- ---------------------------------------------------------------------
 DROP VIEW  IF EXISTS engineer_workload;
+DROP TABLE IF EXISTS app_secrets       CASCADE;
 DROP TABLE IF EXISTS engineer_reviews  CASCADE;
 DROP TABLE IF EXISTS notifications     CASCADE;
 DROP TABLE IF EXISTS incident_history  CASCADE;
@@ -254,8 +255,9 @@ CREATE TRIGGER incidents_updated_at BEFORE UPDATE ON incidents
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------
--- Incident followers - other employees who reported the same problem
--- (added when an admin merges their duplicate into this incident).
+-- Incident followers - other employees who reported the same problem:
+-- added when an admin merges their duplicate into this incident, or when
+-- they find it while reporting and ask for it to be escalated.
 -- They can view the incident, add notes and get the reporter's updates.
 -- ---------------------------------------------------------------------
 CREATE TABLE incident_followers (
@@ -263,6 +265,7 @@ CREATE TABLE incident_followers (
     user_id      BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     added_by     BIGINT      REFERENCES users (id) ON DELETE SET NULL,
     added_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    escalation_requested_at TIMESTAMPTZ,              -- set when they asked to escalate it
     PRIMARY KEY (incident_id, user_id)
 );
 CREATE INDEX incident_followers_user_idx ON incident_followers (user_id);
@@ -382,6 +385,17 @@ CREATE INDEX engineer_reviews_engineer_idx ON engineer_reviews (engineer_id, cre
 
 CREATE TRIGGER engineer_reviews_updated_at BEFORE UPDATE ON engineer_reviews
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- App secrets - values the API needs but that must not live in code or
+-- Terraform state, e.g. the random JWT signing key the init_db task creates
+-- on AWS. Only the API's database user can read it.
+-- ---------------------------------------------------------------------
+CREATE TABLE app_secrets (
+    name        VARCHAR(50) PRIMARY KEY,
+    value       TEXT        NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- ---------------------------------------------------------------------
 -- View: live engineer workload (for assignment decisions)

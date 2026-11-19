@@ -25,11 +25,25 @@ DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "1" if IN_LAMBDA else "10"))
 DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "1" if IN_LAMBDA else "30"))
 DB_POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "10"))  # seconds; then 503 "busy"
 
-# JWT signing key. Prefer an explicit JWT_SECRET; otherwise derive one from
-# deployment-specific values so no extra infrastructure is required.
-JWT_SECRET = os.getenv("JWT_SECRET") or hashlib.sha256(
-    f"jwt:{POSTGRES_PASS}:{os.getenv('APP_ID', 'local')}".encode()
-).hexdigest()
+# Terraform sets IS_LOCAL=false on AWS (true on LocalStack); unset means a dev machine.
+IS_LOCAL = os.getenv("IS_LOCAL", "true").strip().lower() != "false"
+
+# Database connection. Aurora requires TLS; its Serverless v2 instance pauses
+# when idle (min capacity 0) and can take ~15 s or more to wake up.
+DB_SSLMODE = os.getenv("DB_SSLMODE", "prefer" if IS_LOCAL else "require")
+DB_CONNECT_TIMEOUT = int(os.getenv("DB_CONNECT_TIMEOUT", "15" if IS_LOCAL else "10"))
+# While a paused Aurora wakes it refuses or drops new connections; keep retrying for
+# this long. Stays under CloudFront's 30 s origin timeout so the browser gets an answer.
+DB_WAKE_SECONDS = float(os.getenv("DB_WAKE_SECONDS", "0" if IS_LOCAL else "25"))
+
+# JWT signing key, in order of preference:
+#  1. JWT_SECRET from the environment;
+#  2. locally, a key derived from local settings (LocalStack, dev machines);
+#  3. on AWS, None here: the key is a random secret that the init_db task stored
+#     in the app_secrets table (see app/core/security.py and app/admin_tasks.py).
+JWT_SECRET = os.getenv("JWT_SECRET") or (
+    hashlib.sha256(f"jwt:{POSTGRES_PASS}:{os.getenv('APP_ID', 'local')}".encode()).hexdigest() if IS_LOCAL else None
+)
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL_HOURS = 8
 

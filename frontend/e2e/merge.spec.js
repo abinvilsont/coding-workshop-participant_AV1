@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ACCOUNTS, actions, asUser, openNotification, stamp } from './helpers.js';
+import { ACCOUNTS, actions, asUser, openNotification, stamp, submitReport } from './helpers.js';
 
 const SECOND_EMPLOYEE = 'liam.lee@acme.inc';
 
@@ -15,7 +15,7 @@ async function report(page, title, description) {
   await page.getByLabel('Description').fill(description);
   await page.getByLabel('Category').selectOption('plumbing');
   await page.getByLabel('Building').selectOption({ label: 'ACME Headquarters' });
-  await page.getByRole('button', { name: 'Submit incident' }).click();
+  await submitReport(page);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
   return page.url();
 }

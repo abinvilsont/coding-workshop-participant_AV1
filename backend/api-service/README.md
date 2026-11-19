@@ -53,6 +53,8 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST | `/incidents/{id}/notes` | can view, not closed | Add note (`is_internal` for engineers/admins) |
 | POST | `/incidents/{id}/review` | reporter / follower, closed | `{rating 1-5, comment?}`: rate the engineer (one each) |
 | PUT / PATCH, DELETE | `/incidents/{id}/review` | the reviewer | Change or withdraw your review |
+| GET | `/incidents/similar?building_id&category&floor_id` | any | Open incidents (open → on hold, not merged) that may already report this problem; brief: no reporter or description, plus `relation` (`reporter` / `follower`) |
+| POST | `/incidents/{id}/escalation-request` | employee, not the reporter | `{reason?}`: follow the incident, escalate it if not already, add a note, notify; once per employee (409 after) |
 | GET | `/incidents/{id}/merge-candidates` | admin | Open incidents to merge into, same building + category first |
 | POST | `/incidents/{id}/merge` | admin | `{target_id}`: merge this duplicate into another open incident; its reporter follows the target |
 | GET | `/dashboard` | any | Role-specific summary |
@@ -100,3 +102,10 @@ python3.13 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt uvicorn
 CORS_ORIGINS=http://localhost:3000 uvicorn app.main:app --reload --port 8000
 ```
+
+## Database tasks on AWS
+
+`function.handler` also accepts a direct invocation `{"action": "status" | "init_db" | "migrate"}`
+(see `app/admin_tasks.py`). These run the SQL in `sql/`, which is a copy of `backend/db` kept in
+sync by `./bin/sync-db-sql.sh` (`tests/unit/test_packaged_sql.py` fails if it drifts). Requests
+through the Function URL always reach the web API, never these tasks.

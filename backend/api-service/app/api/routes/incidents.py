@@ -10,12 +10,12 @@ from sqlalchemy.exc import IntegrityError
 from app.core.errors import FieldError
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models import (
-    FINAL_STATUSES, EngineerAvailability, EngineerProfile, EngineerReview, Incident, IncidentNote,
+    FINAL_STATUSES, IncidentCategory, EngineerAvailability, EngineerProfile, EngineerReview, Incident, IncidentNote,
     IncidentPriority, IncidentStatus as S, User, incident_followers,
 )
 from app.schemas.incident import (
-    AssignIn, EscalateIn, IncidentCreate, IncidentDetail, IncidentList, IncidentSummary, IncidentUpdate,
-    MergeIn, NoteCreate, ReviewIn, StatusChange,
+    AssignIn, EscalateIn, EscalationRequestIn, IncidentCreate, IncidentDetail, IncidentList, IncidentSummary,
+    IncidentUpdate, MergeIn, NoteCreate, ReviewIn, SimilarIncident, StatusChange,
 )
 from app.services import incidents as svc
 from app.services import notifications as notify
@@ -82,6 +82,55 @@ def list_incidents(
         .offset(offset)
     ).all()
     return {"items": [svc.summary(i) for i in rows], "total": total}
+
+
+@router.get("/similar", response_model=list[SimilarIncident])
+def similar_incidents(
+    db: DbSession,
+    user: CurrentUser,
+    building_id: int,
+    category: IncidentCategory,
+    floor_id: int | None = None,
+):
+    """Open incidents that may already report the problem the caller is about to report:
+    same building and category, and the same floor when both have one. Shown before a new
+    report is saved, so the employee can ask for the existing one to be escalated instead."""
+    where = [
+        Incident.building_id == building_id,
+        Incident.category == category,
+        Incident.status.in_(perms.ESCALATABLE),  # still being worked on
+        Incident.merged_into_id.is_(None),
+    ]
+    if floor_id is not None:
+        where.append((Incident.floor_id == floor_id) | Incident.floor_id.is_(None))
+    rows = db.scalars(
+        select(Incident)
+        .options(*svc.SUMMARY_OPTIONS)
+        .where(*where)
+        .order_by(case((Incident.floor_id == floor_id, 0), else_=1), Incident.created_at.desc())
+        .limit(5)
+    ).all()
+    followed = set(db.scalars(
+        select(incident_followers.c.incident_id).where(
+            incident_followers.c.user_id == user.id,
+            incident_followers.c.incident_id.in_([i.id for i in rows]),
+        )
+    ).all()) if rows else set()
+
+    def relation(inc):
+        if inc.reported_by_id == user.id:
+            return "reporter"
+        return "follower" if inc.id in followed else None
+
+    return [
+        {
+            "id": i.id, "reference": i.reference, "title": i.title, "category": i.category, "status": i.status,
+            "building": i.building.name, "floor": i.floor.name if i.floor else None,
+            "seat": i.seat.seat_code if i.seat else None, "is_escalated": i.is_escalated,
+            "created_at": i.created_at, "relation": relation(i),
+        }
+        for i in rows
+    ]
 
 
 @router.post("", response_model=IncidentDetail, status_code=status.HTTP_201_CREATED)
@@ -410,3 +459,55 @@ def delete_review(incident_id: int, db: DbSession, user: CurrentUser):
     db.delete(_own_review_or_404(user, inc))
     _commit(db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ------------------------------------------------------------------ escalation requests
+
+@router.post("/{incident_id}/escalation-request", response_model=IncidentDetail)
+def request_escalation(incident_id: int, body: EscalationRequestIn, db: DbSession, user: CurrentUser):
+    """An employee with the same problem asks for an existing incident to be escalated
+    instead of reporting it again. They follow it from now on (once per incident)."""
+    if not user.is_employee:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only employees can ask for an incident to be escalated.")
+    # Lock the incident so two people asking at once both get recorded cleanly
+    inc = db.scalar(
+        select(Incident).options(*svc.SUMMARY_OPTIONS).where(Incident.id == incident_id).with_for_update(of=Incident)
+    )
+    if inc is None or inc.merged_into_id is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Incident not found.")
+    if inc.reported_by_id == user.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This is your own incident. Use Escalate on it instead.")
+    if inc.status not in perms.ESCALATABLE:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"{inc.reference} is {inc.status.value.replace('_', ' ')}, so it can't be escalated. Report your problem instead.",
+        )
+    already = db.scalar(
+        select(incident_followers.c.escalation_requested_at).where(
+            incident_followers.c.incident_id == inc.id, incident_followers.c.user_id == user.id
+        )
+    )
+    if already is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You've already asked for this incident to be escalated.")
+
+    now = _now()
+    db.execute(
+        insert(incident_followers)
+        .values(incident_id=inc.id, user_id=user.id, added_by=user.id, escalation_requested_at=now)
+        .on_conflict_do_update(  # a follower from a merge asks too
+            index_elements=["incident_id", "user_id"], set_={"escalation_requested_at": now}
+        )
+    )
+    because = f" Their reason: {body.reason}" if body.reason else ""
+    if not inc.is_escalated:
+        # The history trigger records the escalation under the requester's name
+        inc.is_escalated = True
+        inc.escalated_at = now
+        inc.escalation_reason = f"{user.full_name} has the same problem and asked for it to be escalated.{because}"
+    db.add(IncidentNote(
+        incident_id=inc.id, author_id=user.id,
+        body=f"I have the same problem and asked for this to be escalated.{because}",
+    ))
+    notify.escalation_requested(db, inc, user, body.reason)
+    _commit(db)
+    return _reload(db, inc.id, user)

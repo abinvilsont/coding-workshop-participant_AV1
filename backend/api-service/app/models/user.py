@@ -32,3 +32,7 @@ class User(Base):
     @property
     def is_engineer(self) -> bool:
         return self.role == UserRole.ENGINEER
+
+    @property
+    def is_employee(self) -> bool:
+        return self.role == UserRole.EMPLOYEE

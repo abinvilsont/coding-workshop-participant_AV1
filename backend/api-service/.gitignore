@@ -4,6 +4,7 @@
 !/function.py
 !/requirements.txt
 !/app/
+!/sql/
 !/README.md
 !/tests/
 !/pytest.ini

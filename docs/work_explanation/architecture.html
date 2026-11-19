@@ -181,7 +181,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 18 · reflects local <code>main</code> @ <code>9e8042e</code> + uncommitted error placement</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 19 · reflects local <code>main</code> @ <code>3a36642</code> + uncommitted escalation requests</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -412,12 +412,13 @@ a { color: var(--accent); }
         <text class="t-s" x="588" y="364">logs</text>
 
         <!-- followers -->
-        <rect class="node" x="300" y="590" width="190" height="94" rx="8"/>
+        <rect class="node" x="300" y="590" width="190" height="112" rx="8"/>
         <rect class="band" x="301" y="591" width="188" height="28" rx="7"/>
         <text class="t-b t-m" x="314" y="610">incident_followers</text>
         <text class="t-m" x="314" y="637">incident_id</text><text class="t-ms" x="478" y="637" text-anchor="end">main incident</text>
         <text class="t-m" x="314" y="655">user_id</text><text class="t-ms" x="478" y="655" text-anchor="end">reporter</text>
         <text class="t-m" x="314" y="673">added_by · added_at</text>
+        <text class="t-m" x="314" y="691">escalation_requested_at</text>
         <polyline class="edge" points="490,620 505,620 505,336" marker-end="url(#er-mut)"/>
         <text class="t-s" x="511" y="560">follows</text>
         <polyline class="edge" points="300,655 260,655 260,140 242,140" marker-end="url(#er-mut)"/>
@@ -446,7 +447,7 @@ a { color: var(--accent); }
         <text class="t-s" x="746" y="466">about</text>
       </svg>
     </div>
-    <figcaption>Eleven tables and one view, created by <code>backend/db/schema.sql</code> (existing databases get <code>notifications</code> from <code>migrations/001_notifications.sql</code>, the merge column and <code>incident_followers</code> from <code>migrations/002_incident_merge.sql</code>, and <code>engineer_reviews</code> from <code>migrations/003_engineer_reviews.sql</code>). A review stores the engineer at the time it is written, and the database allows one per reviewer per incident and a rating from 1 to 5. A merged duplicate is stored as <em>cancelled</em> with <code>merged_into_id</code> set (a check constraint ties the two together), and its reporter gets a row in <code>incident_followers</code>; the SQLAlchemy models map onto them and never create tables. The database itself enforces the @acme.inc email rule, that a floor belongs to the incident's building and a seat to its floor, that only engineers get profiles, and that an incident past <em>open</em> has an engineer.</figcaption>
+    <figcaption>Eleven tables and one view, created by <code>backend/db/schema.sql</code> (existing databases get <code>notifications</code> from <code>migrations/001_notifications.sql</code>, the merge column and <code>incident_followers</code> from <code>migrations/002_incident_merge.sql</code>, and <code>engineer_reviews</code> from <code>migrations/003_engineer_reviews.sql</code>; <code>escalation_requested_at</code> on followers from <code>migrations/004_escalation_requests.sql</code>). A review stores the engineer at the time it is written, and the database allows one per reviewer per incident and a rating from 1 to 5. A merged duplicate is stored as <em>cancelled</em> with <code>merged_into_id</code> set (a check constraint ties the two together), and its reporter gets a row in <code>incident_followers</code>; the SQLAlchemy models map onto them and never create tables. The database itself enforces the @acme.inc email rule, that a floor belongs to the incident's building and a seat to its floor, that only engineers get profiles, and that an incident past <em>open</em> has an engineer.</figcaption>
   </figure>
 </section>
 
@@ -721,7 +722,7 @@ a { color: var(--accent); }
         <line class="edge" x1="810" y1="112" x2="848" y2="112" marker-end="url(#m-mut)"/>
       </svg>
     </div>
-    <figcaption><code>POST /incidents/{id}/merge</code>, admin only. Both rows are locked in id order so two opposite merges can't deadlock. Duplicates already merged into the source are re-pointed at the main incident, so chains collapse. Followers see the incident in their list and dashboard, get assignment, status and public-note updates, and can add notes; they never see internal notes, and only the original reporter can escalate, cancel, confirm the fix or reopen.</figcaption>
+    <figcaption><code>POST /incidents/{id}/merge</code>, admin only. Both rows are locked in id order so two opposite merges can't deadlock. Duplicates already merged into the source are re-pointed at the main incident, so chains collapse. Employees can also become followers themselves: when a new report matches an open incident (<code>GET /incidents/similar</code>), they can request escalation on it instead (<code>POST /incidents/{id}/escalation-request</code>), which follows it, escalates it if needed, adds a note and notifies the reporter, engineer and admins. Followers see the incident in their list and dashboard, get assignment, status and public-note updates, and can add notes; they never see internal notes, and only the original reporter can escalate, cancel, confirm the fix or reopen.</figcaption>
   </figure>
 
   <figure>
@@ -911,6 +912,8 @@ a { color: var(--accent); }
         <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/notes</td><td>Add a note</td><td class="yes">public only (also followers)</td><td class="yes">+ internal</td><td class="yes">+ internal</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/review</td><td>Rate the engineer of a closed incident</td><td class="yes">reporter + followers, once each</td><td class="no">—</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">PUT·PATCH·DELETE</span>/incidents/{id}/review</td><td>Change or withdraw your review</td><td class="yes">own review</td><td class="no">—</td><td class="no">—</td></tr>
+        <tr><td class="ep"><span class="m">GET</span>/incidents/similar</td><td>Open incidents like a report about to be sent (same building, category, floor); brief, no reporter</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/escalation-request</td><td>Same problem: follow it, escalate it, note + notify (once each)</td><td class="yes">not the reporter</td><td class="no">—</td><td class="no">—</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/incidents/{id}/merge-candidates</td><td>Open incidents to merge into, likeliest first</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">POST</span>/incidents/{id}/merge</td><td>Merge a duplicate; its reporter follows the main incident</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
         <tr><td class="ep"><span class="m">GET</span>/facilities</td><td>Buildings → floors → seats</td><td class="yes">active</td><td class="yes">active</td><td class="yes">+ inactive</td></tr>
@@ -990,6 +993,7 @@ a { color: var(--accent); }
         <tr><td class="role-eng">Engineer</td><td>Manage assigned tickets, update status</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td class="role-eng">Engineer</td><td>Talk to the reporter through notes</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td class="role-eng">Engineer</td><td>Keep availability up to date</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td class="role-emp">Employee</td><td>Told when a problem is already reported; request escalation instead</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td class="role-emp">Employee</td><td>Review the engineer (hidden from engineers)</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td>All</td><td>Transparent communication: told when someone else updates their incidents</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
       </tbody>
@@ -1007,6 +1011,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 19</span>
+      <span class="log-what">Already reported? Request escalation</span>
+      <span class="log-detail">Before an employee's report is saved, <code>GET /incidents/similar</code> finds open incidents in the same building and category (and floor when both have one; at most 5, no reporter or description). The new "This may already be reported" prompt offers Request escalation (optional reason) or "It's a different problem, report it". <code>POST /incidents/{id}/escalation-request</code> makes the employee a follower (new <code>incident_followers.escalation_requested_at</code>, migration 004), escalates the incident if it wasn't, adds their note, and notifies the reporter, engineer and admins; once per employee (409). The incident shows "Asked to escalate". +16 backend tests (270), +9 frontend tests (126), new E2E journey (15).</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 18</span>
       <span class="log-what">Errors shown above the field that caused them</span>

@@ -175,6 +175,28 @@ class EngineerReviewOut(ReviewOut):
 class Follower(BaseModel):
     id: int
     name: str
+    escalation_requested_at: datetime | None = None  # when they asked to escalate it
+
+
+class SimilarIncident(BaseModel):
+    """An open incident that may be the problem someone is about to report.
+    Deliberately brief: no reporter name, description or notes."""
+
+    id: int
+    reference: str
+    title: str
+    category: IncidentCategory
+    status: IncidentStatus
+    building: str
+    floor: str | None
+    seat: str | None
+    is_escalated: bool
+    created_at: datetime
+    relation: str | None  # 'reporter' / 'follower' when it's already the caller's
+
+
+class EscalationRequestIn(BaseModel):
+    reason: Annotated[str | None, Field(max_length=2000), AfterValidator(_strip_optional)] = None
 
 
 class IncidentDetail(IncidentSummary):

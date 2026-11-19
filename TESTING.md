@@ -28,9 +28,9 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 254 | all pass, ~13 s | **99 %** of `app/` (1385 statements, 13 missed) |
-| Frontend (Vitest) | 117 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
-| End-to-end (Playwright) | 14 | all pass, ~90 s | every critical user path (below) |
+| Backend (pytest) | 295 | all pass, ~20 s | **99 %** of `app/` (1580 statements, 14 missed) |
+| Frontend (Vitest) | 126 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| End-to-end (Playwright) | 15 | all pass, ~90 s | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
 Both coverage runs enforce a minimum of 80 % and fail below it.
@@ -50,6 +50,9 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
   - bcrypt hashing and verification.
   - JWT round trip, plus rejection of tampered or expired tokens.
   - Connection-pool sizing per runtime.
+- `test_aws_settings.py`: on AWS (`IS_LOCAL=false`) the database connection requires TLS, uses a 10 s connect timeout and has no derived JWT key; an explicit `JWT_SECRET` always wins.
+- `test_db_wake.py`: connection retries while a paused Aurora wakes, gives up after `DB_WAKE_SECONDS`, and doesn't retry locally.
+- `test_packaged_sql.py`: the Lambda's copy of `backend/db` (`sql/`) matches the original; run `./bin/sync-db-sql.sh` if it fails.
 - `test_schemas.py`: request validation.
   - Only acme.inc emails are accepted.
   - Password length limits.
@@ -69,6 +72,8 @@ Both coverage runs enforce a minimum of 80 % and fail below it.
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
+| `test_admin_tasks.py` | the Lambda's database tasks: `init_db` on an empty database (tables, admin, random JWT key, pooled connection left in normal mode), refuses a database with tables, sample data warns about passwords, input checks before touching anything, `migrate` repeatable and restores a missing key, `status` on a database from before `app_secrets`, direct invocations vs Function URL requests, tokens signed with the stored key |
+| `test_escalation_requests.py` | finding open incidents like a new report (same building + category + floor; resolved, closed and merged ignored; nothing about the reporter), `relation` for your own / followed ones; requesting escalation: follower, escalated with reason, note, history under the requester, notifications to reporter / engineer / admins, an already-escalated incident keeps its reason, once per employee, merged followers can ask once, refusals (own incident, resolved, admin, engineer, unknown, merged), reason length |
 | `test_reviews.py` | engineer reviews: reporter and follower each review once a closed incident, engineers never see reviews (incident detail, engineer endpoints, own profile, notifications), admins see all plus the average (rounded to 1 dp), edit / delete / re-review, 409 on a second review, refused for admins, engineers, other employees and unclosed incidents, rating and comment validation, deleted with the incident |
 | `test_merge.py` | merging duplicates: links both ways, the duplicate's reporter (and its own followers) follow the main incident, who is notified, followers get every update but not internal notes and can't confirm/cancel, chained merges, freed engineer capacity, candidates ordered by building + category, refusals (self, closed, already merged, non-admin), delete keeps the duplicate |
 | `test_field_errors.py` | rule errors name the field they're about (location parts, critical priority, assignment, escalation, merge target, duplicate email / building code / name / floor / seat, engineer deactivation); errors about the whole request name none |
@@ -82,6 +87,7 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 |---|---|
 | `services/` | auth header, query strings, 204, error messages, validation errors mapped onto fields, network failure, auto sign-out on expired session (not on wrong password), email normalisation |
 | `Login` | sign in, client-side validation with messages above each field and focus on the first, server field errors, loading state, registration, show password |
+| `NewIncident` | the "already reported" prompt: straight through when nothing matches, request escalation instead of a duplicate, refusal shown above the reason, report it anyway, back to the form, your own incident links instead, a failed check never blocks reporting, admins skip it, save errors inside the prompt |
 | `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors |
 | `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
@@ -102,6 +108,7 @@ These tests drive the real stack in Chrome: React → proxy → Lambda (LocalSta
 | `access.spec.js` | registration (domain check, duplicate), wrong password, employee blocked from admin pages, engineer sees only own tickets, "cannot reach the server" message |
 | `admin.spec.js` | admin builds a building/floor/seat, the employee can pick it, then it is deleted; building in use cannot be deleted; admin creates an engineer who signs in and sets availability |
 | `reviews.spec.js` | the employee closes a fixed incident and rates the engineer; the engineer sees no trace of it; the admin sees it on the incident and in the engineer's reviews |
+| `already-reported.spec.js` | Emma reports a jammed printer; Liam starts reporting it too, is told it's already reported and requests escalation; he lands on Emma's incident as a follower, it's escalated, Emma and the admin are told, and a second attempt shows he's already following |
 | `merge.spec.js` | two employees report the same leak, the admin merges and assigns it, the engineer resolves it, both employees are notified and only the original reporter can close it |
 | `responsive.spec.js` | every role's main pages have no horizontal scroll on a phone (Pixel 7), using the phone menu layout |
 

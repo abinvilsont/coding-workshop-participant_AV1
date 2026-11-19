@@ -96,6 +96,7 @@ export default function IncidentForm({
     setSaving(true);
     try {
       await onSubmit(payload);
+      setSaving(false); // the page may stay (e.g. it asks first whether this is already reported)
     } catch (err) {
       // A problem with one field is shown above that field; anything else above the buttons
       if (fe.fromApi(err)) focusFirstError(formEl);

@@ -312,6 +312,20 @@ describe('IncidentDetail', () => {
       expect(screen.getByText(/You're following this incident/)).toHaveTextContent('Emma Employee confirms the fix.');
     });
 
+    it('shows who asked for escalation, and tells them why they follow it', async () => {
+      const liam = { id: 7, name: 'Liam Lee', email: 'liam.lee@acme.inc', role: 'employee' };
+      setup(incident({
+        is_escalated: true,
+        followers: [{ id: 7, name: 'Liam Lee', escalation_requested_at: '2026-11-19T09:00:00Z' }],
+      }));
+      render(<IncidentDetail id={4} user={liam} />);
+      const details = await screen.findByTestId('incident-details');
+      expect(details).toHaveTextContent('Asked to escalateLiam Lee');
+      expect(screen.getByText(/You're following this incident/)).toHaveTextContent(
+        'because you have the same problem and asked for it to be escalated',
+      );
+    });
+
     it('does not show the follower notice to the original reporter', async () => {
       setup(incident({ followers: [{ id: 7, name: 'Liam Lee' }] }));
       render(<IncidentDetail id={4} user={USERS.employee} />);

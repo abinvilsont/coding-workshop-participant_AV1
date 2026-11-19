@@ -15,7 +15,8 @@ from app.models.facility import Building, Floor, Seat
 from app.models.user import User
 
 
-# Employees following an incident because their duplicate was merged into it
+# Employees following an incident: their duplicate was merged into it, or they
+# found it while reporting the same problem and asked for it to be escalated
 incident_followers = Table(
     "incident_followers",
     Base.metadata,
@@ -23,6 +24,7 @@ incident_followers = Table(
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("added_by", ForeignKey("users.id", ondelete="SET NULL")),
     Column("added_at", DateTime(timezone=True), server_default=func.now()),
+    Column("escalation_requested_at", DateTime(timezone=True)),  # asked to escalate it
 )
 
 

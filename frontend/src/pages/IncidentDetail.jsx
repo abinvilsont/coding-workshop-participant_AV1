@@ -649,7 +649,9 @@ export default function IncidentDetail({ id, user }) {
   });
   const hasActions =
     p.status_transitions.length || p.can_assign || p.can_set_priority || p.can_escalate || p.can_merge || p.can_delete;
-  const following = incident.followers?.some((f) => f.id === user.id);
+  const me = incident.followers?.find((f) => f.id === user.id);
+  // Followers who found this incident while reporting and asked for it to be escalated
+  const askedToEscalate = (incident.followers ?? []).filter((f) => f.escalation_requested_at);
 
   const handleDelete = async () => {
     if (!window.confirm(`Permanently delete ${incident.reference}? This cannot be undone.`)) return;
@@ -701,10 +703,11 @@ export default function IncidentDetail({ id, user }) {
           , which is about the same problem. Updates continue there.
         </Alert>
       )}
-      {following && (
+      {me && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          You're following this incident because your report of the same problem was merged into it. You'll get
-          every update; {incident.reported_by} confirms the fix.
+          You're following this incident because you have the same problem
+          {me.escalation_requested_at ? ' and asked for it to be escalated' : ' (your report was merged into it)'}.
+          You'll get every update; {incident.reported_by} confirms the fix.
         </Alert>
       )}
 
@@ -801,6 +804,19 @@ export default function IncidentDetail({ id, user }) {
                     <span key={m.id}>
                       {idx > 0 && <br />}
                       {m.reported_by} (<Link href={`#/incidents/${m.id}`}>{m.reference}</Link>)
+                    </span>
+                  ))}
+                </DetailRow>
+              )}
+              {askedToEscalate.length > 0 && (
+                <DetailRow label="Asked to escalate">
+                  {askedToEscalate.map((f, idx) => (
+                    <span key={f.id}>
+                      {idx > 0 && <br />}
+                      {f.name}{' '}
+                      <Typography component="span" variant="caption" color="text.secondary">
+                        {timeAgo(f.escalation_requested_at)}
+                      </Typography>
                     </span>
                   ))}
                 </DetailRow>

@@ -30,7 +30,7 @@ def test_merge_links_the_duplicate_and_makes_its_reporter_a_follower(client, as_
     assert r.status_code == 200, r.text
     target = r.json()
     assert target["id"] == a["id"]
-    assert target["followers"] == [{"id": USERS["liam"][0], "name": "Liam Lee"}]
+    assert target["followers"] == [{"id": USERS["liam"][0], "name": "Liam Lee", "escalation_requested_at": None}]
     assert target["merged_from"] == [
         {"id": b["id"], "reference": b["reference"], "title": b["title"], "reported_by": "Liam Lee"}
     ]

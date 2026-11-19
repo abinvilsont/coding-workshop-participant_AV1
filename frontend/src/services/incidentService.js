@@ -36,3 +36,10 @@ export const submitReview = (id, rating, comment) =>
 export const updateReview = (id, rating, comment) =>
   apiRequest(`/incidents/${id}/review`, { method: 'PUT', body: { rating, comment } });
 export const deleteReview = (id) => apiRequest(`/incidents/${id}/review`, { method: 'DELETE' });
+
+// Already reported? Open incidents in the same building + category (+ floor) as a report about to be sent
+export const findSimilarIncidents = ({ building_id, category, floor_id }) =>
+  apiRequest('/incidents/similar', { params: { building_id, category, floor_id } });
+// Ask for someone else's incident to be escalated; the caller follows it from then on
+export const requestEscalation = (id, reason) =>
+  apiRequest(`/incidents/${id}/escalation-request`, { method: 'POST', body: { reason: reason || null } });

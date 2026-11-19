@@ -16,7 +16,7 @@ diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
 
 | Role | Can do |
 |---|---|
-| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (and are told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
 | **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, delete incidents |
 
@@ -25,7 +25,16 @@ reporter, not the engineer, confirms the fix. Every change is written to the
 incident's history, and the people involved are notified through the bell
 (it polls every 30 s).
 
-**Duplicates.** When two employees report the same problem, an admin merges one
+**Already reported?** Before a new report is saved, the app looks for open incidents
+in the same building and category (and floor, when both have one). If it finds any,
+the employee sees **"This may already be reported"** and can:
+- **Request escalation** on the existing incident (with an optional reason). They
+  become a follower, the incident is escalated if it wasn't already, a note names
+  them for the engineer, and the admins, engineer and original reporter are told.
+  Each employee can request this once per incident.
+- **Report it anyway** if it's a different problem, or go back to the form.
+
+**Duplicates.** If two employees still report the same problem, an admin merges one
 report into the other:
 - The duplicate is closed and labelled "Merged", with a link to the main incident.
 - The duplicate's details are added to the main incident as a note.
@@ -158,9 +167,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 254 | 99 % |
-| Frontend: Vitest + React Testing Library | 117 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 14 | every critical journey |
+| Backend: pytest, unit + integration on a throwaway database | 295 | 99 % |
+| Frontend: Vitest + React Testing Library | 126 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 15 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -171,18 +180,42 @@ are in [`TESTING.md`](TESTING.md).
 The infrastructure is defined in `infra/` and deployed by the workshop scripts:
 
 ```sh
-./bin/deploy-backend.sh aws     # Terraform: Lambda, Aurora, CloudFront, S3
-./bin/deploy-frontend.sh aws    # build React and upload to S3
+./bin/sync-db-sql.sh            # only if backend/db changed (a test fails if the copies drift)
+./bin/deploy-backend.sh aws     # Terraform: Lambda, Aurora, CloudFront, S3 (renews AWS credentials)
+./bin/deploy-frontend.sh aws    # build React with the CloudFront URL, upload to S3
 ```
 
-Before the first cloud deploy:
-1. Connect to Aurora over TLS (`sslmode=require` when `IS_LOCAL` is `false`).
-2. Create the tables in Aurora: run `schema.sql`, and for sample data, `seed.sql`.
-   Change the sample passwords first. `schema.sql` already includes every
-   migration in `backend/db/migrations/`.
-3. Set a strong `JWT_SECRET`.
+**First deploy: create the database.** Aurora has no public address, so its tables
+are created by the Lambda itself. Invoke it directly; this needs AWS credentials, and
+web requests can't trigger it:
 
-**Status:** the app has not yet been deployed to AWS. All three steps are still open.
+```sh
+FN=$(cd infra && terraform output -json lambda_urls | jq -r 'keys[0]')
+aws lambda invoke --function-name "$FN" --cli-binary-format raw-in-base64-out \
+  --payload '{"action":"init_db","admin":{"name":"Your Name","email":"you@acme.inc","password":"a-strong-password"}}' out.json
+cat out.json
+```
+
+| Payload | What it does |
+|---|---|
+| `{"action":"status"}` | Tables present? Counts of users, incidents and admins; is the signing key set? |
+| `{"action":"init_db", "admin": {...}}` | **Empty database only.** Creates the tables, your admin account and a random JWT signing key. Add `"seed": true` for the sample data; every sample password is `Password123!`. |
+| `{"action":"migrate"}` | Runs every migration in `backend/db/migrations/` (each is additive and safe to repeat). Run it after deploying a version that adds tables or columns. |
+
+On AWS (`IS_LOCAL=false`) the API:
+- connects to Aurora over TLS (`sslmode=require`);
+- waits up to 45 s for a paused Aurora to wake;
+- signs tokens with the random key that `init_db` stored in the `app_secrets` table.
+
+Set `JWT_SECRET` in the Lambda environment to override that key.
+
+Aurora Serverless v2 pauses after 5 idle minutes. While it wakes, the API retries
+the connection for up to 25 seconds (`DB_WAKE_SECONDS`), so the first request after
+a quiet spell is slow rather than failing. That limit stays under CloudFront's
+30-second origin timeout.
+
+**Status:** deployed on 19 Nov 2026 at **https://d3lb2j5ijpzy26.cloudfront.net**, with the sample data, so every
+sample password is `Password123!`.
 
 ## Design decisions and trade-offs
 
@@ -240,7 +273,6 @@ Before the first cloud deploy:
 
 ## Known gaps
 
-- Not yet deployed to AWS (see above).
 - No token refresh, password change or password reset.
 - No push notifications, PWA or offline mode.
 - No admin-account management screen.

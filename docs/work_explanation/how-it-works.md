@@ -63,6 +63,27 @@ A new incident starts as **Open**, is unassigned, and gets a reference like `INC
 5. **Notifications are added** for every active admin, in the same transaction: "Alice reported INC-000012: Broken chair".
 6. **The page opens the new incident** at `/incidents/12`.
 
+## Already reported? Request escalation
+
+Before a new report is saved, the app checks whether the same problem is already open. If it is, the employee can ask for that incident to be escalated instead of reporting it twice.
+
+![A report that is already open becomes an escalation request, not a duplicate](images/already-reported.png)
+
+**What the employee sees:** after clicking Submit, a **This may already be reported** box lists the open incidents at that place. Each has a **Request escalation** button with an optional "Why is it urgent?" box. They can also pick **It's a different problem, report it**, or go back to the form.
+
+**What happens behind the scenes**
+
+1. **The check** (`GET /incidents/similar`) looks for incidents in the same building and category that are still being worked on (open, assigned, in progress or on hold) and not merged. When both have a floor, it must match. It returns at most 5, with no reporter name or description, and marks any that are already the caller's own or followed.
+2. **The request** (`POST /incidents/{id}/escalation-request`) runs in one transaction:
+   - It refuses admins and engineers (403), the incident's own reporter (400, use Escalate instead), incidents no longer being worked on (400), and a second request from the same person (409).
+   - It locks the incident, then adds the employee as a **follower** with the time they asked.
+   - If the incident isn't escalated yet, it is now, with the reason "Liam Lee has the same problem and asked for it to be escalated". The history trigger records it under Liam's name.
+   - It adds a note from Liam with his reason, so the engineer sees it.
+   - It notifies the admins and the engineer ("has the same problem and asked to escalate") and the original reporter.
+3. **The page opens the existing incident.** Liam sees "You're following this incident because you have the same problem and asked for it to be escalated". The details panel lists him under **Asked to escalate**.
+
+The original reporter still owns the incident: only they confirm the fix, reopen or cancel it. A failed check never blocks reporting; the form simply saves as usual.
+
 ## The incident life cycle
 
 An incident goes **Open → Assigned → In progress → Resolved → Closed**. The reporter confirms the last step. Each move is one API call, checked against your role, and it notifies everyone involved except you.
@@ -244,6 +265,7 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Reviews filtered on the server, never shown to engineers | Hiding them only in the UI would still send them to the engineer's browser. Filtering in one function (visible\_reviews) keeps employees' feedback honest. Each review stores the engineer at the time, so a later reassignment can't move a rating to someone else. |
 | Light and dark mode with a sun/moon button, following the device until you pick | Both colour sets live in one theme file as CSS variables, so switching only flips a class on the page and nothing reloads. The choice is saved in the browser, and a tiny script applies it before the app starts, so the screen never flashes white. No server change was needed. |
 | Errors shown above the field they're about, never in a banner at the top | People look at the field they just filled, not the top of the page, which may be scrolled away. The API names the field in the same errors list it uses for invalid input, so rule errors (a duplicate email, a full engineer) land in the right place too. Errors that name no field sit just above the button that was clicked. |
+| Already-reported check before saving, with Request escalation instead of a duplicate | Stops duplicates at the source, so admins merge less, and the extra person still counts: the incident is escalated and they follow it. The match (same building, category and floor) is simple and predictable; the employee decides, and can always report anyway. The list shows no reporter or description, because employees otherwise only see their own incidents. One request per person stops repeated alerts. |
 
 **Reliability**
 
