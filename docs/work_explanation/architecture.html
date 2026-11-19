@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 29 · reflects local <code>main</code> @ <code>a547670</code> (as deployed to AWS)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 30 · reflects local <code>main</code> @ <code>8a888a5</code> (as deployed to AWS)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1027,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 30</span>
+      <span class="log-what">Light/dark flicker with several tabs fixed</span>
+      <span class="log-detail">In Edge, with several app tabs open, the page sometimes switched between light and dark repeatedly after a reload, then settled. Cause: MUI applies the value each cross-tab <code>storage</code> event carries and saves it again, so a tab receiving late events (Edge holds them back for background tabs) replayed outdated choices one by one and every tab flipped with each; the saved choice could end up wrong. Shown on the live site: three late events in one tab made the other switch three times. Fix: a small storage manager (<code>utils/colorSchemeStorage.js</code>, passed to <code>ThemeProvider</code>) applies what is saved now, so a late event changes nothing and fires nothing further. +2 tests (one fails with MUI's default manager); 159 frontend tests, 27 E2E runs pass. Frontend deployed to AWS; the live site shows no switching under the same test.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 29</span>
       <span class="log-what">Final check: engineer deactivation race fixed</span>
