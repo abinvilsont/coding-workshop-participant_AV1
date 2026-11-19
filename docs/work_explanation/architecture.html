@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>fbac27a</code> (deployed to AWS)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>e4a7c9b</code> (app as deployed to AWS; later commits change only checks, test tooling and docs)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1008,11 +1008,15 @@ a { color: var(--accent); }
         <tr><td class="role-emp">Employee</td><td>Told when a problem is already reported; request escalation instead</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td class="role-emp">Employee</td><td>Review the engineer (hidden from engineers)</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
         <tr><td>All</td><td>Transparent communication: told when someone else updates their incidents</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td>Admin</td><td>Manage people: make admin or employee, deactivate, set each person's usual building</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td>Employee</td><td>Report form starts on their usual building, with a soft note if they pick another</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td>All</td><td>Two people changing an incident at once never overwrite each other</td><td class="yes">Done</td><td class="yes">Done</td><td class="yes">Done</td></tr>
+        <tr><td>All</td><td>Works on phones, tablets and desktops</td><td class="no">—</td><td class="no">—</td><td class="yes">Done</td></tr>
       </tbody>
     </table>
   </div>
   <div class="note">
-    <strong>Open items.</strong> Every requirement now has database, API and UI support. Remaining: admins can't reset an engineer's password from the UI (the API has no endpoint for it yet). The local database has not been re-seeded with the newest seed rows (it would delete the registered account <code>test@acme.inc</code>). Deployed to AWS on 19 Nov 2026 at <a href="https://d3lb2j5ijpzy26.cloudfront.net">https://d3lb2j5ijpzy26.cloudfront.net</a> with the sample data (every sample password is <code>Password123!</code>). Not done: password change or reset, push notifications (the bell polls), AI features.
+    <strong>Open items.</strong> Every requirement now has database, API and UI support. Remaining: admins can't reset an engineer's password from the UI (the API has no endpoint for it yet). The local database has not been re-seeded with the newest seed rows (it would delete the registered account <code>test@acme.inc</code>). Deployed to AWS on 19 Nov 2026 at <a href="https://d3lb2j5ijpzy26.cloudfront.net">https://d3lb2j5ijpzy26.cloudfront.net</a> with the sample data (every sample password is <code>Password123!</code>). The GitHub security checks pass: Bandit finds nothing in the app code (tests are left out by <code>backend/.bandit</code>) and npm audit finds no high or critical advisories; Checkov on the Terraform reports only. Not done: password change or reset, push notifications (the bell polls), AI features.
   </div>
 </section>
 
@@ -1023,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 26</span>
+      <span class="log-what">GitHub security checks pass</span>
+      <span class="log-detail">Bandit (<code>bandit -r ./backend</code>) now reads <code>backend/.bandit</code>, which leaves out <code>tests/</code>: every finding was pytest's <code>assert</code> or a fake test password, and the app code has none. npm audit flagged 3 critical advisories in the test runner (Vitest 3 → <code>tinypool</code>), never in what users download; Vitest is now 4.1.12 and the audit finds 0. All 157 unit tests, coverage thresholds and 27 E2E runs pass on Vitest 4 (it measures coverage more precisely: 96 % lines). No change to the deployed app.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 25</span>
       <span class="log-what">Soft note when reporting outside your usual building</span>

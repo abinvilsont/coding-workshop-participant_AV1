@@ -311,6 +311,16 @@ The same code runs on AWS: the React app on S3 behind CloudFront, and the API on
 - tokens are signed with the random key `init_db` stored in the database, not one derived from settings;
 - Aurora pauses after 5 idle minutes, so the API retries the connection for up to 25 seconds while it wakes: the first visit after a quiet spell takes a few seconds instead of failing. That limit stays under CloudFront's 30-second timeout.
 
+## Security checks on every push
+
+GitHub runs three scans on every push and pull request:
+
+- **Bandit** reads the Python code for risky patterns. A small `backend/.bandit` file leaves out the tests folder, because tests use `assert` and fake passwords on purpose; the app code is scanned in full and has no findings.
+- **npm audit** checks the frontend's packages against known vulnerabilities and fails on anything high or critical. It found three critical advisories in Vitest 3, the test runner, never in what users download; Vitest 4 cleared them.
+- **Checkov** reviews the Terraform in `infra/` and only reports.
+
+Bandit and npm audit both pass.
+
 ## When things go wrong
 
 Every error comes back as `{"message": "..."}` in plain English, and the page shows that message as it is. A failed request changes nothing, because the whole transaction is rolled back.

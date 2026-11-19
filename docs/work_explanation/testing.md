@@ -26,12 +26,16 @@ There is also a **load test** with Artillery (`backend/api-service/tests/load/ap
 ./bin/run-tests.sh --e2e    # ...plus the browser end-to-end tests (app must be running)
 ```
 
-## Latest results (18 Nov 2026, local)
+## Latest results (19 Nov 2026, local)
 
 | Suite | Tests | Result | Coverage |
 | --- | --- | --- | --- |
 | Backend (pytest) | 329 | all pass, ~15 s | 99 % of `app/` |
-| Frontend (Vitest) | 157 | all pass, ~20 s | 99 % lines, 91 % branches, 91 % functions |
+| Frontend (Vitest 4) | 157 | all pass, ~20 s | 96 % lines, 88 % branches, 93 % functions |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path |
 
 Both coverage runs fail if coverage drops below 80 %.
+
+## Security checks on GitHub
+
+Every push and pull request also runs three security scans. **Bandit** checks the Python code (the tests folder is left out, because tests use `assert` and fake passwords on purpose). **npm audit** checks the frontend packages for known vulnerabilities. **Checkov** reviews the Terraform and only reports. Bandit and npm audit both pass; see `TESTING.md` for how to run them locally.

@@ -24,16 +24,29 @@ cd backend/api-service
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 ```
 
-## Latest results (18 Nov 2026, local)
+## Latest results (19 Nov 2026, local)
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
 | Backend (pytest) | 329 | all pass, ~22 s | **99 %** of `app/` (1670 statements, 14 missed) |
-| Frontend (Vitest) | 157 | all pass, ~20 s | **99 %** lines, 91 % branches, 91 % functions |
+| Frontend (Vitest 4) | 157 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
 Both coverage runs enforce a minimum of 80 % and fail below it.
+
+## Security checks on GitHub
+
+Every push and pull request runs three checks (`.github/workflows/`):
+
+| Check | What it runs | Status |
+|---|---|---|
+| Python | `bandit -r ./backend` | passes. `backend/.bandit` leaves out `tests/`, where pytest's `assert` and fake passwords are expected; the app code is scanned in full and has no findings |
+| React | `npm audit --audit-level=high` on the frontend | passes. Vitest was upgraded to 4.1.12 (3.x pulled in a critical `tinypool` advisory); the packages users download never had any |
+| Terraform | Checkov on `infra/` | report only (`soft_fail`) |
+
+To repeat them locally: `pip install bandit && bandit -r ./backend`, and `npm audit --prefix ./frontend --audit-level=high`.
+CI installs from `package.json` (the lockfile isn't committed) with Node 24 and npm 11; npm 10 has a bug installing Vitest 4's optional peers, so use `npx npm@11 install` if `npm install` fails with `edgesOut`.
 
 ## What is tested
 

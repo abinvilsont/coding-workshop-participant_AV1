@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ACME Facility Desk: slides</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Inter:wght@400;600&display=swap">
+<style>
+:root {
+  --ink: #172026;
+  --soft: #4A5560;
+  --paper: #F6F5F1;
+  --paper2: #ECEAE3;
+  --line: #CFCBBF;
+  --orange: #E8833A;
+  --blue: #2459B8;
+  --night: #172026;
+  --nightsoft: #B9C4CC;
+}
+
+body { font-family: 'Inter', Arial, sans-serif; }
+
+section {
+  padding: 128px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+section.alt { background: var(--paper2); }
+section.dark { background: var(--night); color: var(--paper); }
+section.accent { background: var(--orange); color: var(--ink); }
+
+h1, h2, h3 { font-family: 'Space Grotesk', Arial, sans-serif; margin: 0; }
+h1 { font-size: 120px; font-weight: 700; line-height: 1.05; }
+h2 { font-size: 72px; font-weight: 700; line-height: 1.1; }
+h3 { font-size: 44px; font-weight: 600; line-height: 1.15; }
+p { margin: 0; font-size: 32px; line-height: 1.4; }
+
+.eyebrow {
+  font-size: 24px; font-weight: 600; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--blue); margin-bottom: 24px;
+}
+section.dark .eyebrow { color: var(--orange); }
+section.accent .eyebrow { color: var(--ink); }
+
+.lede { font-size: 44px; line-height: 1.3; color: var(--soft); }
+section.dark .lede { color: var(--nightsoft); }
+.small { font-size: 24px; line-height: 1.4; color: var(--soft); }
+section.dark .small { color: var(--nightsoft); }
+.spacer { flex: 1; }
+
+/* cards */
+.cards { display: grid; gap: 32px; margin-top: 56px; }
+.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.card {
+  background: #FBFBF8; border: 2px solid var(--line); border-radius: 20px;
+  padding: 40px; display: flex; flex-direction: column; gap: 16px;
+}
+section.alt .card { background: var(--paper); }
+.card .body { font-size: 24px; line-height: 1.45; color: var(--soft); }
+.card .title32 { font-size: 32px; font-weight: 700; }
+.card .xicon { width: 56px; height: 56px; color: var(--blue); }
+.tag {
+  align-self: flex-start; font-size: 24px; font-weight: 600;
+  background: var(--paper2); color: var(--ink); padding: 6px 16px; border-radius: 999px;
+}
+
+/* flow / architecture rows */
+.flowrow { display: flex; align-items: stretch; gap: 0; margin-top: 64px; }
+.step {
+  flex: 1; background: #FBFBF8; border: 2px solid var(--line); border-radius: 20px;
+  padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.step h3 { font-size: 32px; font-weight: 700; text-align: center; }
+.step .who { font-size: 24px; color: var(--soft); text-align: center; line-height: 1.4; }
+.step.hl { border-color: var(--blue); background: #E3EAF6; }
+.arrowbox { width: 56px; display: flex; align-items: center; justify-content: center; }
+.arrowbox .xarrow { width: 32px; height: 16px; color: var(--line); }
+
+.loopnote {
+  margin-top: 40px; align-self: center; font-size: 32px; color: var(--soft);
+  background: #FBFBF8; border: 2px dashed var(--line); border-radius: 999px; padding: 16px 40px;
+}
+
+/* numbers */
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; margin-top: 56px; }
+.stat { border-top: 4px solid var(--orange); padding-top: 24px; display: flex; flex-direction: column; gap: 8px; }
+.stat .num { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 120px; font-weight: 700; line-height: 1; }
+.stat .lbl { font-size: 32px; font-weight: 600; }
+.stat .sub { font-size: 24px; color: var(--soft); line-height: 1.4; }
+section.dark .stat .sub { color: var(--nightsoft); }
+
+.facts { display: flex; gap: 32px; margin-top: 48px; }
+.fact {
+  flex: 1; font-size: 24px; line-height: 1.45; color: var(--ink);
+  background: var(--paper2); border-radius: 16px; padding: 24px 32px;
+}
+
+/* lists */
+.checks { display: flex; flex-direction: column; gap: 28px; margin-top: 56px; }
+.check { display: flex; gap: 28px; align-items: flex-start; }
+.check .xicon { width: 44px; height: 44px; color: var(--blue); flex: none; }
+.check p { font-size: 32px; }
+.check .muted { color: var(--soft); }
+
+.nextlist { display: flex; flex-direction: column; gap: 24px; margin-top: 48px; }
+.nextitem { display: flex; gap: 32px; align-items: baseline; }
+.nextitem .n { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 44px; font-weight: 700; width: 72px; flex: none; }
+.nextitem p { font-size: 44px; font-weight: 600; }
+
+.url {
+  align-self: flex-start; font-size: 32px; font-weight: 600;
+  background: var(--ink); color: var(--paper); padding: 16px 32px; border-radius: 14px;
+}
+.coverurl {
+  align-self: flex-start; font-size: 24px; color: var(--paper);
+  border: 2px solid #3A4852; padding: 12px 24px; border-radius: 999px;
+}
+
+/* motion */
+@keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.rise { animation: rise 500ms ease-out both; animation-delay: calc(var(--i, 0) * 110ms); }
+
+/* screenshots */
+.shots { display: flex; gap: 32px; margin-top: 40px; align-items: flex-start; }
+.shot { display: flex; flex-direction: column; gap: 16px; }
+.shot img {
+  width: 816px; height: 510px; object-fit: contain; background: #F4F5F8;
+  border: 2px solid var(--line); border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(23,32,38,0.12);
+}
+.shot .big { width: 928px; height: 580px; }
+.shot .tall { width: 268px; height: 580px; border-radius: 28px; }
+.shot .cap { font-size: 24px; color: var(--soft); }
+.sidepoints { display: flex; flex-direction: column; gap: 28px; padding-top: 16px; width: 640px; }
+.sidepoints p { font-size: 32px; }
+
+/* QR on the cover */
+.qr {
+  position: absolute; right: 128px; top: 128px; width: 400px; box-sizing: border-box;
+  background: var(--paper); border-radius: 24px; padding: 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.qr img { width: 344px; height: 344px; object-fit: contain; }
+.qr .qrcap { font-size: 24px; font-weight: 600; color: var(--ink); text-align: center; }
+.qrmini {
+  position: absolute; right: 32px; bottom: 32px; width: 136px; height: 136px;
+  object-fit: contain; border-radius: 10px; border: 2px solid var(--line);
+}
+section.dark .qrmini { border-color: #3A4852; }
+
+/* standalone viewer: slides stacked and scaled to the window; one slide per page when printed */
+html, body { margin: 0; background: #2A333A; }
+.deck { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; }
+.frame { width: calc(100vw - 48px); max-width: 1920px; aspect-ratio: 16 / 9; position: relative; overflow: hidden; }
+.frame > section { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.xicon { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rise { animation: none; }
+@page { size: 1920px 1080px; margin: 0; }
+@media print {
+  html, body { background: none; }
+  .deck { display: block; padding: 0; }
+  .frame { width: 1920px; height: 1080px; max-width: none; break-after: page; }
+  .frame > section { transform: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="deck">
+<div class="frame"><section id="cover" class="dark" data-transition="fade">
+<div class="qr"><img src="images/qr.png" alt="QR code linking to the live app at d3lb2j5ijpzy26.cloudfront.net"><p class="qrcap">Scan to open the app</p></div>
+<p class="eyebrow">Coding workshop · November 2026</p>
+<h1 class="rise" style="--i:0; width:1200px">ACME Facility Desk</h1>
+<p class="lede rise" style="--i:1; margin-top:40px; width:1150px">Report a problem in the office, follow it to the fix, and confirm it’s done — all in one app.</p>
+<div class="spacer"></div>
+<div style="display:flex; gap:24px; flex-wrap:wrap">
+<p class="coverurl">React + Material UI</p>
+<p class="coverurl">Python FastAPI on AWS Lambda</p>
+<p class="coverurl">PostgreSQL</p>
+<p class="coverurl">Live on CloudFront</p>
+</div>
+</section>
+</div><div class="frame"><section id="brief">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">The brief</p>
+<h2>Let staff report office problems themselves, and see them through to the fix</h2>
+<div class="cards cols3">
+<div class="card rise" style="--i:0"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-send"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+  <path d="m21.854 2.147-10.94 10.939" />
+</svg><p class="title32">Self-service reporting</p><p class="body">Anyone with an @acme.inc email signs up and reports a problem in under a minute.</p></div>
+<div class="card rise" style="--i:1"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-users"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+</svg><p class="title32">Clear responsibilities</p><p class="body">Employees, engineers and admins each see only the screens and actions for their job.</p></div>
+<div class="card rise" style="--i:2"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-message-circle"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+</svg><p class="title32">Open communication</p><p class="body">Notes, a full history and notifications keep everyone on the same page.</p></div>
+</div>
+<div class="spacer"></div>
+<p class="small">Stand-alone by design: no integrations with other company tools.</p>
+</section>
+</div><div class="frame"><section id="roles" class="alt">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">Who uses it</p>
+<h2>Three roles, three different views</h2>
+<div class="cards cols3">
+<div class="card rise" style="--i:0"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-users"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+</svg><h3>Employee</h3><p class="tag">Signs up themselves</p><p class="body">Reports problems, follows progress, adds notes, confirms the fix and rates the engineer.</p></div>
+<div class="card rise" style="--i:1"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-wrench"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+</svg><h3>Engineer</h3><p class="tag">Created by an admin</p><p class="body">Sees only their own jobs, starts and finishes work, adds notes and sets their availability.</p></div>
+<div class="card rise" style="--i:2"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-settings"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+  <circle cx="12" cy="12" r="3" />
+</svg><h3>Facility Admin</h3><p class="tag">Runs the help desk</p><p class="body">Sees everything, sets priorities, assigns engineers, merges duplicates and manages buildings and people.</p></div>
+</div>
+</section>
+</div><div class="frame"><section id="flow">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">The main workflow</p>
+<h2 style="width:1500px">A problem is closed only when the person who reported it agrees</h2>
+<div class="flowrow">
+<div class="step rise" style="--i:0"><h3>Open</h3><p class="who">Employee reports</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step rise" style="--i:1"><h3>Assigned</h3><p class="who">Admin picks an engineer</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step rise" style="--i:2"><h3>In progress</h3><p class="who">Engineer starts</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step rise" style="--i:3"><h3>Resolved</h3><p class="who">Engineer fixes</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step hl rise" style="--i:4"><h3>Closed</h3><p class="who">Reporter agrees</p></div>
+</div>
+<p class="loopnote rise" style="--i:5">Not fixed? The reporter reopens it and it goes back to In progress</p>
+<div class="spacer"></div>
+<p class="small">Every step notifies the people involved. Reporters can cancel while Open or Assigned; engineers can put work on hold.</p>
+</section>
+</div><div class="frame"><section id="shot-employee">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">In the app · Employee</p>
+<h2>Report a problem, then follow it</h2>
+<div class="shots">
+<div class="shot rise" style="--i:0"><img src="images/report-form.png" alt="Report an incident form with title, description, category, priority and location; the usual building is filled in"><p class="cap">The report form starts on your usual building</p></div>
+<div class="shot rise" style="--i:1"><img src="images/incident-detail.png" alt="Incident detail page for INC-000004 showing status, notes between employee and engineer, details and an escalate button"><p class="cap">Every problem has its status, notes, details and actions</p></div>
+</div>
+</section>
+</div><div class="frame"><section id="shot-admin" class="alt">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">In the app · Facility Admin</p>
+<h2>See everything that needs attention</h2>
+<div class="shots">
+<div class="shot rise" style="--i:0"><img src="images/admin-dashboard.png" alt="Admin dashboard with counts for unassigned, escalated, priority requests, awaiting closure and active tickets, plus a needs-attention list and engineer workload"><p class="cap">Dashboard: what needs action, and each engineer’s workload</p></div>
+<div class="shot rise" style="--i:1"><img src="images/admin-engineers.png" alt="Engineers page listing four engineers with specialisations, availability, workload bars, star ratings and home building"><p class="cap">Engineers: skills, availability, capacity and ratings</p></div>
+</div>
+</section>
+</div><div class="frame"><section id="shot-engineer">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">In the app · Engineer</p>
+<h2>Just my jobs, highest priority first</h2>
+<div class="shots" style="gap:64px">
+<div class="shot rise" style="--i:0"><img class="big" src="images/engineer-dashboard.png" alt="Engineer dashboard with an availability switch, counts for new, in progress and on hold, capacity 1 of 5, and a list of assigned tickets"></div>
+<div class="sidepoints">
+<div class="check rise" style="--i:1"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-activity"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+</svg><p>One click to set availability: available, busy, on leave or offline</p></div>
+<div class="check rise" style="--i:2"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-chart-column"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+  <path d="M18 17V9" />
+  <path d="M13 17V5" />
+  <path d="M8 17v-3" />
+</svg><p>Capacity shows how many jobs they can still take</p></div>
+<div class="check rise" style="--i:3"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-lock"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+</svg><p>Only their own tickets, checked by the server</p></div>
+</div>
+</div>
+</section>
+</div><div class="frame"><section id="shot-phone" class="alt">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">In the app · Any screen</p>
+<h2>The same app on a desktop and a phone</h2>
+<div class="shots" style="gap:64px; justify-content:center">
+<div class="shot rise" style="--i:0"><img class="big" src="images/employee-dashboard.png" alt="Employee dashboard on a desktop showing counts and a table of my incidents"><p class="cap">Desktop: tables with every detail</p></div>
+<div class="shot rise" style="--i:1"><img class="tall" src="images/phone-dashboard.png" alt="The same employee dashboard on a phone, with stacked count tiles and incident cards"><p class="cap">Phone: cards</p></div>
+</div>
+</section>
+</div><div class="frame"><section id="features" class="alt">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">Beyond the basics</p>
+<h2>Small touches that cut noise for everyone</h2>
+<div class="cards cols3" style="margin-top:48px; gap:28px">
+<div class="card rise" style="--i:0; padding:32px"><p class="title32">“Already reported?”</p><p class="body">Before saving, the app shows open problems at the same place, so you join one instead of filing a duplicate.</p></div>
+<div class="card rise" style="--i:1; padding:32px"><p class="title32">Merge duplicates</p><p class="body">Admins fold a duplicate into the main ticket. Both reporters follow one problem from then on.</p></div>
+<div class="card rise" style="--i:2; padding:32px"><p class="title32">Engineer ratings</p><p class="body">Reporters give 1–5 stars after a fix. Admins see averages; engineers never see them, enforced on the server.</p></div>
+<div class="card rise" style="--i:3; padding:32px"><p class="title32">Notifications</p><p class="body">A bell with a badge for every change on your problems, never for your own actions.</p></div>
+<div class="card rise" style="--i:4; padding:32px"><p class="title32">Usual building</p><p class="body">The report form starts on your building, with a gentle note if you pick another one.</p></div>
+<div class="card rise" style="--i:5; padding:32px"><p class="title32">Installable app</p><p class="body">Works on desktop, tablet and phone, and installs as an app on Chrome, Edge and mobile.</p></div>
+</div>
+</section>
+</div><div class="frame"><section id="arch">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">Architecture</p>
+<h2 style="width:1500px">One click is one API call, checked twice and saved in one transaction</h2>
+<div class="flowrow" style="margin-top:56px">
+<div class="step rise" style="--i:0"><h3>React app</h3><p class="who">Material UI, React Responsive, installable PWA</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step rise" style="--i:1"><h3>CloudFront</h3><p class="who">Web files from S3, /api to Lambda</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step hl rise" style="--i:2; flex:1.4"><h3>FastAPI on Lambda</h3><p class="who">Check token, check role, save change and alerts, commit all or nothing</p></div>
+<div class="arrowbox"><svg class="xarrow" viewBox="0 0 32 16" aria-hidden="true"><path d="M0 5h20V0l12 8-12 8v-5H0z" fill="currentColor"/></svg></div>
+<div class="step rise" style="--i:3"><h3>PostgreSQL</h3><p class="who">Aurora on AWS, history kept by a trigger</p></div>
+</div>
+<div class="facts">
+<p class="fact rise" style="--i:4"><b>Modular monolith:</b> one Lambda, kept simple on purpose</p>
+<p class="fact rise" style="--i:5"><b>51 endpoints, 12 tables,</b> 6 additive migrations</p>
+<p class="fact rise" style="--i:6"><b>Terraform + shell scripts</b> deploy to LocalStack or AWS</p>
+</div>
+</section>
+</div><div class="frame"><section id="quality" class="dark">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">Testing</p>
+<h2>513 automated tests, from single functions to a real browser</h2>
+<div class="stats">
+<div class="stat rise" style="--i:0"><p class="num">329</p><p class="lbl">Backend tests</p><p class="sub">pytest, against a real throwaway PostgreSQL. 99% coverage.</p></div>
+<div class="stat rise" style="--i:1"><p class="num">157</p><p class="lbl">Frontend tests</p><p class="sub">Vitest and React Testing Library, phone layouts included. 96% of lines.</p></div>
+<div class="stat rise" style="--i:2"><p class="num">27</p><p class="lbl">End-to-end journeys</p><p class="sub">Playwright in Chrome: every role, the full incident life cycle.</p></div>
+</div>
+<div class="spacer"></div>
+<p class="small">Coverage runs fail below 80%. An Artillery load test sized the database pool, and parallel edits lock the row and refuse stale changes.</p>
+</section>
+</div><div class="frame"><section id="security">
+<img class="qrmini" src="images/qr.png" alt="QR code linking to the live app">
+<p class="eyebrow">Keeping accounts safe</p>
+<h2>The server decides what you may do, on every click</h2>
+<div class="checks">
+<div class="check rise" style="--i:0"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-lock"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+</svg><p><b>Passwords are hashed with bcrypt.</b> <span class="muted">The database never holds the real password.</span></p></div>
+<div class="check rise" style="--i:1"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-key"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" />
+  <path d="m21 2-9.6 9.6" />
+  <circle cx="7.5" cy="15.5" r="5.5" />
+</svg><p><b>Sign-in tokens expire.</b> <span class="muted">8 hours, renewed quietly while you work; sign in again after 24.</span></p></div>
+<div class="check rise" style="--i:2"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-badge-check"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" />
+  <path d="m9 12 2 2 4-4" />
+</svg><p><b>Roles are checked server-side.</b> <span class="muted">A disabled or changed account takes effect immediately.</span></p></div>
+<div class="check rise" style="--i:3"><svg class="xicon" aria-hidden="true"
+  class="lucide lucide-search"
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <circle cx="11" cy="11" r="8" />
+  <path d="m21 21-4.3-4.3" />
+</svg><p><b>Same message for wrong email or password.</b> <span class="muted">Nobody can probe who has an account.</span></p></div>
+</div>
+</section>
+</div><div class="frame"><section id="next" class="accent">
+<div class="qr"><img src="images/qr.png" alt="QR code linking to the live app at d3lb2j5ijpzy26.cloudfront.net"><p class="qrcap">Scan to open the app</p></div>
+<p class="eyebrow">What’s next</p>
+<h2>Three things on the list</h2>
+<div class="nextlist">
+<div class="nextitem rise" style="--i:0"><p class="n">01</p><p>Limit repeated sign-in attempts</p></div>
+<div class="nextitem rise" style="--i:1"><p class="n">02</p><p>Self-service password reset</p></div>
+<div class="nextitem rise" style="--i:2"><p class="n">03</p><p>Push notifications to phones</p></div>
+</div>
+<div class="spacer"></div>
+<p style="font-size:32px; font-weight:600; margin-bottom:16px">Try it live</p>
+<p class="url">d3lb2j5ijpzy26.cloudfront.net</p>
+</section>
+</div>
+</main>
+<script>
+function fit() {
+  document.querySelectorAll('.frame').forEach(f => {
+    f.firstElementChild.style.transform = 'scale(' + f.clientWidth / 1920 + ')';
+  });
+}
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>
