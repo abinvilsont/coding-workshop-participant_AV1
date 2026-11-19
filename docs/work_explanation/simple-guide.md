@@ -24,7 +24,7 @@ There are three kinds of user. Each one sees only the screens and buttons for th
 
 | Feature | In plain words |
 | --- | --- |
-| **Report a problem** | Pick the building, floor and seat, describe the problem, and send it. If an admin has set your usual building, it's already filled in. It gets a number like INC-000012. |
+| **Report a problem** | Pick the building, floor and seat, describe the problem, and send it. If an admin has set your usual building, it's already filled in. You can still pick another; the app just reminds you it isn't your usual one. It gets a number like INC-000012. |
 | **"Already reported?" check** | Before saving, the app shows open problems at the same place. If yours is there, you can join it instead of reporting it twice. |
 | **Track progress** | Each problem shows its status, who is fixing it, and everything that happened to it. |
 | **Notes** | Anyone involved can add a note. Engineers and admins can also write internal notes that employees don't see. |

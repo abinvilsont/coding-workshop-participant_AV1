@@ -16,7 +16,7 @@ diagrams, is in [`docs/work_explanation/`](docs/work_explanation/README.md).
 
 | Role | Can do |
 |---|---|
-| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (the form starts on their usual building, if an admin has set one; they're told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat (the form starts on their usual building, if an admin has set one, with a gentle note if they pick another; they're told if it's already reported, so they can request escalation instead), follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
 | **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, manage **People** (set each person's usual building, make an employee an admin or back, deactivate or reactivate accounts), delete incidents |
 

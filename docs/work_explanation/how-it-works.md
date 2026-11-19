@@ -353,6 +353,7 @@ Most choices follow from two facts. The workshop deploys to Lambda, which keeps 
 | Only `@acme.inc` emails | Only company staff can register. The check runs in the form, the API and the database. |
 | Quiet token renewal, capped at 24 hours per sign-in | Nobody is thrown out mid-task after 8 hours, yet a stolen token stops working within a day. Each renewal re-reads the role and active flag, so admin changes apply quickly. |
 | People page safeguards: not yourself, not engineers, never zero admins | An admin can't lock everyone out by accident or in a race. Engineers stay on the Engineers page, where their open tickets block deactivation. |
+| Usual building is a starting point, not a rule | People report problems in other buildings all the time (a meeting room, a site they're visiting). The form starts on their usual building to save a step, and a soft note appears if they pick another, to catch an accidental change. A pop-up or a server check would only slow down real reports. |
 | Database set-up as a Lambda task, plus a random signing key stored in the database | Aurora isn't reachable from outside AWS, and the key the app would otherwise derive on AWS comes from a guessable database password. Direct invocation needs AWS credentials, so the public site can't trigger it. |
 
 **Workflow**
