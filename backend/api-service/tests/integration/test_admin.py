@@ -9,8 +9,9 @@ from tests.integration.conftest import PASSWORD, USERS
 
 def test_everyone_reads_active_facilities(client, as_):
     tree = client.get("/facilities", headers=as_("emma")).json()
-    assert [b["code"] for b in tree] == ["HQ1", "INN"]
-    assert sum(len(f["seats"]) for b in tree for f in b["floors"]) == 9
+    assert [b["code"] for b in tree] == ["HQ1", "INN", "LOG", "NTH", "RVT"]
+    assert sum(len(b["floors"]) for b in tree) == 21
+    assert sum(len(f["seats"]) for b in tree for f in b["floors"]) == 115
 
 
 def test_inactive_items_hidden_except_for_admin(client, as_, facilities):
@@ -20,12 +21,12 @@ def test_inactive_items_hidden_except_for_admin(client, as_, facilities):
     client.patch(f"/buildings/{facilities['inn']['id']}", headers=alice, json={"is_active": False})
 
     employee = client.get("/facilities", headers=as_("emma"), params={"include_inactive": True}).json()
-    assert [b["code"] for b in employee] == ["HQ1"]
+    assert [b["code"] for b in employee] == ["HQ1", "LOG", "NTH", "RVT"]
     seats = [s["id"] for b in employee for f in b["floors"] for s in f["seats"]]
     assert seat["id"] not in seats
 
     admin = client.get("/facilities", headers=alice, params={"include_inactive": True}).json()
-    assert len(admin) == 2
+    assert len(admin) == 5
 
 
 def test_create_building_floor_and_seat(client, as_):
@@ -121,7 +122,8 @@ def test_missing_parents_are_404(client, as_):
 
 def test_list_engineers_with_workload(client, as_):
     engineers = {e["email"]: e for e in client.get("/engineers", headers=as_("alice")).json()}
-    assert set(engineers) == {"ethan.eng@acme.inc", "priya.eng@acme.inc", "tom.eng@acme.inc", "omar.eng@acme.inc"}
+    assert set(engineers) == {"ethan.eng@acme.inc", "priya.eng@acme.inc", "tom.eng@acme.inc", "omar.eng@acme.inc",
+                              "hana.eng@acme.inc"}
     ethan = engineers["ethan.eng@acme.inc"]
     assert ethan["active_tickets"] == 1 and ethan["remaining_capacity"] == 4  # AC in progress; lights resolved
     assert set(ethan["specializations"]) == {"electrical", "hvac"}
@@ -176,7 +178,7 @@ def test_deactivating_engineer_requires_no_active_tickets(client, as_):
     assert r.status_code == 200 and r.json()["is_active"] is False
     emails = [e["email"] for e in client.get("/engineers", headers=alice).json()]
     assert "omar.eng@acme.inc" not in emails
-    assert len(client.get("/engineers", headers=alice, params={"include_inactive": True}).json()) == 4
+    assert len(client.get("/engineers", headers=alice, params={"include_inactive": True}).json()) == 5
     login = client.post("/auth/login", json={"email": "omar.eng@acme.inc", "password": PASSWORD})
     assert login.status_code == 403
 

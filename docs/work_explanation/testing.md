@@ -16,7 +16,7 @@ There is also a **load test** with Artillery (`backend/api-service/tests/load/ap
 ## How the integration tests keep data clean
 
 1. The run creates a throwaway `facility_desk_test` database from `backend/db/schema.sql`.
-2. `seed.sql` is reloaded before every test, so each test starts from the same 9 users and 7 incidents.
+2. `seed.sql` is reloaded before every test, so each test starts from the same 17 users (2 admins, 5 engineers, 10 employees), 5 buildings (21 floors, 115 seats) and 7 incidents.
 3. The database is dropped at the end. Your normal `postgres` database is never touched.
 
 ## Running them
@@ -30,7 +30,7 @@ There is also a **load test** with Artillery (`backend/api-service/tests/load/ap
 
 | Suite | Tests | Result | Coverage |
 | --- | --- | --- | --- |
-| Backend (pytest) | 329 | all pass, ~15 s | 99 % of `app/` |
+| Backend (pytest) | 332 | all pass, ~25 s | 99 % of `app/` |
 | Frontend (Vitest 4) | 157 | all pass, ~20 s | 96 % lines, 88 % branches, 93 % functions |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path |
 

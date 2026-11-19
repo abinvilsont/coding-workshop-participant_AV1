@@ -11,12 +11,14 @@ import time
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from app.api.routes import incidents as routes
+from app.api.routes import engineers as eng_routes, incidents as routes
+from app.core.errors import FieldError
 from app.db.session import SessionLocal
-from app.models import Incident, IncidentStatus as S, User
-from app.schemas.incident import NoteCreate, StatusChange
+from app.models import EngineerProfile, Incident, IncidentStatus as S, User
+from app.schemas.admin import EngineerUpdate
+from app.schemas.incident import AssignIn, NoteCreate, StatusChange
 from app.services import incidents as svc
 from tests.integration.conftest import DOCK, USERS
 
@@ -149,3 +151,88 @@ def test_an_edit_based_on_the_current_copy_saves(client, as_):
 def test_edits_without_the_check_still_work(client, as_, body):
     """API clients that don't send expected_updated_at keep the old behaviour."""
     assert client.patch(f"/incidents/{DOCK}", headers=as_("alice"), json=body).status_code == 200
+
+
+# ---------------------------------------------------------------- engineer capacity and deactivation
+
+HANA, ALICE, BEN = USERS["hana"][0], USERS["alice"][0], USERS["ben"][0]
+
+
+def _open_incidents_not_hanas(n):
+    with SessionLocal() as db:
+        return db.scalars(
+            select(Incident.id).where(Incident.status.in_([S.OPEN, S.ASSIGNED, S.IN_PROGRESS]),
+                                      Incident.assigned_engineer_id.is_distinct_from(HANA))
+            .order_by(Incident.id).limit(n)
+        ).all()
+
+
+def hold_assignment_to_hana(incident_id):
+    """An admin's assignment of `incident_id` to Hana: her profile locked, NOT committed yet."""
+    db = SessionLocal()
+    db.get(EngineerProfile, HANA, with_for_update=True)
+    inc = db.get(Incident, incident_id)
+    inc.assigned_engineer_id, inc.assigned_by_id, inc.status = HANA, ALICE, S.ASSIGNED
+    db.flush()
+    return db
+
+
+def wait_behind(first, call):
+    """`first` holds Hana's profile lock; `call` must wait for it, then run."""
+    second = Racer(call)
+    second.start()
+    time.sleep(0.5)
+    waited = second.is_alive()
+    first.commit()  # always release the lock, so a failure here can't block the next test
+    first.close()
+    second.join(timeout=10)
+    assert waited, "the second request should have waited for the engineer's profile lock"
+    assert not second.is_alive()
+    return second
+
+
+def test_two_admins_cannot_both_take_an_engineers_last_free_slot(seed_conn):
+    """Hana has room for one more ticket. Alice and Ben each assign her one at the same moment:
+    the second waits for the first, then sees she is full."""
+    with SessionLocal() as db:
+        db.get(EngineerProfile, HANA).max_active_tickets = 1
+        db.commit()
+    first_id, second_id = _open_incidents_not_hanas(2)
+
+    second = wait_behind(hold_assignment_to_hana(first_id), lambda db: routes.assign_engineer(
+        second_id, AssignIn(engineer_id=HANA), db, db.get(User, BEN)))
+
+    assert isinstance(second.error, FieldError) and second.error.status_code == 409
+    assert "full capacity (1/1" in second.error.detail
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(Incident).where(Incident.assigned_engineer_id == HANA)) == 1
+
+
+def test_deactivating_an_engineer_waits_for_an_assignment_and_is_then_refused(seed_conn):
+    """Ben deactivates Hana while Alice is assigning her a ticket. Without the lock the
+    deactivation counts no active tickets and goes through, leaving an inactive engineer
+    holding a live ticket."""
+    (incident_id,) = _open_incidents_not_hanas(1)
+
+    second = wait_behind(hold_assignment_to_hana(incident_id), lambda db: eng_routes.update_engineer(
+        HANA, EngineerUpdate(is_active=False), db, db.get(User, BEN)))
+
+    assert isinstance(second.error, FieldError) and second.error.status_code == 409
+    assert "Reassign them first" in second.error.detail
+    with SessionLocal() as db:
+        assert db.get(User, HANA).is_active is True
+
+
+def test_assigning_an_engineer_who_was_just_deactivated_is_refused(seed_conn):
+    """The other order: the deactivation lands first, so the assignment is refused."""
+    (incident_id,) = _open_incidents_not_hanas(1)
+    first = SessionLocal()
+    first.get(EngineerProfile, HANA, with_for_update=True)
+    first.get(User, HANA).is_active = False
+    first.flush()
+
+    second = wait_behind(first, lambda db: routes.assign_engineer(
+        incident_id, AssignIn(engineer_id=HANA), db, db.get(User, ALICE)))
+
+    assert isinstance(second.error, FieldError) and second.error.status_code == 400
+    assert "doesn't exist or is inactive" in second.error.detail

@@ -77,6 +77,9 @@ USERS = {
     "liam": (7, "employee"),
     "sofia": (8, "employee"),
     "noah": (9, "employee"),
+    "ben": (10, "facility_admin"),    # second Facility Admin
+    "hana": (11, "engineer"),         # hvac / furniture / other, available
+    # 12-17: six more employees (Ava, Mason, Chloe, Lucas, Mia, Zara)
 }
 
 # Seeded incidents (ids are stable because seed.sql restarts identities)

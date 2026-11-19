@@ -20,7 +20,7 @@ def test_admin_dashboard_attention_counts(client, as_):
     d = client.get("/dashboard", headers=as_("alice")).json()
     assert d["role"] == "facility_admin"
     assert d["attention"] == {"unassigned": 1, "escalated": 1, "priority_requests": 1, "awaiting_closure": 1}
-    assert d["facilities"] == {"buildings": 2, "floors": 5, "seats": 9}
+    assert d["facilities"] == {"buildings": 5, "floors": 21, "seats": 115}
     assert sum(d["status_counts"].values()) == 7
     assert d["needs_attention"][0]["reference"] == "INC-000007"  # escalated first
-    assert len(d["engineers"]) == 4
+    assert len(d["engineers"]) == 5

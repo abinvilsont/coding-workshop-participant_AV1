@@ -101,9 +101,11 @@ Sample accounts (password `Password123!` for all):
 
 | Role | Email |
 |---|---|
-| Facility Admin | `alice.admin@acme.inc` |
-| Engineer | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave) |
-| Employee | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc` |
+| Facility Admin (2) | `alice.admin@acme.inc`, `ben.admin@acme.inc` |
+| Engineer (5) | `ethan.eng@acme.inc`, `priya.eng@acme.inc`, `tom.eng@acme.inc`, `omar.eng@acme.inc` (on leave), `hana.eng@acme.inc` |
+| Employee (10) | `emma@acme.inc`, `liam.lee@acme.inc`, `sofia.santos@acme.inc`, `noah.patel@acme.inc`, `ava.johnson@acme.inc`, `mason.clark@acme.inc`, `chloe.martin@acme.inc`, `lucas.brown@acme.inc`, `mia.wong@acme.inc`, `zara.ahmed@acme.inc` |
+
+Sample buildings: ACME Headquarters (HQ1), ACME Innovation Hub (INN), ACME Riverside Tower (RVT), ACME North Campus (NTH) and ACME Logistics Centre (LOG), with 3 to 6 floors each (21 in all) and 4 to 8 seats per floor (115 in all).
 
 **To redeploy backend changes to LocalStack**, run `./bin/start-dev.sh` again. If you
 call `./bin/deploy-backend.sh` yourself:
@@ -167,7 +169,7 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 329 | 99 % |
+| Backend: pytest, unit + integration on a throwaway database | 332 | 99 % |
 | Frontend: Vitest + React Testing Library | 157 | 96 % lines |
 | End-to-end: Playwright on desktop Chrome, plus layout checks at 320 px, a Pixel 7, and an iPad Mini (768 and 1024 px) | 27 | every critical journey, every page at every size |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
@@ -255,8 +257,10 @@ sample password is `Password123!`.
   live in `src/theme.js`, and switching only changes a class on `<html>`, so nothing
   re-renders. A small script in `index.html` applies the saved choice before React
   loads, so the page doesn't flash white.
-- **Engineer capacity is enforced on the server** with a row lock, so two admins
-  can't both fill an engineer's last slot.
+- **Engineer capacity is enforced on the server** with a row lock on the engineer's
+  profile, so two admins can't both fill an engineer's last slot. Changing or
+  deactivating an engineer takes the same lock, so a deactivation can't slip past an
+  assignment landing at the same moment and leave a live ticket with nobody to work it.
 - **People acting on the same incident at once never overwrite each other.**
   - Every request that changes an incident locks its row first. A second request
     waits, then re-checks its rules against what the first one saved. For example, a

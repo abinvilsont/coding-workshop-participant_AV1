@@ -28,7 +28,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 329 | all pass, ~22 s | **99 %** of `app/` (1670 statements, 14 missed) |
+| Backend (pytest) | 332 | all pass, ~25 s | **99 %** of `app/` (1684 statements, 14 missed) |
 | Frontend (Vitest 4) | 157 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
@@ -74,7 +74,7 @@ CI installs from `package.json` (the lockfile isn't committed) with Node 24 and 
 
 **Integration tests** (`tests/integration/`) run against a real PostgreSQL database:
 - The run creates a throwaway `facility_desk_test` database from `backend/db/schema.sql`.
-- `seed.sql` is reloaded before every test, so each test starts from the same 9 users and 7 incidents.
+- `seed.sql` is reloaded before every test, so each test starts from the same 17 users (2 admins, 5 engineers, 10 employees), 5 buildings (21 floors, 115 seats) and 7 incidents.
 - The database is dropped at the end. Your `postgres` database is never touched.
 
 | File | Covers |
@@ -86,7 +86,7 @@ CI installs from `package.json` (the lockfile isn't committed) with Node 24 and 
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
 | `test_admin_tasks.py` | the Lambda's database tasks: `init_db` on an empty database (tables, admin, random JWT key, pooled connection left in normal mode), refuses a database with tables, sample data warns about passwords, input checks before touching anything, `migrate` repeatable and restores a missing key, `status` on a database from before `app_secrets`, direct invocations vs Function URL requests, tokens signed with the stored key |
-| `test_concurrency.py` | two changes to one incident at the same moment, made deterministic by holding the first transaction open: a cancel arriving just after "start work" is refused (and vice versa), a note waits for a close and is refused, changes to different fields are both kept; stale edits (`expected_updated_at`) get 409, current ones save, clients that don't send it still work. The race tests fail if the row lock is removed |
+| `test_concurrency.py` | two changes to one incident at the same moment, made deterministic by holding the first transaction open: a cancel arriving just after "start work" is refused (and vice versa), a note waits for a close and is refused, changes to different fields are both kept; stale edits (`expected_updated_at`) get 409, current ones save, clients that don't send it still work. Engineers: two admins taking an engineer's last free slot (the second gets 409 "full capacity"), deactivating an engineer while an assignment lands (refused, "Reassign them first") and the reverse order (the assignment is refused). The race tests fail if the row lock is removed |
 | `test_users.py` | People admin: list and filter, make admin and back (takes effect on the next request, the person is notified), deactivate signs out and blocks sign-in, reactivate, not yourself, engineers refused, two admins demoting each other at once leave one admin (409), usual building: shown in the list, set and cleared (and returned by `/auth/me`), admins may set their own, must be an active building, not for engineers, admins only, bad input |
 | `test_escalation_requests.py` | finding open incidents like a new report (same building + category + floor; resolved, closed and merged ignored; nothing about the reporter), `relation` for your own / followed ones; requesting escalation: follower, escalated with reason, note, history under the requester, notifications to reporter / engineer / admins, an already-escalated incident keeps its reason, once per employee, merged followers can ask once, refusals (own incident, resolved, admin, engineer, unknown, merged), reason length |
 | `test_reviews.py` | engineer reviews: reporter and follower each review once a closed incident, engineers never see reviews (incident detail, engineer endpoints, own profile, notifications), admins see all plus the average (rounded to 1 dp), edit / delete / re-review, 409 on a second review, refused for admins, engineers, other employees and unclosed incidents, rating and comment validation, deleted with the incident |

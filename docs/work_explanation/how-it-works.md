@@ -158,6 +158,7 @@ When an engineer and an employee act on the same incident at the same moment, no
 | Two status changes, or a status change and a cancel | The first wins; the second is re-checked and refused if no longer allowed |
 | An edit saved after someone else's change | Refused with 409; the editor sees the new version |
 | Two admins assigning an engineer's last slot | One succeeds, the other gets 409 "at full capacity" |
+| An admin deactivating an engineer while another assigns them a ticket | Both lock the engineer's profile, so one waits. Assignment first: the deactivation is refused with 409 ("Reassign them first"). Deactivation first: the assignment is refused (the engineer is inactive) |
 
 ## Merging duplicate reports
 
