@@ -50,6 +50,8 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST | `/incidents/{id}/assign` | admin | Assign / reassign; refuses on-leave, offline, inactive (400) or full (409) engineers |
 | POST | `/incidents/{id}/escalate` | reporter | Escalate, optionally request higher priority |
 | POST | `/incidents/{id}/notes` | can view, not closed | Add note (`is_internal` for engineers/admins) |
+| POST | `/incidents/{id}/review` | reporter / follower, closed | `{rating 1-5, comment?}`: rate the engineer (one each) |
+| PUT / PATCH, DELETE | `/incidents/{id}/review` | the reviewer | Change or withdraw your review |
 | GET | `/incidents/{id}/merge-candidates` | admin | Open incidents to merge into, same building + category first |
 | POST | `/incidents/{id}/merge` | admin | `{target_id}`: merge this duplicate into another open incident; its reporter follows the target |
 | GET | `/dashboard` | any | Role-specific summary |
@@ -57,6 +59,7 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 | POST, PATCH / PUT, DELETE | `/buildings`, `/floors`, `/seats` (`/{id}`) | admin | Manage locations; delete refused (409) while in use |
 | GET, POST | `/engineers` | admin | List with workload / create engineer account |
 | GET, PATCH / PUT | `/engineers/{id}` | admin | View / update profile, capacity, availability, active flag |
+| GET | `/engineers/{id}/reviews` | admin | Every review of the engineer, newest first (`GET /engineers` also returns `avg_rating`, `review_count`) |
 | PATCH / PUT | `/engineers/me/availability` | engineer | Set own availability |
 | GET | `/notifications` | any | Own notifications, newest first, + unread count |
 | GET | `/notifications/unread-count` | any | Cheap badge count (polled every 30 s) |
@@ -71,6 +74,9 @@ All routes except `/auth/register`, `/auth/login` and `/health` need
 - **Facility Admin** sees and manages everything, including merging duplicates.
 - **Follower** (reporter of a duplicate merged into the incident) can view it, add
   notes and gets every update the reporter gets, but can't confirm, reopen or cancel.
+- **Reviews**: once an incident is closed, its reporter and followers may each rate
+  the engineer. Admins see every review, an employee sees their own, and engineers
+  see none (`visible_reviews()`).
 
 Status, assignment, priority and escalation changes are written to
 `incident_history` by a database trigger; the API sets `app.user_id` per request

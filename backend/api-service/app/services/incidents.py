@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from app.models import Building, Floor, Incident, IncidentHistory, IncidentNote, Seat, User
+from app.models import Building, EngineerReview, Floor, Incident, IncidentHistory, IncidentNote, Seat, User
 from app.services import permissions as perms
 
 # Eager-load everything a summary row needs in one round trip
@@ -49,6 +49,9 @@ def get_incident_or_404(db: Session, incident_id: int, user: User) -> Incident:
             selectinload(Incident.followers),
             selectinload(Incident.merged_into),
             selectinload(Incident.merged_from).joinedload(Incident.reporter),
+            selectinload(Incident.reviews).options(
+                joinedload(EngineerReview.reviewer), joinedload(EngineerReview.engineer)
+            ),
         )
         .where(Incident.id == incident_id)
     )
@@ -132,6 +135,21 @@ def detail(db: Session, inc: Incident, user: User) -> dict:
             for m in inc.merged_from
         ],
         "followers": [{"id": f.id, "name": f.full_name} for f in inc.followers],
+        "reviews": [review_out(r) for r in perms.visible_reviews(user, inc)],
+    }
+
+
+def review_out(r: EngineerReview) -> dict:
+    return {
+        "id": r.id,
+        "engineer_id": r.engineer_id,
+        "engineer_name": r.engineer.full_name,
+        "reviewer_id": r.reviewer_id,
+        "reviewer_name": r.reviewer.full_name,
+        "rating": r.rating,
+        "comment": r.comment,
+        "created_at": r.created_at,
+        "updated_at": r.updated_at,
     }
 
 

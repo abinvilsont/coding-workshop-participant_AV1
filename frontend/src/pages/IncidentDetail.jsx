@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Alert, Box, Button, Checkbox, Chip, FormControlLabel, Link, List, ListItem, Stack, TextField, Typography,
+  Alert, Box, Button, Checkbox, Chip, FormControlLabel, FormLabel, Link, List, ListItem, Rating, Stack, TextField,
+  Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { EscalatedBadge, PriorityBadge, Section, StatusBadge } from '../components/Badges';
 import IncidentForm from '../components/IncidentForm';
+import { ReviewItem } from '../components/Reviews';
 import { useIsPhone } from '../hooks/useResponsive';
 import { navigate } from '../router';
 import { markAllRead } from '../services/notificationService';
 import {
-  addNote, assignEngineer, changeStatus, deleteIncident, escalateIncident, getEngineers,
-  getIncident, getMergeCandidates, mergeIncident, updateIncident,
+  addNote, assignEngineer, changeStatus, deleteIncident, deleteReview, escalateIncident, getEngineers,
+  getIncident, getMergeCandidates, mergeIncident, submitReview, updateIncident, updateReview,
 } from '../services/incidentService';
 import {
-  AVAILABILITY_LABELS, PRIORITIES, ROLE_LABELS, STATUS_LABELS, categoryLabel, formatDateTime,
-  timeAgo, titleCase,
+  AVAILABILITY_LABELS, PRIORITIES, RATING_LABELS, ROLE_LABELS, STATUS_LABELS, categoryLabel, formatDateTime,
+  starsLabel, timeAgo, titleCase,
 } from '../utils/format';
 
 // Button text for a move to each status, depending on where we are now
@@ -330,6 +332,112 @@ function MergeAction({ incident, run }) {
   );
 }
 
+/** Employee: rate the engineer once the incident is closed. Admin: read every review.
+ *  The API never sends reviews to engineers, so they never see this section. */
+function ReviewSection({ incident, user, run }) {
+  const isAdmin = user.role === 'facility_admin';
+  const mine = incident.reviews.find((r) => r.reviewer_id === user.id);
+  const [editing, setEditing] = useState(false);
+  const [rating, setRating] = useState(null);
+  const [hover, setHover] = useState(-1);
+  const [comment, setComment] = useState('');
+  const canWrite = incident.permissions.can_review || (mine && editing);
+
+  if (isAdmin) {
+    if (!incident.reviews.length) return null;
+    return (
+      <Section title={`Engineer reviews (${incident.reviews.length})`}>
+        <Stack spacing={1.5}>
+          {incident.reviews.map((r) => (
+            <ReviewItem key={r.id} review={r} heading={`${r.reviewer_name} rated ${r.engineer_name}`} />
+          ))}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1.5 }}>
+          Only Facility Admins and the reviewer see reviews. Engineers don't.
+        </Typography>
+      </Section>
+    );
+  }
+  if (!mine && !incident.permissions.can_review) return null;
+
+  const startEdit = () => {
+    setRating(mine.rating);
+    setComment(mine.comment ?? '');
+    setEditing(true);
+  };
+  const submit = (e) => {
+    e.preventDefault();
+    if (!rating) return;
+    const save = mine ? updateReview : submitReview;
+    run(() => save(incident.id, rating, comment.trim() || null)).then((ok) => {
+      if (ok) {
+        setEditing(false);
+        setComment('');
+        setRating(null);
+      }
+    });
+  };
+  const remove = () => {
+    if (!window.confirm('Delete your review?')) return;
+    run(async () => {
+      await deleteReview(incident.id);
+      return getIncident(incident.id);
+    });
+  };
+  const shown = hover !== -1 ? hover : rating;
+
+  return (
+    <Section title={`Rate ${incident.assigned_engineer}`}>
+      {mine && !editing ? (
+        <>
+          <ReviewItem review={mine} heading="Your review" />
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+            <Button variant="outlined" onClick={startEdit}>Edit review</Button>
+            <Button color="error" onClick={remove}>Delete</Button>
+          </Stack>
+        </>
+      ) : canWrite ? (
+        <Stack component="form" spacing={1.5} onSubmit={submit} aria-label="Review the engineer">
+          <Box>
+            <FormLabel id="review-rating-label" sx={{ display: 'block', mb: 0.5, fontSize: 14 }}>
+              How did {incident.assigned_engineer} do?
+            </FormLabel>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Rating
+                name="review-rating"
+                aria-labelledby="review-rating-label"
+                value={rating}
+                size="large"
+                getLabelText={starsLabel}
+                onChange={(_, v) => setRating(v)}
+                onChangeActive={(_, v) => setHover(v)}
+              />
+              <Typography variant="body2" color="text.secondary">{shown ? RATING_LABELS[shown] : 'Choose 1–5 stars'}</Typography>
+            </Stack>
+          </Box>
+          <TextField
+            multiline
+            minRows={2}
+            label="Comment (optional)"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: 2000 } }}
+          />
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            {editing && <Button variant="outlined" color="inherit" onClick={() => setEditing(false)}>Cancel</Button>}
+            <Button type="submit" variant="contained" disabled={!rating}>
+              {mine ? 'Save review' : 'Submit review'}
+            </Button>
+          </Stack>
+        </Stack>
+      ) : null}
+      <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1.5 }}>
+        Only you and Facility Admins see your review. {incident.assigned_engineer} won't.
+      </Typography>
+    </Section>
+  );
+}
+
 function Notes({ incident, user, run }) {
   const isPhone = useIsPhone();
   const [body, setBody] = useState('');
@@ -589,6 +697,8 @@ export default function IncidentDetail({ id, user }) {
               )}
             </Section>
           )}
+
+          <ReviewSection incident={incident} user={user} run={run} />
 
           <Notes incident={incident} user={user} run={run} />
 

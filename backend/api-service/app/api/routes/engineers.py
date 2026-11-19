@@ -6,12 +6,14 @@ engineers keep their own availability up to date.
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.core.security import hash_password
-from app.models import ACTIVE_STATUSES, Building, EngineerProfile, Incident, User, UserRole
+from app.models import ACTIVE_STATUSES, Building, EngineerProfile, EngineerReview, Incident, User, UserRole
 from app.schemas.admin import AvailabilityUpdate, EngineerCreate, EngineerUpdate
+from app.schemas.incident import EngineerReviewOut
+from app.services.incidents import review_out
 
 router = APIRouter(prefix="/engineers", tags=["engineers"])
 
@@ -20,12 +22,20 @@ _ENGINEER_SQL = """
            ep.availability::text, ep.specializations::text[] AS specializations,
            ep.max_active_tickets, ep.home_building_id, b.name AS home_building, ep.notes,
            COALESCE(w.active_tickets, 0) AS active_tickets,
-           ep.max_active_tickets - COALESCE(w.active_tickets, 0) AS remaining_capacity
+           ep.max_active_tickets - COALESCE(w.active_tickets, 0) AS remaining_capacity,
+           r.avg_rating::float AS avg_rating, COALESCE(r.review_count, 0) AS review_count
     FROM engineer_profiles ep
     JOIN users u ON u.id = ep.user_id
     LEFT JOIN buildings b ON b.id = ep.home_building_id
     LEFT JOIN engineer_workload w ON w.engineer_id = ep.user_id
+    LEFT JOIN (
+        SELECT engineer_id, round(avg(rating), 1) AS avg_rating, count(*) AS review_count
+        FROM engineer_reviews GROUP BY engineer_id
+    ) r ON r.engineer_id = ep.user_id
 """
+
+# Employees' ratings are for admins; strip them from anything an engineer receives
+RATING_FIELDS = ("avg_rating", "review_count")
 
 
 def _engineers(db: Session, where: str = "TRUE", params: dict | None = None) -> list[dict]:
@@ -92,12 +102,37 @@ def update_my_availability(body: AvailabilityUpdate, db: DbSession, user: Curren
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only engineers have an availability status.")
     profile.availability = body.availability
     db.commit()
-    return _engineer_or_404(db, user.id)
+    me = _engineer_or_404(db, user.id)
+    return {k: v for k, v in me.items() if k not in RATING_FIELDS}
 
 
 @router.get("/{engineer_id}")
 def get_engineer(engineer_id: int, db: DbSession, _user: AdminUser):
     return _engineer_or_404(db, engineer_id)
+
+
+@router.get("/{engineer_id}/reviews", response_model=list[EngineerReviewOut])
+def engineer_reviews(engineer_id: int, db: DbSession, _user: AdminUser):
+    """Every employee review of this engineer, newest first (admin only)."""
+    _engineer_or_404(db, engineer_id)
+    rows = db.scalars(
+        select(EngineerReview)
+        .options(
+            joinedload(EngineerReview.reviewer), joinedload(EngineerReview.engineer),
+            joinedload(EngineerReview.incident),
+        )
+        .where(EngineerReview.engineer_id == engineer_id)
+        .order_by(EngineerReview.created_at.desc(), EngineerReview.id.desc())
+    ).all()
+    return [
+        {
+            **review_out(r),
+            "incident_id": r.incident_id,
+            "incident_reference": r.incident.reference,
+            "incident_title": r.incident.title,
+        }
+        for r in rows
+    ]
 
 
 @router.put("/{engineer_id}")  # PUT is accepted as an alias of PATCH

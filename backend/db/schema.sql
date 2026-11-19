@@ -16,6 +16,7 @@ SET LOCAL client_min_messages = warning;
 -- Clean slate (reverse dependency order)
 -- ---------------------------------------------------------------------
 DROP VIEW  IF EXISTS engineer_workload;
+DROP TABLE IF EXISTS engineer_reviews  CASCADE;
 DROP TABLE IF EXISTS notifications     CASCADE;
 DROP TABLE IF EXISTS incident_history  CASCADE;
 DROP TABLE IF EXISTS incident_followers CASCADE;
@@ -361,6 +362,26 @@ CREATE TABLE notifications (
 );
 CREATE INDEX notifications_user_idx     ON notifications (user_id, is_read, created_at DESC);
 CREATE INDEX notifications_incident_idx ON notifications (incident_id);
+
+-- ---------------------------------------------------------------------
+-- Engineer reviews - an employee rates the engineer who fixed their
+-- closed incident. Seen by the reviewer and admins, never by engineers.
+-- ---------------------------------------------------------------------
+CREATE TABLE engineer_reviews (
+    id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    incident_id  BIGINT      NOT NULL REFERENCES incidents (id) ON DELETE CASCADE,
+    engineer_id  BIGINT      NOT NULL REFERENCES engineer_profiles (user_id) ON DELETE CASCADE,
+    reviewer_id  BIGINT      NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    rating       SMALLINT    NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment      TEXT        CHECK (comment IS NULL OR length(comment) <= 2000),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT engineer_reviews_one_per_reviewer_uq UNIQUE (incident_id, reviewer_id)
+);
+CREATE INDEX engineer_reviews_engineer_idx ON engineer_reviews (engineer_id, created_at DESC);
+
+CREATE TRIGGER engineer_reviews_updated_at BEFORE UPDATE ON engineer_reviews
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------
 -- View: live engineer workload (for assignment decisions)

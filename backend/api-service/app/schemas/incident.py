@@ -68,6 +68,18 @@ class EscalateIn(BaseModel):
     requested_priority: IncidentPriority | None = None
 
 
+def _strip_optional(v: str | None) -> str | None:
+    v = (v or "").strip()
+    return v or None
+
+
+class ReviewIn(BaseModel):
+    """Create or replace your review of the engineer (PUT/PATCH send the whole review)."""
+
+    rating: int = Field(ge=1, le=5, description="1 (poor) to 5 (excellent)")
+    comment: Annotated[str | None, Field(max_length=2000), AfterValidator(_strip_optional)] = None
+
+
 class NoteCreate(BaseModel):
     body: LongText
     is_internal: bool = False
@@ -129,6 +141,7 @@ class Permissions(BaseModel):
     can_add_internal_note: bool
     can_delete: bool
     can_merge: bool = False
+    can_review: bool = False
     status_transitions: list[IncidentStatus]
 
 
@@ -137,6 +150,26 @@ class LinkedIncident(BaseModel):
     reference: str
     title: str
     reported_by: str | None = None
+
+
+class ReviewOut(BaseModel):
+    id: int
+    engineer_id: int
+    engineer_name: str
+    reviewer_id: int
+    reviewer_name: str
+    rating: int
+    comment: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class EngineerReviewOut(ReviewOut):
+    """A review as listed on the admin's Engineers page."""
+
+    incident_id: int
+    incident_reference: str
+    incident_title: str
 
 
 class Follower(BaseModel):
@@ -162,3 +195,4 @@ class IncidentDetail(IncidentSummary):
     merged_into: LinkedIncident | None = None      # set on a duplicate
     merged_from: list[LinkedIncident] = []         # duplicates merged into this one
     followers: list[Follower] = []                 # their reporters, kept informed
+    reviews: list[ReviewOut] = []                  # admins: all; employees: their own; engineers: none

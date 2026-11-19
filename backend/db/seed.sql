@@ -12,7 +12,7 @@
 
 BEGIN;
 
-TRUNCATE notifications, incident_history, incident_notes, incidents, engineer_profiles,
+TRUNCATE engineer_reviews, notifications, incident_history, incident_notes, incidents, engineer_profiles,
          seats, floors, buildings, users
 RESTART IDENTITY CASCADE;
 
@@ -176,5 +176,12 @@ FROM (VALUES
 ) AS n(title, email, body, internal, age)
 JOIN incidents i ON i.title = n.title
 JOIN users u ON u.email = n.email;
+
+-- ---------------------------------------------------------------------
+-- Engineer reviews (employee rates the engineer after confirming the fix)
+-- ---------------------------------------------------------------------
+INSERT INTO engineer_reviews (incident_id, engineer_id, reviewer_id, rating, comment, created_at)
+SELECT i.id, i.assigned_engineer_id, i.reported_by, 5, 'Quick fix and kept me updated.', now() - interval '2 days'
+FROM incidents i WHERE i.title = 'Broken chair';
 
 COMMIT;

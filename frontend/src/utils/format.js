@@ -57,3 +57,6 @@ export function locationText(i) {
     .filter(Boolean)
     .join(' · ');
 }
+
+export const RATING_LABELS = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Very good', 5: 'Excellent' };
+export const starsLabel = (n) => `${n} star${n === 1 ? '' : 's'}`;

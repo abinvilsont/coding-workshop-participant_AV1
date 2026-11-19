@@ -24,3 +24,4 @@ export const updateEngineer = (id, body) => apiRequest(`/engineers/${id}`, { met
 // Engineer self-service
 export const setMyAvailability = (availability) =>
   apiRequest('/engineers/me/availability', { method: 'PATCH', body: { availability } });
+export const getEngineerReviews = (id) => apiRequest(`/engineers/${id}/reviews`);

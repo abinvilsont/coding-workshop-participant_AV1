@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger, Column, Computed, DateTime, FetchedValue, ForeignKey, Identity, String, Table, Text, false,
-    func,
+    BigInteger, Column, Computed, DateTime, FetchedValue, ForeignKey, Identity, SmallInteger, String, Table, Text,
+    false, func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -103,6 +103,10 @@ class Incident(Base):
         order_by=lambda: Incident.id,
         viewonly=True,
     )
+    # Written directly; the DB's ON DELETE CASCADE removes them with the incident
+    reviews: Mapped[list["EngineerReview"]] = relationship(
+        order_by="EngineerReview.created_at", viewonly=True
+    )
 
 
 class IncidentNote(Base):
@@ -138,3 +142,28 @@ class IncidentHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     actor: Mapped[User | None] = relationship()
+
+
+class EngineerReview(Base):
+    """An employee's rating of the engineer who fixed their closed incident.
+    Visible to the reviewer and admins only - never to engineers."""
+
+    __tablename__ = "engineer_reviews"
+    __mapper_args__ = {"eager_defaults": True}
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    incident_id: Mapped[int] = mapped_column(ForeignKey("incidents.id", ondelete="CASCADE"))
+    engineer_id: Mapped[int] = mapped_column(ForeignKey("engineer_profiles.user_id", ondelete="CASCADE"))
+    reviewer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    rating: Mapped[int] = mapped_column(SmallInteger)
+    comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), server_onupdate=FetchedValue()
+    )
+
+    incident: Mapped[Incident] = relationship(viewonly=True)
+    reviewer: Mapped[User] = relationship(foreign_keys=[reviewer_id])
+    engineer: Mapped[User] = relationship(
+        primaryjoin="EngineerReview.engineer_id == User.id", foreign_keys=[engineer_id], viewonly=True
+    )

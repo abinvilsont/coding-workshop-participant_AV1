@@ -12,9 +12,9 @@ Built for the coding workshop. The workshop brief and evaluation guides are in
 
 | Role | Can do |
 |---|---|
-| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen |
+| **Employee** (self-registers with an `@acme.inc` email) | Report incidents with building / floor / seat, follow progress, add notes, escalate and request a higher priority, cancel before work starts, confirm the fix or reopen, rate the engineer once the incident is closed |
 | **Engineer** (created by an admin) | See only tickets assigned to them, move them `assigned → in progress ⇄ on hold → resolved`, add public or internal notes, set their own availability |
-| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, manage buildings / floors / seats and engineer accounts, delete incidents |
+| **Facility Admin** | See everything, set priority, assign engineers (on-leave, offline or full engineers are refused), merge duplicate reports, read engineer reviews and ratings, manage buildings / floors / seats and engineer accounts, delete incidents |
 
 An incident's journey: **Open → Assigned → In progress → Resolved → Closed**. The
 reporter, not the engineer, confirms the fix. Every change is written to the
@@ -28,6 +28,15 @@ report into the other:
 - Its reporter becomes a **follower** of the main incident: they see it, can comment,
   and get every update.
 - Only the original reporter confirms the fix.
+
+**Engineer reviews.** Once an incident is closed, the employees who reported it
+(the reporter and any followers) can each rate the engineer from 1 to 5 stars, with
+an optional comment, and edit or delete that review later.
+- The reviewer sees their own review on the incident.
+- Admins see every review on the incident, plus each engineer's average rating on
+  the Engineers page.
+- **Engineers never see reviews.** The API leaves reviews out of every response an
+  engineer receives, and doesn't notify them.
 
 ## Architecture
 
@@ -137,9 +146,9 @@ cd frontend && npm run lint
 
 | Suite | Count | Coverage |
 |---|---|---|
-| Backend: pytest, unit + integration on a throwaway database | 228 | 99 % |
-| Frontend: Vitest + React Testing Library | 104 | 99 % lines |
-| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 13 | every critical journey |
+| Backend: pytest, unit + integration on a throwaway database | 247 | 99 % |
+| Frontend: Vitest + React Testing Library | 110 | 99 % lines |
+| End-to-end: Playwright on desktop Chrome and a Pixel 7 phone | 14 | every critical journey |
 | Load: Artillery | 1 scenario | 0 / 510 users failed, p95 228 ms |
 
 Details, known gaps and the load-test story (it found a real connection-pool bug)
@@ -189,6 +198,12 @@ Before the first cloud deploy:
     labels it "Merged".
   - Followers live in their own table, so the original reporter keeps sole control
     of confirming the fix.
+- **Reviews are filtered on the server, not hidden in the UI.**
+  - `visible_reviews()` in `permissions.py` returns every review to admins, the
+    caller's own review to an employee, and nothing to engineers.
+  - The engineer's own profile response has the rating fields removed.
+  - Each review stores the engineer at the time it's written, so a later
+    reassignment doesn't move the rating to someone else.
 
 ## Assumptions
 
@@ -202,6 +217,10 @@ Before the first cloud deploy:
 - A merge isn't undone automatically. If an admin merges by mistake, the follower
   can still comment on the main incident, and the admin can ask them to report
   it again.
+- Employees see only their own review, not other reporters'. Reviews are feedback
+  for admins, not a public score.
+- Only closed incidents can be reviewed. A cancelled or merged report has no fix
+  to rate; its reporter rates the main incident instead.
 
 ## Known gaps
 

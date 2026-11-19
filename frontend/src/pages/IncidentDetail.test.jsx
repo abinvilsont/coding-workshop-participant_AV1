@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { USERS, incident, mockApi } from '../test/mockApi';
@@ -315,6 +315,82 @@ describe('IncidentDetail', () => {
       render(<IncidentDetail id={4} user={USERS.employee} />);
       await screen.findByRole('heading', { name: 'Air conditioning not cooling' });
       expect(screen.queryByText(/You're following this incident/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('engineer reviews', () => {
+    const closed = (overrides = {}) =>
+      incident({ status: 'closed', assigned_engineer: 'Tom Tech', assigned_engineer_id: 4, ...overrides });
+    const REVIEW = {
+      id: 1, engineer_id: 4, engineer_name: 'Tom Tech', reviewer_id: 6, reviewer_name: 'Emma Employee',
+      rating: 4, comment: 'Quick fix.', created_at: '2026-11-18T09:00:00Z', updated_at: '2026-11-18T09:00:00Z',
+    };
+
+    it('employee rates the engineer of a closed incident', async () => {
+      const user = userEvent.setup();
+      const api = setup(closed({ permissions: { can_review: true } }), {
+        'POST /incidents/4/review': () => ({ status: 201, body: closed({ reviews: [REVIEW] }) }),
+      });
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+
+      const section = await screen.findByRole('region', { name: 'Rate Tom Tech' });
+      expect(section).toHaveTextContent("Only you and Facility Admins see your review. Tom Tech won't.");
+      const submit = within(section).getByRole('button', { name: 'Submit review' });
+      expect(submit).toBeDisabled();
+      // MUI Rating reads hover from element sizes, which jsdom lacks, so click the radio itself
+      fireEvent.click(within(section).getByRole('radio', { name: '4 stars' }));
+      expect(section).toHaveTextContent('Very good');
+      await user.type(within(section).getByLabelText('Comment (optional)'), '  Quick fix.  ');
+      await user.click(submit);
+
+      expect(api.calls.at(-1)).toMatchObject({ method: 'POST', path: '/incidents/4/review', body: { rating: 4, comment: 'Quick fix.' } });
+      expect(await within(section).findByText('Your review')).toBeInTheDocument();
+      expect(within(section).getByRole('img', { name: '4 stars' })).toBeInTheDocument();
+    });
+
+    it('employee edits and deletes their review', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      let current = closed({ reviews: [REVIEW] });
+      const api = setup(current, {
+        'GET /incidents/4': () => current,
+        'PUT /incidents/4/review': (body) => (current = closed({ reviews: [{ ...REVIEW, ...body }] })),
+        'DELETE /incidents/4/review': () => {
+          current = closed({ permissions: { can_review: true } });
+          return { status: 204, body: null };
+        },
+      });
+      render(<IncidentDetail id={4} user={USERS.employee} />);
+
+      const section = await screen.findByRole('region', { name: 'Rate Tom Tech' });
+      expect(section).toHaveTextContent('Quick fix.');
+      await user.click(within(section).getByRole('button', { name: 'Edit review' }));
+      fireEvent.click(within(section).getByRole('radio', { name: '2 stars' }));
+      await user.clear(within(section).getByLabelText('Comment (optional)'));
+      await user.click(within(section).getByRole('button', { name: 'Save review' }));
+      expect(api.calls.at(-1)).toMatchObject({ method: 'PUT', body: { rating: 2, comment: null } });
+      expect(await within(section).findByRole('img', { name: '2 stars' })).toBeInTheDocument();
+
+      await user.click(within(section).getByRole('button', { name: 'Delete' }));
+      expect(await within(section).findByRole('button', { name: 'Submit review' })).toBeInTheDocument();
+      expect(api.calls.some((c) => c.method === 'DELETE')).toBe(true);
+    });
+
+    it('admin reads every review', async () => {
+      setup(closed({ reviews: [REVIEW, { ...REVIEW, id: 2, reviewer_id: 7, reviewer_name: 'Liam Lee', rating: 2, comment: null }] }));
+      render(<IncidentDetail id={4} user={USERS.admin} />);
+      const section = await screen.findByRole('region', { name: 'Engineer reviews (2)' });
+      expect(section).toHaveTextContent('Emma Employee rated Tom Tech');
+      expect(section).toHaveTextContent('Liam Lee rated Tom Tech');
+      expect(within(section).queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('shows nothing to engineers, or before the incident is closed', async () => {
+      setup(closed());
+      render(<IncidentDetail id={4} user={USERS.engineer} />);
+      await screen.findByRole('heading', { name: 'Air conditioning not cooling' });
+      expect(screen.queryByText(/review/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: /Rate/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -4,12 +4,12 @@ from app.models.enums import (
     IncidentPriority, IncidentStatus, UserRole,
 )
 from app.models.facility import Building, Floor, Seat
-from app.models.incident import Incident, IncidentHistory, IncidentNote, incident_followers
+from app.models.incident import EngineerReview, Incident, IncidentHistory, IncidentNote, incident_followers
 from app.models.notification import Notification
 from app.models.user import User
 
 __all__ = [
-    "ACTIVE_STATUSES", "FINAL_STATUSES", "Building", "EngineerAvailability", "EngineerProfile",
+    "ACTIVE_STATUSES", "FINAL_STATUSES", "Building", "EngineerAvailability", "EngineerProfile", "EngineerReview",
     "Floor", "HistoryEvent", "Incident", "IncidentCategory", "IncidentHistory", "IncidentNote",
     "IncidentPriority", "IncidentStatus", "Notification", "Seat", "User", "UserRole", "incident_followers",
 ]

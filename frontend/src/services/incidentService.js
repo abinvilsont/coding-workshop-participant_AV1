@@ -29,3 +29,10 @@ export const addNote = (id, body, isInternal = false) =>
 export const getMergeCandidates = (id) => apiRequest(`/incidents/${id}/merge-candidates`);
 export const mergeIncident = (id, targetId) =>
   apiRequest(`/incidents/${id}/merge`, { method: 'POST', body: { target_id: targetId } });
+
+// Engineer reviews (reporters of a closed incident). Reviews are never shown to engineers.
+export const submitReview = (id, rating, comment) =>
+  apiRequest(`/incidents/${id}/review`, { method: 'POST', body: { rating, comment } });
+export const updateReview = (id, rating, comment) =>
+  apiRequest(`/incidents/${id}/review`, { method: 'PUT', body: { rating, comment } });
+export const deleteReview = (id) => apiRequest(`/incidents/${id}/review`, { method: 'DELETE' });

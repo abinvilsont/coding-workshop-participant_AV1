@@ -153,4 +153,44 @@ describe('Engineers admin page', () => {
     expect(within(card).getByRole('progressbar', { name: 'Workload 5 of 5' })).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
+
+  it('shows ratings and opens an engineer’s reviews', async () => {
+    const user = userEvent.setup();
+    const PRIYA = { ...ETHAN, id: 3, name: 'Priya Plumbing', email: 'priya.eng@acme.inc', avg_rating: 4.5, review_count: 2 };
+    const api = mockApi({
+      'GET /facilities': FACILITIES,
+      'GET /engineers': [ETHAN, PRIYA],
+      'GET /engineers/3/reviews': [
+        { id: 1, engineer_id: 3, engineer_name: 'Priya Plumbing', reviewer_id: 6, reviewer_name: 'Emma Employee', rating: 5,
+          comment: 'Quick fix and kept me updated.', created_at: '2026-11-17T09:00:00Z', updated_at: '2026-11-17T09:00:00Z',
+          incident_id: 1, incident_reference: 'INC-000001', incident_title: 'Broken chair' },
+      ],
+    });
+    render(<Engineers />);
+
+    const ethan = (await screen.findByText('Ethan Electrics')).closest('tr');
+    expect(ethan).toHaveTextContent('No reviews');
+    await user.click(screen.getByRole('button', { name: /^Priya Plumbing: 4.5 out of 5 from 2 reviews/ }));
+
+    const panel = await screen.findByRole('region', { name: 'Reviews of Priya Plumbing' });
+    expect(await within(panel).findByText('Quick fix and kept me updated.')).toBeInTheDocument();
+    expect(within(panel).getByRole('link', { name: 'INC-000001' })).toHaveAttribute('href', '#/incidents/1');
+    expect(within(panel).getByRole('img', { name: '5 stars' })).toBeInTheDocument();
+    expect(api.calls.at(-1).path).toBe('/engineers/3/reviews');
+
+    await user.click(within(panel).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('region', { name: 'Reviews of Priya Plumbing' })).not.toBeInTheDocument();
+  });
+
+  it('shows when loading reviews fails', async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /facilities': FACILITIES,
+      'GET /engineers': [{ ...ETHAN, avg_rating: 3, review_count: 1 }],
+      'GET /engineers/2/reviews': { status: 500, body: { message: 'Something went wrong.' } },
+    });
+    render(<Engineers />);
+    await user.click(await screen.findByRole('button', { name: /from 1 review\./ }));
+    expect(await screen.findByText('Something went wrong.')).toBeInTheDocument();
+  });
 });

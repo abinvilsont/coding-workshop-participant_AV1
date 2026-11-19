@@ -9,12 +9,12 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.models import (
-    FINAL_STATUSES, EngineerAvailability, EngineerProfile, Incident, IncidentNote, IncidentPriority,
-    IncidentStatus as S, User, incident_followers,
+    FINAL_STATUSES, EngineerAvailability, EngineerProfile, EngineerReview, Incident, IncidentNote,
+    IncidentPriority, IncidentStatus as S, User, incident_followers,
 )
 from app.schemas.incident import (
     AssignIn, EscalateIn, IncidentCreate, IncidentDetail, IncidentList, IncidentSummary, IncidentUpdate,
-    MergeIn, NoteCreate, StatusChange,
+    MergeIn, NoteCreate, ReviewIn, StatusChange,
 )
 from app.services import incidents as svc
 from app.services import notifications as notify
@@ -349,3 +349,63 @@ def merge(incident_id: int, body: MergeIn, db: DbSession, user: AdminUser):
     notify.merged(db, source, target, user, source_reporters)
     _commit(db)
     return _reload(db, target.id, user)
+
+
+# ------------------------------------------------------------------ reviews
+# The employees who reported a closed incident rate its engineer. Reviews are
+# returned to the reviewer and to admins only; engineers never receive them.
+
+def _check_can_review(user: User, inc: Incident) -> None:
+    if user.is_admin or user.is_engineer:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the employees who reported an incident can review its engineer.")
+    if inc.status != S.CLOSED:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You can review the engineer once the incident is closed.")
+    if inc.assigned_engineer_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "No engineer worked on this incident.")
+
+
+def _own_review_or_404(user: User, inc: Incident) -> EngineerReview:
+    review = perms.own_review(user, inc)
+    if review is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "You haven't reviewed this incident's engineer yet.")
+    return review
+
+
+@router.post("/{incident_id}/review", response_model=IncidentDetail, status_code=status.HTTP_201_CREATED)
+def create_review(incident_id: int, body: ReviewIn, db: DbSession, user: CurrentUser):
+    """Rate the engineer who fixed your closed incident (reporter or follower, once each)."""
+    inc = svc.get_incident_or_404(db, incident_id, user)
+    _check_can_review(user, inc)
+    if perms.own_review(user, inc):
+        raise HTTPException(status.HTTP_409_CONFLICT, "You've already reviewed this engineer. Edit your review instead.")
+    db.add(EngineerReview(
+        incident_id=inc.id, engineer_id=inc.assigned_engineer_id, reviewer_id=user.id,
+        rating=body.rating, comment=body.comment,
+    ))
+    try:
+        db.commit()
+    except IntegrityError as exc:  # a double-click raced the check above
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "You've already reviewed this engineer.") from exc
+    return _reload(db, incident_id, user)
+
+
+@router.put("/{incident_id}/review", response_model=IncidentDetail)
+@router.patch("/{incident_id}/review", response_model=IncidentDetail)
+def update_review(incident_id: int, body: ReviewIn, db: DbSession, user: CurrentUser):
+    """Change your rating or comment."""
+    inc = svc.get_incident_or_404(db, incident_id, user)
+    review = _own_review_or_404(user, inc)
+    review.rating = body.rating
+    review.comment = body.comment
+    _commit(db)
+    return _reload(db, incident_id, user)
+
+
+@router.delete("/{incident_id}/review", status_code=status.HTTP_204_NO_CONTENT)
+def delete_review(incident_id: int, db: DbSession, user: CurrentUser):
+    """Withdraw your review."""
+    inc = svc.get_incident_or_404(db, incident_id, user)
+    db.delete(_own_review_or_404(user, inc))
+    _commit(db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

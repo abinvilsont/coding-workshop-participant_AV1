@@ -13,6 +13,10 @@ Admin     : sees and manages everything: edit, priority, assignment,
 Follower  : an employee whose duplicate report was merged into this
             incident. Can view it, add notes and is kept informed, but
             only the original reporter confirms, reopens or cancels.
+
+Reviews   : once an incident is closed, its reporter and followers may
+            each rate the engineer who fixed it (one review each). The
+            reviewer and admins see a review; engineers never do.
 """
 
 from sqlalchemy import or_, select
@@ -70,6 +74,35 @@ def can_merge(user: User, inc: Incident) -> bool:
     return user.is_admin and inc.status not in FINAL_STATUSES and inc.merged_into_id is None
 
 
+def is_review_eligible(user: User, inc: Incident) -> bool:
+    """Reporter or follower of a closed incident that had an engineer."""
+    return (
+        not user.is_admin
+        and not user.is_engineer
+        and inc.status == S.CLOSED
+        and inc.assigned_engineer_id is not None
+        and (is_reporter(user, inc) or is_follower(user, inc))
+    )
+
+
+def own_review(user: User, inc: Incident):
+    return next((r for r in inc.reviews if r.reviewer_id == user.id), None)
+
+
+def can_review(user: User, inc: Incident) -> bool:
+    """May write a new review (editing an existing one is checked separately)."""
+    return is_review_eligible(user, inc) and own_review(user, inc) is None
+
+
+def visible_reviews(user: User, inc: Incident) -> list:
+    """Admins see every review; an employee sees their own; engineers see none."""
+    if user.is_admin:
+        return list(inc.reviews)
+    if user.is_engineer:
+        return []
+    return [r for r in inc.reviews if r.reviewer_id == user.id]
+
+
 def allowed_transitions(user: User, inc: Incident) -> set[S]:
     current = inc.status
     allowed: set[S] = set()
@@ -119,5 +152,6 @@ def permissions(user: User, inc: Incident) -> dict:
         "can_add_internal_note": can_add_internal_note(user, inc),
         "can_delete": user.is_admin,
         "can_merge": can_merge(user, inc),
+        "can_review": can_review(user, inc),
         "status_transitions": sorted(allowed_transitions(user, inc), key=order.index),
     }
