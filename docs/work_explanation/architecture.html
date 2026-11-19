@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 24 · reflects local <code>main</code> @ <code>e4a7c9b</code> (app as deployed to AWS; later commits change only checks, test tooling and docs)</span>
+  <span class="updated">Last updated 19 Nov 2026 · revision 27 · reflects local <code>main</code> @ <code>eb5c180</code> (app as deployed to AWS; later commits change only checks, test tooling, sample data and docs)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -976,7 +976,7 @@ a { color: var(--accent); }
       <span class="path">backend/db/ · bin/ · infra/</span>
       <ul>
         <li><code>schema.sql</code>: tables, enums, triggers, workload view</li>
-        <li><code>seed.sql</code>: demo data, all passwords <code>Password123!</code></li>
+        <li><code>seed.sql</code>: demo data for a fresh database (wipes first): 2 admins, 5 engineers, 10 employees, 2 buildings, 7 incidents; all passwords <code>Password123!</code></li>
         <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building)</li>
         <li><code>bin/start-dev.sh</code>: Postgres, LocalStack, deploy, proxy</li>
         <li><code>infra/</code>: Terraform finds each folder under <code>backend/</code> and deploys it as a Lambda</li>
@@ -1027,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">19 Nov 2026 · rev 27</span>
+      <span class="log-what">More sample people</span>
+      <span class="log-detail"><code>seed.sql</code> now has 2 admins, 5 engineers and 10 employees (was 1, 4 and 4): Ben Brooks (admin), Hana Kim (engineer: HVAC, furniture, other) and six employees, added after the existing people so every id the tests use stays the same. The live databases were not reseeded (that wipes them): the missing people were inserted into the local database, and added on AWS through the API as Alice (register, then role and usual building; Hana via <code>POST /engineers</code>). Tests that counted the sample people expect the new totals; the two-admins race test demotes Ben first. 329 backend tests pass. No change to the app.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 26</span>
       <span class="log-what">GitHub security checks pass</span>
