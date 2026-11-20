@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 31 · reflects the app as deployed to AWS on 20 Nov 2026 (local <code>main</code> plus the moving-back-to-Open fix)</span>
+  <span class="updated">Last updated 20 Nov 2026 · revision 32 · reflects the app as deployed to AWS on 20 Nov 2026 (local <code>main</code>)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -1027,6 +1027,11 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">20 Nov 2026 · rev 32</span>
+      <span class="log-what">Acting on a reassigned ticket: a clear message, not a blank page</span>
+      <span class="log-detail">Found while rehearsing: Priya had an incident open, an admin reassigned it to Tom, and Priya then clicked Put on hold. The API rightly refused with 404 (she can no longer see it), but on AWS CloudFront answers every 404 with <code>index.html</code> and status 200 (its fallback for page URLs also catches <code>/api/*</code>). The page took that HTML for the updated incident and crashed to a blank screen. Now <code>apiClient.js</code> treats an HTML reply to an API call as a 404, and a 404 from an action reloads the incident page, which says it may have been reassigned or deleted. Checked on the live site that the cached 404 page is not shared between people. +2 frontend tests (161), 27 E2E runs pass. Deployed to AWS; migration 007 also run there.</span>
+    </li>
     <li>
       <span class="log-when">20 Nov 2026 · rev 31</span>
       <span class="log-what">Moving back to Open takes the engineer off</span>

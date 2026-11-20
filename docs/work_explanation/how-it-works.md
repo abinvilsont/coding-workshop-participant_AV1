@@ -331,7 +331,7 @@ Every error comes back as `{"message": "..."}` in plain English, and the page sh
 | 400 | A rule or field check failed, such as a wrong location, a missing field or an invalid email | The reason in red directly above the field it's about, for example "That floor is not in the selected building." above Floor, and the cursor moves to the first one. Nothing appears at the top of the page. |
 | 401 | No token, an expired token (after 8 hours), or a deactivated account | You are signed out and sent back to the login page. A wrong password does not sign you out; it just shows the error. |
 | 403 | Your role isn't allowed to do this | "You can't change this incident from X to Y." or "You don't have permission to do that." |
-| 404 | The incident doesn't exist **or** you aren't allowed to see it | "Incident not found." The same answer for both, so nobody can guess other people's incidents. |
+| 404 | The incident doesn't exist **or** you aren't allowed to see it | "Incident not found." The same answer for both, so nobody can guess other people's incidents. On AWS, CloudFront swaps any 404 for the app's own page (status 200), so the app treats an HTML reply from the API as a 404. If you act on an incident that was just reassigned away from you, the page reloads and says it may have been reassigned or deleted. |
 | 409 | A duplicate, or something still in use | "An account with this email already exists." or "… Deactivate it instead." |
 | 503 | The database pool is full (waited 10 s) or the database is down | "The service is busy right now…" with a `Retry-After` header |
 | 500 | An unexpected bug | "Something went wrong. Please try again." The details go to the server log, never to the browser. |
