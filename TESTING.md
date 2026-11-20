@@ -28,8 +28,8 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 332 | all pass, ~25 s | **99 %** of `app/` (1684 statements, 14 missed) |
-| Frontend (Vitest 4) | 159 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
+| Backend (pytest) | 336 | all pass, ~26 s | **99 %** of `app/` (1691 statements, 14 missed) |
+| Frontend (Vitest 4) | 161 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
 
@@ -81,7 +81,7 @@ CI installs from `package.json` (the lockfile isn't committed) with Node 24 and 
 |---|---|
 | `test_auth.py` | register (incl. ignoring a forged `role`), duplicates, login, generic login errors, disabled accounts, missing/invalid/expired tokens, deactivated users; token refresh keeps the session start, stops after 24 h, needs a valid token and active account, picks up a changed role, accepts older tokens |
 | `test_incidents.py` | CRUD per role, visibility, filters, search, pagination, location validation, inactive buildings, edit rules, priority rules, delete with cascade |
-| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer / at full capacity, last slot, freed slot), escalation rules, notes and internal-note visibility |
+| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer / at full capacity, last slot, freed slot), escalation rules, notes and internal-note visibility; moving back to Open (or reopening a cancelled incident) takes the engineer off, tells them, and the database refuses an Open incident with an engineer |
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |
@@ -106,13 +106,13 @@ These tests mock `fetch` with a small fake backend (`src/test/mockApi.js`), so t
 | `pwa` (static) | manifest fields and icons browsers need to install, icon files really have their stated sizes, page links, the service worker never caches `/api/` and only precaches files that exist |
 | `NewIncident` | the "already reported" prompt: straight through when nothing matches, request escalation instead of a duplicate, refusal shown above the reason, report it anyway, back to the form, your own incident links instead, a failed check never blocks reporting, admins skip it, save errors inside the prompt; starts on the usual building from `/auth/me`, and still works if that check fails |
 | `IncidentForm` | required fields with per-field messages that clear as you type, server field errors, building → floor → seat cascade, numeric payload, critical priority for admins only, server errors, starts on the usual building (with a hint) unless it's been deactivated, a soft note (never a block) when another building is picked, and that report still sends |
-| `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes; edits send the version they started from, a stale edit closes the form on the latest version with a warning, a refused action reloads the incident and keeps its message visible even when its box disappears |
+| `IncidentDetail` | role-based actions shown/hidden, merge duplicate (candidates, confirm, navigate), merged banner, also-reported-by and follower notice, rate / edit / delete a review, admin review list, no reviews for engineers, full engineers disabled in the picker, status change with comment, confirm before cancel, internal notes, escalation, assign + approve priority, edit, delete, errors, closed notes; edits send the version they started from, a stale edit closes the form on the latest version with a warning, a refused action reloads the incident and keeps its message visible even when its box disappears; an action refused with 404 (e.g. the ticket was reassigned while the page was open) reloads and says it may have been reassigned or deleted |
 | `NotificationBell` | unread badge, list, open → mark read + navigate, mark all read, empty state, Escape, 30 s polling |
 | `Dashboard` | employee / engineer / admin views, availability switch, empty and error states, refresh |
 | `IncidentList` | filters and search sent to the API, role headings, paging, errors |
 | `admin/Facilities`, `admin/Engineers` | create / edit / deactivate / delete, validation with per-field messages (incl. server field errors), conflict messages, inactive toggle, engineer ratings and reviews panel |
 | `App` | sign in/out, tab title shows the user, admin nav and route guard, expired session |
-| `apiClient` | JSON and token headers, query strings, error shapes and field errors, network failure, 401 sign-out; quiet token renewal under an hour left, one renewal shared by concurrent requests, carries on with the old token if renewal is refused or offline |
+| `apiClient` | JSON and token headers, query strings, error shapes and field errors, network failure, 401 sign-out; quiet token renewal under an hour left, one renewal shared by concurrent requests, carries on with the old token if renewal is refused or offline; an HTML page in reply to an API call (CloudFront's stand-in for a 404) is raised as a 404 |
 | `AppLayout`, `IncidentTable` | desktop top bar vs phone menu drawer (React Responsive); at 1024 px admins get the drawer (six links) while employees keep the top bar, admins get it back at 1200 px; incident table vs cards on phones and tablets (768 px) |
 | `ThemeToggle` | light ⇄ dark switch, choice saved and restored, `<html>` class, hidden outside the theme provider; with other tabs open, late storage events change nothing (fails with MUI's default storage) and a real change in another tab is followed |
 

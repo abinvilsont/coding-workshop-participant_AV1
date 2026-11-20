@@ -118,6 +118,12 @@ def assigned(db, inc: Incident, actor: User, engineer: User, previous_id: int | 
                message=f"{actor.full_name} reassigned {inc.reference} to {engineer.full_name}")
 
 
+def unassigned(db, inc: Incident, actor: User, engineer_id: int):
+    """An admin moved the incident back to Open, which takes it off the engineer."""
+    notify(db, {engineer_id}, actor=actor, kind="unassigned", incident=inc,
+           message=f"{actor.full_name} moved {inc.reference} back to Open and took it off your list")
+
+
 def escalated(db, inc: Incident, actor: User, requested: str | None):
     message = f"{actor.full_name} escalated {inc.reference}"
     if requested:

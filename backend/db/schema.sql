@@ -247,6 +247,10 @@ CREATE TABLE incidents (
     ),
     CONSTRAINT incidents_assignment_chk CHECK (
         status IN ('open', 'cancelled') OR assigned_engineer_id IS NOT NULL
+    ),
+    -- Open means waiting for an engineer: moving back to Open clears the engineer
+    CONSTRAINT incidents_open_unassigned_chk CHECK (
+        status <> 'open' OR assigned_engineer_id IS NULL
     )
 );
 CREATE INDEX incidents_status_idx      ON incidents (status);

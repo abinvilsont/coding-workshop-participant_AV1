@@ -228,7 +228,13 @@ def change_status(incident_id: int, body: StatusChange, db: DbSession, user: Cur
         )
 
     old_status = inc.status
+    previous_engineer_id = inc.assigned_engineer_id
     inc.status = body.status
+    if body.status == S.OPEN and previous_engineer_id:
+        # Open means "waiting for an engineer". Moving back to it takes the ticket off the
+        # engineer, so it shows as unassigned and is assigned again (with the capacity check)
+        # instead of sitting in their list with nothing they can do.
+        inc.assigned_engineer_id = inc.assigned_by_id = inc.assigned_at = None
     if body.status == S.RESOLVED:
         inc.resolved_at = _now()
     elif body.status == S.CLOSED:
@@ -240,6 +246,8 @@ def change_status(incident_id: int, body: StatusChange, db: DbSession, user: Cur
     if body.comment and body.comment.strip():
         db.add(IncidentNote(incident_id=inc.id, author_id=user.id, body=body.comment.strip()))
     notify.status_changed(db, inc, user, old_status.value, inc.status.value)
+    if previous_engineer_id and inc.assigned_engineer_id is None:
+        notify.unassigned(db, inc, user, previous_engineer_id)
     _commit(db)
     return _reload(db, incident_id, user)
 

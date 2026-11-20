@@ -177,7 +177,7 @@ a { color: var(--accent); }
     <span class="chip"><b>Database</b> PostgreSQL 18</span>
     <span class="chip"><b>Local</b> LocalStack + dev proxy</span>
   </div>
-  <span class="updated">Last updated 19 Nov 2026 · revision 30 · reflects local <code>main</code> @ <code>8a888a5</code> (as deployed to AWS)</span>
+  <span class="updated">Last updated 20 Nov 2026 · revision 32 · reflects the app as deployed to AWS on 20 Nov 2026 (local <code>main</code>)</span>
 </header>
 
 <!-- ============================================================ 1. Request path -->
@@ -977,7 +977,7 @@ a { color: var(--accent); }
       <ul>
         <li><code>schema.sql</code>: tables, enums, triggers, workload view</li>
         <li><code>seed.sql</code>: demo data for a fresh database (wipes first): 2 admins, 5 engineers, 10 employees, 5 buildings (3 to 6 floors each, 21 in all), 115 seats (4 to 8 per floor), 7 incidents; all passwords <code>Password123!</code></li>
-        <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building)</li>
+        <li><code>migrations/</code>: additive changes for existing databases, safe to repeat (001 notifications · 002 merge and followers · 003 reviews · 004 escalation requests · 005 app secrets · 006 usual building · 007 an Open incident has no engineer)</li>
         <li><code>bin/start-dev.sh</code>: Postgres, LocalStack, deploy, proxy</li>
         <li><code>infra/</code>: Terraform finds each folder under <code>backend/</code> and deploys it as a Lambda</li>
       </ul>
@@ -1027,6 +1027,16 @@ a { color: var(--accent); }
     <h2>Change log</h2>
   </div>
   <ol class="log">
+    <li>
+      <span class="log-when">20 Nov 2026 · rev 32</span>
+      <span class="log-what">Acting on a reassigned ticket: a clear message, not a blank page</span>
+      <span class="log-detail">Found while rehearsing: Priya had an incident open, an admin reassigned it to Tom, and Priya then clicked Put on hold. The API rightly refused with 404 (she can no longer see it), but on AWS CloudFront answers every 404 with <code>index.html</code> and status 200 (its fallback for page URLs also catches <code>/api/*</code>). The page took that HTML for the updated incident and crashed to a blank screen. Now <code>apiClient.js</code> treats an HTML reply to an API call as a 404, and a 404 from an action reloads the incident page, which says it may have been reassigned or deleted. Checked on the live site that the cached 404 page is not shared between people. +2 frontend tests (161), 27 E2E runs pass. Deployed to AWS; migration 007 also run there.</span>
+    </li>
+    <li>
+      <span class="log-when">20 Nov 2026 · rev 31</span>
+      <span class="log-what">Moving back to Open takes the engineer off</span>
+      <span class="log-detail">Found while rehearsing: an admin moved a cancelled incident back to Open, then In progress, then Open again, and the engineer stayed attached with no buttons (engineers have no moves from Open). The ticket also didn't count toward their workload (the <code>engineer_workload</code> view counts only Assigned, In progress and On hold) and didn't show as unassigned on the dashboard. Now <code>change_status</code> clears the engineer whenever an incident moves to Open, the engineer is notified ("… moved INC-… back to Open and took it off your list"), and History shows "Took Tom Tech off the incident". Migration 007 clears incidents already left that way and adds <code>incidents_open_unassigned_chk</code>, so the database refuses an Open incident with an engineer. Docs corrected: Cancelled and Closed are final for employees and engineers, but an admin can reopen one (it comes back unassigned). +4 backend tests (336), history wording checked in the frontend test (159), 27 E2E runs pass. Deployed to AWS.</span>
+    </li>
     <li>
       <span class="log-when">19 Nov 2026 · rev 30</span>
       <span class="log-what">Light/dark flicker with several tabs fixed</span>

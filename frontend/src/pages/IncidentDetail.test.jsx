@@ -12,6 +12,8 @@ const HISTORY = [
   { id: 1, event_type: 'created', from_value: null, to_value: 'open', comment: null, changed_by: 'Emma Employee', created_at: '2026-11-15T09:00:00Z' },
   { id: 2, event_type: 'assignment', from_value: null, to_value: 'Ethan Electrics', comment: null, changed_by: 'Alice Admin', created_at: '2026-11-15T10:00:00Z' },
   { id: 3, event_type: 'status_change', from_value: 'assigned', to_value: 'in_progress', comment: null, changed_by: 'Ethan Electrics', created_at: '2026-11-15T11:00:00Z' },
+  { id: 4, event_type: 'assignment', from_value: 'Ethan Electrics', to_value: 'Tom Tech', comment: null, changed_by: 'Alice Admin', created_at: '2026-11-15T12:00:00Z' },
+  { id: 5, event_type: 'assignment', from_value: 'Tom Tech', to_value: null, comment: null, changed_by: null, created_at: '2026-11-15T13:00:00Z' },
 ];
 
 function setup(inc, extraRoutes = {}) {
@@ -37,6 +39,8 @@ describe('IncidentDetail', () => {
     expect(screen.getByText('Refrigerant is low.')).toBeInTheDocument();
     expect(screen.getByText('Assigned to Ethan Electrics')).toBeInTheDocument();
     expect(screen.getByText('Changed status: Assigned → In progress')).toBeInTheDocument();
+    expect(screen.getByText('Reassigned: Ethan Electrics → Tom Tech')).toBeInTheDocument();
+    expect(screen.getByText('Took Tom Tech off the incident')).toBeInTheDocument(); // moved back to Open
     const readAll = api.calls.find((c) => c.path === '/notifications/read-all');
     expect(readAll.query.get('incident_id')).toBe('4');
   });
@@ -261,6 +265,26 @@ describe('IncidentDetail', () => {
     await waitFor(() => expect(screen.getByTestId('incident-badges')).toHaveTextContent('In progress'));
     expect(screen.queryByRole('button', { name: 'Cancel incident' })).not.toBeInTheDocument();
     expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
+  });
+
+  it('says the ticket is no longer theirs when it was reassigned while the page was open', async () => {
+    const user = userEvent.setup();
+    let reassigned = false;
+    setup(incident({ status: 'in_progress', permissions: { status_transitions: ['on_hold', 'resolved'] } }), {
+      'GET /incidents/4': () => (reassigned
+        ? { status: 404, body: { message: 'Incident not found.' } }
+        : incident({ status: 'in_progress', permissions: { status_transitions: ['on_hold', 'resolved'] } })),
+      'POST /incidents/4/status': () => {
+        reassigned = true; // an admin gave it to another engineer a moment ago
+        return { status: 404, body: { message: 'Incident not found.' } };
+      },
+    });
+    render(<IncidentDetail id={4} user={USERS.engineer} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Put on hold' }));
+    expect(await screen.findByText(/may have been reassigned to someone else/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Put on hold' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Incidents/ })).toBeInTheDocument();
   });
 
   it('deletes after confirmation and returns to the list', async () => {
