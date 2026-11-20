@@ -46,6 +46,16 @@ describe('apiRequest', () => {
     await expect(apiRequest('/dashboard')).rejects.toThrow('Something went wrong. Please try again.');
   });
 
+  it('treats the HTML page CloudFront sends in place of an API 404 as a 404', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html><html></html>', {
+      status: 200, headers: { 'Content-Type': 'text/html' },
+    })));
+    const err = await apiRequest('/incidents/4/status', { method: 'POST', body: { status: 'on_hold' } }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(404);
+    expect(err.message).toMatch(/^Not found/);
+  });
+
   it('reports network failures clearly', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
     const err = await apiRequest('/dashboard').catch((e) => e);

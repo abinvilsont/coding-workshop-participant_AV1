@@ -267,6 +267,26 @@ describe('IncidentDetail', () => {
     expect(api.calls.filter((c) => c.method === 'GET' && c.path === '/incidents/4')).toHaveLength(2);
   });
 
+  it('says the ticket is no longer theirs when it was reassigned while the page was open', async () => {
+    const user = userEvent.setup();
+    let reassigned = false;
+    setup(incident({ status: 'in_progress', permissions: { status_transitions: ['on_hold', 'resolved'] } }), {
+      'GET /incidents/4': () => (reassigned
+        ? { status: 404, body: { message: 'Incident not found.' } }
+        : incident({ status: 'in_progress', permissions: { status_transitions: ['on_hold', 'resolved'] } })),
+      'POST /incidents/4/status': () => {
+        reassigned = true; // an admin gave it to another engineer a moment ago
+        return { status: 404, body: { message: 'Incident not found.' } };
+      },
+    });
+    render(<IncidentDetail id={4} user={USERS.engineer} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Put on hold' }));
+    expect(await screen.findByText(/may have been reassigned to someone else/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Put on hold' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Incidents/ })).toBeInTheDocument();
+  });
+
   it('deletes after confirmation and returns to the list', async () => {
     const user = userEvent.setup();
     setup(incident({ permissions: { can_delete: true } }), { 'DELETE /incidents/4': { status: 204, body: null } });

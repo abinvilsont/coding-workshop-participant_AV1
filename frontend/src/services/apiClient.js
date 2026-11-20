@@ -110,6 +110,12 @@ export async function apiRequest(path, { method = 'GET', body, params } = {}) {
   }
 
   if (res.status === 204) return null;
+  // On AWS, CloudFront answers every 404 with the app's own index.html and status 200
+  // (its fallback for page URLs, which also catches the API). The API only ever sends
+  // JSON, so an HTML page here is a 404 in disguise: report it as one.
+  if (res.ok && (res.headers.get('content-type') ?? '').includes('text/html')) {
+    throw new ApiError(404, "Not found. It may have been removed, or it's no longer available to you.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized();

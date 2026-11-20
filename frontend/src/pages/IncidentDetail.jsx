@@ -589,6 +589,9 @@ const BackLink = () => (
 
 /* ------------------------------------------------------------------ */
 
+const NOT_AVAILABLE = 'Incident not found. It may have been reassigned to someone else or deleted, '
+  + 'so it is no longer on your list.';
+
 export default function IncidentDetail({ id, user }) {
   const isPhone = useIsPhone();
   const [incident, setIncident] = useState(null);
@@ -610,7 +613,9 @@ export default function IncidentDetail({ id, user }) {
         // Viewing an incident counts as reading its notifications
         markAllRead(id).catch(() => {});
       })
-      .catch((err) => setError(err.message)),
+      // 404 = it doesn't exist, or this person can't see it any more (e.g. an engineer
+      // whose ticket was reassigned while the page was open)
+      .catch((err) => setError(err.status === 404 ? NOT_AVAILABLE : err.message)),
     [id],
   );
 
@@ -631,8 +636,9 @@ export default function IncidentDetail({ id, user }) {
     } catch (err) {
       setActionError({ box, message: err.message, fields: err.fields ?? {} });
       // Refused because the incident changed meanwhile (someone else acted first):
-      // show its current state so the buttons match it again
-      if (err.status === 403 || err.status === 409) load();
+      // show its current state so the buttons match it again. A 404 means it was taken
+      // away from this person (reassigned, or deleted): reloading then says so.
+      if (err.status === 403 || err.status === 404 || err.status === 409) load();
       return false;
     } finally {
       setBusy(false);
