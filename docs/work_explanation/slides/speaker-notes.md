@@ -42,7 +42,7 @@ Pick one or two of these to demo live. The already-reported prompt and the merge
 
 Requests go through CloudFront: static files come from S3, API calls go to a single FastAPI Lambda. Every request checks the token (401) and the role rules (403), then saves the change and its notifications in one transaction. We considered splitting into microservices and decided against it.
 
-## 11. 518 automated tests, from single functions to a real browser
+## 11. 522 automated tests, from single functions to a real browser
 
 All suites pass. The integration tests build a fresh database from schema.sql and reload the seed data before every test, so they never touch real data. The load test found pool exhaustion early, which we fixed.
 

@@ -74,6 +74,38 @@ def test_admin_can_override_status(client, as_):
     assert status(client, as_("alice"), BADGE, "open").json()["status"] == "open"
 
 
+def test_moving_back_to_open_takes_the_engineer_off(client, as_):
+    """Open means waiting for an engineer. Before, the engineer stayed attached with no
+    actions, and the ticket counted neither as unassigned nor toward their workload."""
+    tom = as_("tom")
+    before = len(unread(client, tom))
+    d = status(client, as_("alice"), DOCK, "open").json()  # DOCK is assigned to Tom
+    assert d["status"] == "open" and d["assigned_engineer"] is None
+    assert d["history"][-1]["event_type"] == "assignment"
+    assert (d["history"][-1]["from_value"], d["history"][-1]["to_value"]) == ("Tom Tech", None)
+
+    news = unread(client, tom)
+    assert len(news) == before + 1
+    assert news[0]["message"] == "Alice Admin moved INC-000006 back to Open and took it off your list"
+    assert client.get(f"/incidents/{DOCK}", headers=tom).status_code == 404  # off his list
+    assert client.get("/dashboard", headers=as_("alice")).json()["attention"]["unassigned"] == 2
+
+    # ...and it's assigned again the normal way
+    assert assign(client, as_("alice"), DOCK, "tom").json()["status"] == "assigned"
+
+
+def test_reopening_a_cancelled_incident_leaves_it_unassigned(client, as_):
+    assert status(client, as_("sofia"), DOCK, "cancelled").status_code == 200
+    d = status(client, as_("alice"), DOCK, "open").json()
+    assert (d["status"], d["assigned_engineer"]) == ("open", None)
+
+
+def test_database_refuses_an_open_incident_with_an_engineer(seed_conn):
+    import psycopg
+    with pytest.raises(psycopg.errors.CheckViolation, match="incidents_open_unassigned_chk"):
+        seed_conn.execute("UPDATE incidents SET status = 'open' WHERE id = %s", (DOCK,))
+
+
 def test_unknown_status_is_validation_error(client, as_):
     assert status(client, as_("alice"), AC, "done").status_code == 400
 

@@ -44,6 +44,7 @@ function historyText(h) {
     case 'status_change':
       return `Changed status: ${from(h.from_value)} → ${from(h.to_value)}`;
     case 'assignment':
+      if (!h.to_value) return `Took ${h.from_value} off the incident`; // moved back to Open
       return h.from_value ? `Reassigned: ${h.from_value} → ${h.to_value}` : `Assigned to ${h.to_value}`;
     case 'priority_change':
       return `Changed priority: ${titleCase(h.from_value)} → ${titleCase(h.to_value)}`;

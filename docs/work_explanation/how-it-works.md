@@ -120,7 +120,7 @@ An incident goes **Open → Assigned → In progress → Resolved → Closed**, 
 
 ![Incident lifecycle: the engineer resolves, only the reporter closes](images/incident-lifecycle.png)
 
-Reopen an incident and it goes back to the engineer as In progress. Cancelled and Closed are final: once it's there, that's it.
+Reopen an incident and it goes back to the engineer as In progress. For employees and engineers, Cancelled and Closed are final: once it's there, that's it. Only an admin can bring one back, and it comes back as Open with no engineer, ready to be assigned again.
 
 | Step | Who | API call | What happens behind the scenes | Who is notified |
 | --- | --- | --- | --- | --- |
@@ -136,7 +136,7 @@ Reopen an incident and it goes back to the engineer as In progress. Cancelled an
 | Edit details | Employee while Open; admin any time before closing | `PATCH /incidents/{id}` | Re-checks the location and saves only the fields that changed. | Reporter and engineer, listing the changed fields |
 | Delete | Admin | `DELETE /incidents/{id}` | Removes the incident with its notes and history. | Reporter and engineer (the alert has no link) |
 
-Admins can make any status move, with one exception: an incident with no engineer can only stay Open or be Cancelled. The database enforces that too. Anything else gets a **403**: "You can't change this incident from X to Y."
+Admins can make any status move, with two rules. An incident with no engineer can only stay Open or be Cancelled. And moving an incident back to Open, including reopening a cancelled or closed one, takes the engineer off it: Open always means "waiting for an engineer", so it shows as unassigned on the dashboard and gets assigned again with the usual capacity check. The engineer is told ("Alice Admin moved INC-000006 back to Open and took it off your list"), and History shows "Took Tom Tech off the incident". The database enforces both rules. Anything else gets a **403**: "You can't change this incident from X to Y."
 
 ## Two people acting at once
 
@@ -376,6 +376,7 @@ Most of these choices come down to two things. The workshop deploys to Lambda, w
 | Only admins set Critical; employees escalate | Otherwise everyone would choose Critical. Escalation lets an admin triage and approve. |
 | Assignment blocks engineers on leave, offline or at full capacity | Tickets don't sit with someone who isn't working or is already overloaded. The limit is checked on the server against the \`engineer\_workload\` view, and full engineers are greyed out in the picker. |
 | Internal notes | Engineers and admins can discuss costs or vendors without confusing the employee. |
+| Moving back to Open takes the engineer off | Before, an admin moving a ticket back to Open left the engineer attached: it sat in their list with no buttons, didn't count toward their workload, and didn't show as unassigned either, so it could slip through the cracks. Now Open always means waiting for an engineer, and a database rule (migration 007) makes sure of it. |
 | Deactivate instead of delete for locations and engineers | Old incidents keep a valid location and engineer. An engineer with open tickets must hand them over first, so no ticket is orphaned. |
 | History written by a database trigger | No code path can forget to log a change. The API tells the trigger who is acting, so every entry names a person. |
 | Readable `INC-000012` references | People can quote them over the phone or in email. The database generates them, so there are never duplicates. |

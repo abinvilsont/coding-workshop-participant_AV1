@@ -28,7 +28,7 @@ python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 
 | Suite | Tests | Result | Coverage |
 |---|---|---|---|
-| Backend (pytest) | 332 | all pass, ~25 s | **99 %** of `app/` (1684 statements, 14 missed) |
+| Backend (pytest) | 336 | all pass, ~26 s | **99 %** of `app/` (1691 statements, 14 missed) |
 | Frontend (Vitest 4) | 159 | all pass, ~20 s | **96 %** lines, 88 % branches, 93 % functions (Vitest 4 measures more precisely than 3, so the figures dropped without any test being lost) |
 | End-to-end (Playwright) | 27 | all pass, ~3.5 min | every critical user path (below) |
 | Load (Artillery) | 1 scenario | see below | — |
@@ -81,7 +81,7 @@ CI installs from `package.json` (the lockfile isn't committed) with Node 24 and 
 |---|---|
 | `test_auth.py` | register (incl. ignoring a forged `role`), duplicates, login, generic login errors, disabled accounts, missing/invalid/expired tokens, deactivated users; token refresh keeps the session start, stops after 24 h, needs a valid token and active account, picks up a changed role, accepts older tokens |
 | `test_incidents.py` | CRUD per role, visibility, filters, search, pagination, location validation, inactive buildings, edit rules, priority rules, delete with cascade |
-| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer / at full capacity, last slot, freed slot), escalation rules, notes and internal-note visibility |
+| `test_workflow.py` | full lifecycle, every forbidden transition, assignment (busy / on-leave / non-engineer / at full capacity, last slot, freed slot), escalation rules, notes and internal-note visibility; moving back to Open (or reopening a cancelled incident) takes the engineer off, tells them, and the database refuses an Open incident with an engineer |
 | `test_admin.py` | buildings / floors / seats CRUD, duplicates (409), delete-while-in-use (409), engineer create/update/deactivate, availability, admin-only endpoints |
 | `test_notifications.py` | who is notified for each event, never the actor, internal notes never reach employees, read / read-all, ownership |
 | `test_dashboard.py` | each role's dashboard numbers against the seed |

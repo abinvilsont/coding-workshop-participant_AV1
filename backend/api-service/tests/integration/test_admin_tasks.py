@@ -87,7 +87,7 @@ def test_migrate_is_safe_to_repeat_and_restores_a_missing_key(empty_db):
     assert first["ok"] and first["jwt_secret_created"] is True
     assert first["migrations"] == [
         "001_notifications.sql", "002_incident_merge.sql", "003_engineer_reviews.sql",
-        "004_escalation_requests.sql", "005_app_secrets.sql", "006_user_home_building.sql",
+        "004_escalation_requests.sql", "005_app_secrets.sql", "006_user_home_building.sql", "007_open_means_unassigned.sql",
     ]
     second = admin_tasks.migrate(empty_db)
     assert second["ok"] and second["jwt_secret_created"] is False and second["users"] == 1
